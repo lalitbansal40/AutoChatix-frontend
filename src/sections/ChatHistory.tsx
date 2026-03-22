@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/alt-text */
 /* eslint-disable jsx-a11y/iframe-has-title */
 import { useCallback, useEffect, useRef } from 'react';
 
@@ -9,9 +10,12 @@ import {
   Stack,
   Theme,
   Typography,
-  Button,
+  // IconButton, Slider
+  // Button,
   // Link
 } from '@mui/material';
+// import { PlayArrow, Pause } from "@mui/icons-material";
+
 
 // project imports
 import UserAvatar from './UserAvatar';
@@ -19,7 +23,7 @@ import UserAvatar from './UserAvatar';
 // types
 import { UserProfile } from 'types/user-profile';
 import { History } from 'types/chat';
-import { ThemeMode } from 'types/config';
+// import { ThemeMode } from 'types/config';
 
 interface ChatHistoryProps {
   data: History[];
@@ -138,247 +142,554 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
     if (!history) return null;
 
     const type = history?.type;
-    const payload = history?.payload;
+    const payload = history?.payload || {};
+    const media = history?.media || {};
 
-    if (!type) return null;
+    // 🔥 TEXT (priority order)
+    const text =
+      history?.text ||
+      payload?.caption ||
+      payload?.text?.body ||
+      payload?.bodyText ||
+      payload?.caption ||
+      payload?.text;
 
-    // TEXT
-    if (type === 'text') {
-      return <Typography>{payload?.text?.body}</Typography>;
+    // 🔥 UNIVERSAL URL (old + new)
+    const url =
+      payload?.url ||
+      media?.url ||
+      payload?.image?.url ||
+      payload?.video?.url ||
+      payload?.audio?.url ||
+      payload?.document?.url;
+
+    if (type === "audio") {
+      return (
+        <audio
+          src={url}
+          controls
+          style={{
+            width: "100%",
+            minWidth: 220,
+            maxWidth: 420,
+            height: 40
+          }}
+        />
+      );
     }
 
-    if (type === 'location_request') {
-      return (
-        <Stack spacing={1}>
-          <Typography
-            variant="body2"
-            sx={{
-              whiteSpace: 'pre-line',
-              lineHeight: 1.6
-            }}
-          >
-            {payload?.text}
-          </Typography>
+    // 🔥 FORCE MEDIA RENDER (OUTGOING FIX)
+    if (payload?.url) {
+      if (type === "image") {
+        return <img
+          src={payload?.url}
+          style={{ maxWidth: 250, borderRadius: 8 }}
+          onError={(e: any) => {
+            e.target.src = "/image-error.png"; // fallback
+          }}
+        />;
+      }
 
-          <Button
-            variant="outlined"
-            size="small"
-            sx={{ width: 'fit-content' }}
-          >
-            Share Location
-          </Button>
+      if (type === "video") {
+        return <video src={payload.url} controls style={{ maxWidth: 250 }} />;
+      }
+
+      if (type === "document") {
+        return (
+          <Stack onClick={() => window.open(payload.url)}>
+            <Typography>📄 {payload.filename || "Document"}</Typography>
+          </Stack>
+        );
+      }
+    }
+    // ================= TEXT =================
+    if (type === "text") {
+      return <Typography>{text}</Typography>;
+    }
+
+    if (type === "interactive" && payload?.interactive?.nfm_reply) {
+      return (
+        <RenderFlowResponse
+          response={payload?.interactive?.nfm_reply?.response_json}
+        />
+      );
+    }
+
+    // ================= IMAGE =================
+    if (type === "image") {
+      return (
+        <Stack spacing={0.5}>
+          {url && (
+            <img
+              src={url}
+              style={{ maxWidth: 250, borderRadius: 8 }}
+              onError={(e: any) => {
+                e.target.src = "/image-error.png"; // fallback
+              }}
+            />
+          )}
+
+          {/* 🔥 caption support */}
+          {text && <Typography variant="body2">{text}</Typography>}
         </Stack>
       );
     }
 
-    // BUTTON
-    if (type === 'button') {
+    // ================= VIDEO =================
+    if (type === "video") {
+      return (
+        <Stack spacing={0.5}>
+          {url && (
+            <video src={url} controls style={{ maxWidth: 250 }} />
+          )}
+
+          {text && <Typography variant="body2">{text}</Typography>}
+        </Stack>
+      );
+    }
+
+
+    // ================= DOCUMENT =================
+    if (type === "document") {
+      const filename =
+        payload?.filename || // 🔥 ADD THIS
+        media?.filename ||
+        payload?.document?.filename ||
+        "Document";
+
+      return (
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          sx={{ cursor: "pointer" }}
+          onClick={() => url && window.open(url, "_blank")}
+        >
+          <Typography fontSize={28}>📄</Typography>
+
+          <Stack>
+            <Typography fontWeight={500}>
+              {filename}
+            </Typography>
+
+            <Typography variant="caption" color="text.secondary">
+              Tap to open
+            </Typography>
+          </Stack>
+        </Stack>
+      );
+    }
+
+    // ================= LOCATION =================
+    if (type === "location") {
+      const lat = payload?.location?.latitude;
+      const lng = payload?.location?.longitude;
+
+      if (!lat || !lng) {
+        return <Typography>📍 Location</Typography>;
+      }
+
+      return (
+        <iframe
+          width="100%"
+          height="180"
+          style={{ borderRadius: 8 }}
+          src={`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`}
+        />
+      );
+    }
+
+    // ================= CONTACT =================
+    if (type === "contacts") {
+      const contact = payload?.contacts?.[0];
+
+      const name =
+        contact?.name?.formatted_name ||
+        contact?.name?.first_name ||
+        "Contact";
+
+      const phone = contact?.phones?.[0]?.phone;
+      const waId = contact?.phones?.[0]?.wa_id;
+
+      return (
+        <Stack spacing={0.5}>
+          <Typography fontWeight={600}>{name}</Typography>
+
+          {phone && (
+            <Typography
+              sx={{ color: "#25D366", cursor: "pointer" }}
+              onClick={() => window.open(`https://wa.me/${waId}`, "_blank")}
+            >
+              {phone}
+            </Typography>
+          )}
+        </Stack>
+      );
+    }
+
+    // ================= BUTTON =================
+    if (type === "button") {
       return (
         <Stack spacing={1}>
-          <Typography variant="body2"
-            sx={{
-              whiteSpace: 'pre-line',
-              lineHeight: 1.6
-            }}>{payload?.bodyText}</Typography>
+          <Typography>{payload?.bodyText}</Typography>
 
           {payload?.buttons?.map((btn: any) => (
-            <Button key={btn.id} variant="outlined"
-              size="small"
-              sx={{ width: 'fit-content' }}>
-              {btn.title}
-            </Button>
+            <Stack
+              key={btn.id}
+              sx={{
+                border: "1px solid #ddd",
+                borderRadius: 2,
+                px: 2,
+                py: 1,
+                cursor: "pointer",
+                width: "fit-content",
+                "&:hover": {
+                  background: "#f5f5f5"
+                }
+              }}
+            >
+              <Typography variant="body2">
+                {btn.title}
+              </Typography>
+            </Stack>
           ))}
         </Stack>
       );
     }
 
-    // INTERACTIVE
+    // ================= INTERACTIVE =================
     if (type === "interactive") {
-      const buttonTitle = payload?.interactive?.button_reply?.title;
-
-      if (buttonTitle) {
-        return (
-          <Button
-            variant="outlined"
-            size="small"
+      return (
+        <Stack>
+          <Typography
             sx={{
-              width: "fit-content",
-              pointerEvents: "none"
+              bgcolor: "#DCF8C6",
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 2,
+              width: "fit-content"
             }}
           >
-            {buttonTitle}
-          </Button>
-        );
-      }
+            {payload?.interactive?.button_reply?.title ||
+              payload?.interactive?.list_reply?.title}
+          </Typography>
+        </Stack>
+      );
+    }
 
-      const flowResponse = payload?.interactive?.nfm_reply?.response_json;
-
-      if (flowResponse) {
-        return <RenderFlowResponse response={flowResponse} />;
-      }
+    if (type === "flow") {
+      const options = payload?.options || {};
 
       return (
-        <Typography
-          variant="body2"
+        <Stack
+          spacing={1}
           sx={{
-            whiteSpace: "pre-line",
-            lineHeight: 1.6
+            border: "1px solid #ddd",
+            borderRadius: 2,
+            p: 1.5,
+            maxWidth: 260
           }}
         >
-          {payload?.interactive?.nfm_reply?.body}
-        </Typography>
-      );
-    }
+          <Typography fontWeight={600}>
+            {options.header}
+          </Typography>
 
-    // LOCATION
-    if (type === "location") {
-      const lat = payload?.location?.latitude;
-      const lng = payload?.location?.longitude;
+          <Typography variant="body2">
+            {options.body}
+          </Typography>
 
-      if (!lat || !lng) return null;
-
-      return (
-        <Stack spacing={1} sx={{ width: "100%" }}>
-          <iframe
-            width="100%"
-            height="180"
-            style={{ border: 0, borderRadius: 8 }}
-            loading="lazy"
-            src={`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`}
-          />
+          <Stack
+            sx={{
+              borderTop: "1px solid #eee",
+              pt: 1,
+              mt: 1,
+              color: "#25D366",
+              fontWeight: 500,
+              cursor: "pointer"
+            }}
+          >
+            {options.cta}
+          </Stack>
         </Stack>
       );
     }
 
-    // FLOW
-    if (type === 'flow') {
+    if (type === "cta_url") {
       return (
-        <Stack>
-          <Typography variant="body2"
-            sx={{
-              whiteSpace: 'pre-line',
-              lineHeight: 1.6
-            }}>{payload?.options?.body}</Typography>
-          <Button variant="outlined"
-            size="small"
-            sx={{ width: 'fit-content' }}>{payload?.options?.cta}</Button>
-        </Stack>
-      );
-    }
+        <Stack spacing={1}>
+          <Typography>{payload?.bodyText}</Typography>
 
-    // CTA URL
-    if (type === 'cta_url') {
-      return (
-        <Stack>
-          <Typography variant="body2"
+          <Stack
+            onClick={() => window.open(payload?.url)}
             sx={{
-              whiteSpace: 'pre-line',
-              lineHeight: 1.6
-            }}>{payload?.bodyText}</Typography>
-
-          <Button
-            variant="outlined"
-            size="small"
-            sx={{ width: 'fit-content' }}
-            href={payload?.url}
-            target="_blank"
+              border: "1px solid #25D366",
+              color: "#25D366",
+              borderRadius: 2,
+              px: 2,
+              py: 1,
+              cursor: "pointer",
+              width: "fit-content",
+              fontWeight: 500
+            }}
           >
             {payload?.buttonText}
-          </Button>
+          </Stack>
         </Stack>
       );
     }
 
-    return <Typography variant="body2"
-      sx={{
-        whiteSpace: 'pre-line',
-        lineHeight: 1.6
-      }}>Unsupported message</Typography>;
+    // ================= OLD FALLBACK (IMPORTANT) =================
+    return (
+      <Typography>
+        {payload?.bodyText ||
+          payload?.text?.body ||
+          payload?.text ||
+          text ||
+          "Message"}
+      </Typography>
+    );
   };
+
+  const groupedMessages: any[] = [];
+
+  data.forEach((msg: any) => {
+    if (msg.group_id) {
+      const existing = groupedMessages.find(
+        (g) => g.group_id === msg.group_id
+      );
+
+      if (existing) {
+        existing.items.push(msg);
+      } else {
+        groupedMessages.push({
+          group_id: msg.group_id,
+          items: [msg],
+          direction: msg.direction
+        });
+      }
+    } else {
+      groupedMessages.push(msg);
+    }
+  });
 
   if (!data) return null;
 
   return (
     <Grid container spacing={2.5} ref={wrapper}>
-      {data.map((history: any, index: number) => (
-        <Grid item xs={12} key={index}>
-          {history.direction !== 'IN' ? (
-            <Stack spacing={1.25} direction="row">
-              <Grid container spacing={1} justifyContent="flex-end">
-                <Grid item xs={2} md={3} xl={4} />
+      {groupedMessages.map((group: any, index: number) => {
 
-                <Grid item xs={10} md={9} xl={8}>
-                  <Stack direction="row" justifyContent="flex-end" alignItems="flex-start">
-                    <Card
-                      sx={{
-                        display: 'inline-block',
-                        float: 'right',
-                        bgcolor: theme.palette.mode === ThemeMode.DARK
-                          ? 'background.default'
-                          : 'grey.100',
-                        boxShadow: 'none',
-                        ml: 1
-                      }}
-                    >
+        // 🔥 GROUP CASE (MULTIPLE MEDIA)
+        if (group.items) {
+          const first = group.items[0];
+
+          return (
+            <Grid item xs={12} key={index}>
+              {group.direction !== 'IN' ? (
+                <Stack spacing={1.25} direction="row">
+                  <Grid container spacing={1} justifyContent="flex-end">
+                    <Grid item xs={2} md={3} xl={4} />
+
+                    <Grid item xs={10} md={9} xl={8}>
+                      <Stack direction="row" justifyContent="flex-end">
+                        <Card
+                          sx={{
+                            maxWidth: 520,
+                            bgcolor: 'grey.100',
+                            boxShadow: 'none',
+                            ml: 1
+                          }}
+                        >
+                          <CardContent sx={{ p: 1 }}>
+
+                            {/* 🔥 MEDIA GRID */}
+                            <Stack direction="row" spacing={1} flexWrap="wrap">
+                              {group.items.map((item: any, i: number) => {
+                                const url = item.payload?.url;
+
+                                if (item.type === "image") {
+                                  return (
+                                    <img
+                                      key={i}
+                                      src={url}
+                                      onError={(e: any) => {
+                                        e.target.src = "/image-error.png"; // fallback
+                                      }}
+                                      style={{
+                                        width: 140,
+                                        height: 140,
+                                        borderRadius: 8,
+                                        objectFit: "cover"
+                                      }}
+                                    />
+                                  );
+                                }
+
+                                if (item.type === "video") {
+                                  return (
+                                    <video
+                                      key={i}
+                                      src={url}
+                                      controls
+                                      style={{
+                                        width: 140,
+                                        height: 140,
+                                        borderRadius: 8
+                                      }}
+                                    />
+                                  );
+                                }
+
+                                return null;
+                              })}
+                            </Stack>
+
+                            {/* 🔥 CAPTION */}
+                            {first.payload?.caption && (
+                              <Typography sx={{ mt: 1 }}>
+                                {first.payload.caption}
+                              </Typography>
+                            )}
+
+                          </CardContent>
+                        </Card>
+                      </Stack>
+                    </Grid>
+
+                    <Grid item xs={12} display="flex" justifyContent="flex-end">
+                      <Typography variant="caption">
+                        {new Date(first.createdAt).toLocaleTimeString()}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+
+                  <UserAvatar user={{ online_status: 'available', avatar: 'avatar-1.png', name: 'User 1' }} />
+                </Stack>
+              ) : (
+                <Stack direction="row" spacing={1.25}>
+                  <UserAvatar user={user} />
+
+                  <Grid container spacing={1}>
+                    <Grid item xs={10} md={9} xl={8}>
+                      <Card sx={{ maxWidth: 520, boxShadow: 'none', ml: 1 }}>
+                        <CardContent sx={{ p: 1 }}>
+
+                          {/* 🔥 MEDIA GRID */}
+                          <Stack direction="row" spacing={1} flexWrap="wrap">
+                            {group.items.map((item: any, i: number) => {
+                              const url = item.payload?.url;
+
+                              if (item.type === "image") {
+                                return (
+                                  <img
+                                    key={i}
+                                    src={url}
+                                    style={{
+                                      width: 140,
+                                      height: 140,
+                                      borderRadius: 8,
+                                      objectFit: "cover"
+                                    }}
+                                  />
+                                );
+                              }
+
+                              if (item.type === "video") {
+                                return (
+                                  <video
+                                    key={i}
+                                    src={url}
+                                    controls
+                                    style={{
+                                      width: 140,
+                                      height: 140,
+                                      borderRadius: 8
+                                    }}
+                                  />
+                                );
+                              }
+
+                              return null;
+                            })}
+                          </Stack>
+
+                          {/* 🔥 CAPTION */}
+                          {first.payload?.caption && (
+                            <Typography sx={{ mt: 1 }}>
+                              {first.payload.caption}
+                            </Typography>
+                          )}
+
+                        </CardContent>
+                      </Card>
+                    </Grid>
+
+                    <Grid item xs={12}>
+                      <Typography variant="caption">
+                        {new Date(first.createdAt).toLocaleTimeString()}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                </Stack>
+              )}
+            </Grid>
+          );
+        }
+
+        // 🔥 NORMAL MESSAGE (OLD FLOW)
+        const history = group;
+
+        return (
+          <Grid item xs={12} key={index}>
+            {history.direction !== 'IN' ? (
+              <Stack spacing={1.25} direction="row">
+                <Grid container spacing={1} justifyContent="flex-end">
+                  <Grid item xs={2} md={3} xl={4} />
+
+                  <Grid item xs={10} md={9} xl={8}>
+                    <Stack direction="row" justifyContent="flex-end">
+                      <Card sx={{ maxWidth: 520, boxShadow: 'none', ml: 1 }}>
+                        <CardContent sx={{ p: 1 }}>
+                          <ReplyPreview message={history.reply_message} />
+                          <RenderMessage history={history} />
+                        </CardContent>
+                      </Card>
+                    </Stack>
+                  </Grid>
+
+                  <Grid item xs={12} display="flex" justifyContent="flex-end">
+                    <Typography variant="caption">
+                      {new Date(history.createdAt).toLocaleTimeString()}
+                    </Typography>
+                  </Grid>
+                </Grid>
+
+                <UserAvatar user={{ online_status: 'available', avatar: 'avatar-1.png', name: 'User 1' }} />
+              </Stack>
+            ) : (
+              <Stack direction="row" spacing={1.25}>
+                <UserAvatar user={user} />
+
+                <Grid container spacing={1}>
+                  <Grid item xs={10} md={9} xl={8}>
+                    <Card sx={{ maxWidth: 300, boxShadow: 'none', ml: 1 }}>
                       <CardContent sx={{ p: 1 }}>
                         <ReplyPreview message={history.reply_message} />
-
                         <RenderMessage history={history} />
-
                       </CardContent>
                     </Card>
-                  </Stack>
-                </Grid>
+                  </Grid>
 
-                <Grid item xs={12} display="flex" justifyContent="flex-end">
-                  <Typography variant="caption">
-                    {new Date(history.createdAt).toLocaleTimeString()}
-                  </Typography>
+                  <Grid item xs={12}>
+                    <Typography variant="caption">
+                      {new Date(history.createdAt).toLocaleTimeString()}
+                    </Typography>
+                  </Grid>
                 </Grid>
-              </Grid>
-
-              <UserAvatar
-                user={{ online_status: 'available', avatar: 'avatar-1.png', name: 'User 1' }}
-              />
-            </Stack>
-          ) : (
-            <Stack direction="row" spacing={1.25}>
-              <UserAvatar
-                user={{ online_status: user.online_status, avatar: user.avatar, name: user.name }}
-              />
-
-              <Grid container spacing={1}>
-                <Grid item xs={10} md={9} xl={8}>
-                  <Card
-                    sx={{
-                      display: 'inline-block',
-                      bgcolor:
-                        theme.palette.mode === ThemeMode.DARK
-                          ? 'background.default'
-                          : 'grey.100',
-                      boxShadow: 'none',
-                      ml: 1,
-                      maxWidth: 420,
-                      width: "fit-content"
-                    }}
-                  >
-                    <CardContent sx={{ p: 1 }}>
-                      <ReplyPreview message={history.reply_message} />
-                      <RenderMessage history={history} />
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12} sx={{ mt: 1 }}>
-                  <Typography variant="caption">
-                    {new Date(history.createdAt).toLocaleTimeString()}
-                  </Typography>
-                </Grid>
-              </Grid>
-            </Stack>
-          )}
-        </Grid>
-      ))}
+              </Stack>
+            )}
+          </Grid>
+        );
+      })}
     </Grid>
   );
 };

@@ -2,7 +2,7 @@
 import { FormattedMessage } from 'react-intl';
 
 // assets
-import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined } from '@ant-design/icons';
+import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined } from '@ant-design/icons';
 
 // type
 import { NavItemType } from 'types/menu';
@@ -12,7 +12,7 @@ const icons = {
   ChromeOutlined,
   QuestionOutlined,
   DeploymentUnitOutlined,
-  MessageOutlined
+  MessageOutlined, RobotOutlined
 };
 
 // ==============================|| MENU ITEMS - SUPPORT ||============================== //
@@ -28,6 +28,13 @@ const other: NavItemType = {
       type: 'item',
       url: '/chats',
       icon: icons.MessageOutlined
+    },
+    {
+      id: 'Channels',
+      title: <FormattedMessage id="Channels" />,
+      type: 'item',
+      url: '/channels',
+      icon: icons.RobotOutlined
     }
   ]
 };

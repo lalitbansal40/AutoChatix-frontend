@@ -38,7 +38,6 @@ import { PopupTransition } from 'components/@extended/Transitions';
 
 import { dispatch, useSelector } from 'store';
 // import { openDrawer } from 'store/reducers/menu';
-import { openSnackbar } from 'store/reducers/snackbar';
 import { getUserChats } from 'store/reducers/chat';
 
 // assets
@@ -48,11 +47,11 @@ import {
   DownloadOutlined,
   EditOutlined,
   // MoreOutlined,
-  // PaperClipOutlined,
+  PaperClipOutlined,
   // PictureOutlined,
   // SendOutlined,
   SmileOutlined,
-  // SoundOutlined
+  SoundOutlined
 } from '@ant-design/icons';
 
 // types
@@ -61,7 +60,7 @@ import { UserProfile } from 'types/user-profile';
 import { ThemeMode } from 'types/config';
 import { messageService } from 'service/message.service';
 import { CreateContactModal } from 'components/chat/CreateContactModel';
-
+import heic2any from "heic2any";
 const drawerWidth = 320;
 
 const Main = styled('main', { shouldForwardProp: (prop: string) => prop !== 'open' })(
@@ -99,6 +98,15 @@ const Chat = () => {
   const [searchParams] = useSearchParams();
   const contactIdFromUrl = searchParams.get('contactId');
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const fileInputRef = useRef<any>();
+  const mediaRecorderRef = useRef<any>();
+  const chunksRef = useRef<any[]>([]);
+  const [recording, setRecording] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [recordModalOpen, setRecordModalOpen] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
 
   const handleEditOpen = () => setEditModalOpen(true);
   const handleEditClose = () => setEditModalOpen(false);
@@ -134,58 +142,6 @@ const Chat = () => {
   const [message, setMessage] = useState('');
   const textInput = useRef(null);
 
-  const handleOnSend = async () => {
-    if (!message.trim()) {
-      dispatch(
-        openSnackbar({
-          open: true,
-          message: 'Message required',
-          variant: 'alert',
-          alert: { color: 'error' },
-          close: false
-        })
-      );
-      return;
-    }
-
-    if (!user?._id || !user?.channel_id) return;
-
-    const tempMessage = {
-      _id: `temp-${Date.now()}`,
-      direction: "OUT",
-      type: "text",
-      payload: { text: message },
-      createdAt: new Date().toISOString()
-    };
-
-    // optimistic UI
-    setData((prev) => [...prev, tempMessage as any]);
-
-    const text = message;
-    setMessage("");
-
-    try {
-      await messageService.sendMessage({
-        channelId: user.channel_id,
-        contactId: user._id,
-        text
-      });
-
-    } catch (err) {
-      console.error(err);
-
-      dispatch(
-        openSnackbar({
-          open: true,
-          message: 'Failed to send message',
-          variant: 'alert',
-          alert: { color: 'error' },
-          close: false
-        })
-      );
-    }
-  };
-
   const loadOlderMessages = async () => {
     if (!cursor || loadingMore || !user?._id) return;
 
@@ -214,6 +170,180 @@ const Chat = () => {
 
   const handleCloseEmoji = () => {
     setAnchorElEmoji(null);
+  };
+
+  const handleFileUpload = async (e: any) => {
+    const files = Array.from(e.target.files || []) as File[];
+
+    const processedFiles: File[] = [];
+
+    for (const file of files) {
+      // 🔥 HEIC HANDLE
+      if (
+        file.type === "image/heic" ||
+        file.type === "image/heif" ||
+        file.name.toLowerCase().endsWith(".heic")
+      ) {
+        try {
+          console.log("🖼️ Converting HEIC → JPG (frontend)");
+
+          const convertedBlob: any = await heic2any({
+            blob: file,
+            toType: "image/jpeg",
+            quality: 0.9,
+          });
+
+          const convertedFile = new File(
+            [convertedBlob],
+            `${Date.now()}.jpg`,
+            { type: "image/jpeg" }
+          );
+
+          processedFiles.push(convertedFile);
+        } catch (err) {
+          console.error("HEIC convert failed", err);
+        }
+      } else {
+        processedFiles.push(file);
+      }
+    }
+
+    setSelectedFiles((prev) => {
+      const newFiles = processedFiles.filter(
+        (f) => !prev.some((p) => p.name === f.name && p.size === f.size)
+      );
+
+      return [...prev, ...newFiles];
+    });
+
+    e.target.value = "";
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSendAll = async () => {
+    if (!user?._id || !user?.channel_id) return;
+
+    // ✅ TEXT ONLY CASE
+    if (selectedFiles.length === 0 && message.trim()) {
+      await messageService.sendMessage({
+        channelId: user.channel_id,
+        contactId: user._id,
+        text: message
+      });
+
+      setMessage("");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+
+      // 🔥 append files
+      selectedFiles.forEach((file) => {
+        formData.append("files", file);
+      });
+
+      formData.append("contactId", user._id);
+      formData.append("channelId", user.channel_id);
+
+      if (message.trim()) {
+        formData.append("caption", message);
+      }
+
+      // 🔥 optimistic UI (optional but recommended)
+      const tempMessage = {
+        _id: `temp-${Date.now()}`,
+        direction: "OUT",
+        type: "media_group",
+        payload: {
+          files: selectedFiles.map((file) => ({
+            url: URL.createObjectURL(file),
+            type: file.type
+          })),
+          caption: message
+        },
+        createdAt: new Date().toISOString()
+      };
+
+      setData(prev => [...prev, tempMessage as any]);
+
+      // 🔥 API call
+      await messageService.sendMedia(formData);
+
+      // reset
+      setSelectedFiles([]);
+      setMessage("");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const pauseRecording = () => {
+    mediaRecorderRef.current.pause();
+    setIsPaused(true);
+  };
+
+  const resumeRecording = () => {
+    mediaRecorderRef.current.resume();
+    setIsPaused(false);
+  };
+
+  const startRecording = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    const recorder = new MediaRecorder(stream);
+    mediaRecorderRef.current = recorder;
+
+    chunksRef.current = [];
+
+    recorder.ondataavailable = (e) => {
+      chunksRef.current.push(e.data);
+    };
+
+    recorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: "audio/ogg" });
+      setAudioBlob(blob);
+    };
+
+    recorder.start();
+    setRecording(true);
+  };
+
+  const stopRecording = () => {
+    return new Promise<Blob>((resolve) => {
+      mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "audio/ogg" });
+        setAudioBlob(blob);
+        resolve(blob); // 🔥 important
+      };
+
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+    });
+  };
+
+  const sendRecordedAudio = async () => {
+    if (!user?._id || !user?.channel_id) return;
+
+    let blob = audioBlob;
+
+    // 🔥 ensure blob exists
+    if (!blob) {
+      blob = await stopRecording();
+    }
+
+    const formData = new FormData();
+    formData.append("files", blob, "audio.ogg");
+    formData.append("contactId", user._id);
+    formData.append("channelId", user.channel_id);
+
+    await messageService.sendMedia(formData);
+
+    setAudioBlob(null);
+    setRecordModalOpen(false);
   };
 
   // close sidebar when widow size below 'md' breakpoint
@@ -288,6 +418,14 @@ const Chat = () => {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [data]);
+
+  useEffect(() => {
+    return () => {
+      selectedFiles.forEach((file) => {
+        URL.revokeObjectURL(file as any);
+      });
+    };
+  }, [selectedFiles]);
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -451,18 +589,120 @@ const Chat = () => {
                   </SimpleBar>
                 </Grid>
                 <Grid item xs={12} sx={{ mt: 3, bgcolor: theme.palette.background.paper, borderTop: `1px solid ${theme.palette.divider}` }}>
+                  {selectedFiles.length > 0 && (
+                    <Box sx={{ display: "flex", gap: 1, mb: 1, flexWrap: "wrap" }}>
+                      {selectedFiles.map((file, index) => {
+                        const url = URL.createObjectURL(file);
+
+                        if (file.type.startsWith("image")) {
+                          return (
+                            <Box key={index} sx={{ position: "relative" }}>
+                              <img
+                                alt='unkown'
+                                src={url}
+                                style={{ width: 80, height: 80, borderRadius: 8 }}
+                              />
+                              <span
+                                onClick={() => removeFile(index)}
+                                style={{
+                                  position: "absolute",
+                                  top: 0,
+                                  right: 0,
+                                  cursor: "pointer",
+                                  background: "black",
+                                  color: "white",
+                                  borderRadius: "50%",
+                                  padding: "2px 6px",
+                                  fontSize: 12
+                                }}
+                              >
+                                ×
+                              </span>
+                            </Box>
+                          );
+                        }
+
+                        if (file.type.startsWith("video")) {
+                          return (
+                            <Box key={index} sx={{ position: "relative" }}>
+                              <video
+                                src={url}
+                                controls
+                                style={{ width: 80, height: 80, borderRadius: 8 }}
+                              />
+                              <span
+                                onClick={() => removeFile(index)}
+                                style={{
+                                  position: "absolute",
+                                  top: 0,
+                                  right: 0,
+                                  cursor: "pointer",
+                                  background: "black",
+                                  color: "white",
+                                  borderRadius: "50%",
+                                  padding: "2px 6px",
+                                  fontSize: 12
+                                }}
+                              >
+                                ×
+                              </span>
+                            </Box>
+                          );
+                        }
+
+                        return (
+                          <Box key={index} sx={{ position: "relative", p: 1, border: "1px solid #ccc" }}>
+                            📄 {file.name}
+                            <span
+                              onClick={() => removeFile(index)}
+                              style={{
+                                position: "absolute",
+                                top: 0,
+                                right: 0,
+                                cursor: "pointer",
+                                background: "black",
+                                color: "white",
+                                borderRadius: "50%",
+                                padding: "2px 6px",
+                                fontSize: 12
+                              }}
+                            >
+                              ×
+                            </span>
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  )}
+                  {/* 🔴 RECORDING INDICATOR */}
+                  {recording && (
+                    <Box sx={{ display: "flex", alignItems: "center", px: 2, py: 1 }}>
+                      <Box
+                        sx={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          bgcolor: "red",
+                          mr: 1,
+                          animation: "pulse 1s infinite"
+                        }}
+                      />
+                      <Typography color="error">Recording...</Typography>
+                    </Box>
+                  )}
                   <TextField
                     inputRef={textInput}
                     fullWidth
                     multiline
-                    rows={4}
+                    rows={1}
+                    maxRows={4}
                     placeholder="Your Message..."
                     value={message}
                     onChange={(e) => setMessage(e.target.value.length <= 1 ? e.target.value.trim() : e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        handleOnSend();
+                        handleSendAll();
                       }
                     }}
                     variant="standard"
@@ -508,17 +748,28 @@ const Chat = () => {
                           </ClickAwayListener>
                         </Popper>
                       </>
+                      <IconButton
+                        sx={{ opacity: 0.5 }}
+                        size="medium"
+                        color="secondary"
+                        onClick={() => fileInputRef.current.click()}
+                      >
+                        <PaperClipOutlined />
+                      </IconButton>
                       {/* <IconButton sx={{ opacity: 0.5 }} size="medium" color="secondary">
-                          <PaperClipOutlined />
-                        </IconButton>
-                        <IconButton sx={{ opacity: 0.5 }} size="medium" color="secondary">
-                          <PictureOutlined />
-                        </IconButton>
-                        <IconButton sx={{ opacity: 0.5 }} size="medium" color="secondary">
-                          <SoundOutlined />
-                        </IconButton>
-                      </Stack>
-                      <IconButton color="primary" onClick={handleOnSend} size="large" sx={{ mr: 1.5 }}>
+                        <PictureOutlined />
+                      </IconButton> */}
+                      <IconButton
+                        sx={{ opacity: 0.5 }}
+                        size="medium"
+                        color="secondary"
+                        onClick={() => {
+                          setRecordModalOpen(true);
+                        }}
+                      >
+                        <SoundOutlined />
+                      </IconButton>
+                      {/* <IconButton color="primary" onClick={handleOnSend} size="large" sx={{ mr: 1.5 }}>
                         <SendOutlined />
                       </IconButton> */}
                     </Stack>
@@ -547,6 +798,83 @@ const Chat = () => {
           contactId={user._id} // 🔥 THIS IS EDIT MODE
         />
       )}
+
+      <input
+        type="file"
+        multiple
+        ref={fileInputRef}
+        style={{ display: "none" }}
+        onChange={handleFileUpload}
+      />
+
+      <Dialog
+        open={recordModalOpen}
+        onClose={() => {
+          if (recording) stopRecording();
+
+          setRecordModalOpen(false);
+          setHasStarted(false);
+          setAudioBlob(null);
+        }}
+      >
+        {audioBlob && !hasStarted && (
+          <audio controls style={{ width: "100%", marginBottom: 10 }}>
+            <source src={URL.createObjectURL(audioBlob)} />
+          </audio>
+        )}
+        <Box sx={{ p: 3, width: 300 }}>
+          {/* 🔥 FAKE WAVEFORM */}
+          <Box sx={{ display: "flex", gap: 0.5, mb: 2 }}>
+            {Array.from({ length: 30 }).map((_, i) => (
+              <Box
+                key={i}
+                sx={{
+                  width: 3,
+                  height: Math.random() * 30 + 10,
+                  background: "#4caf50",
+                  borderRadius: 2,
+                  animation: "pulse 1s infinite"
+                }}
+              />
+            ))}
+          </Box>
+
+          {/* CONTROLS */}
+          <Stack direction="row" spacing={2} justifyContent="center">
+
+            {!hasStarted ? (
+              <button
+                onClick={() => {
+                  startRecording();
+                  setHasStarted(true);
+                }}
+              >
+                🎤 Start
+              </button>
+            ) : (
+              <>
+                {!isPaused ? (
+                  <button onClick={pauseRecording}>⏸</button>
+                ) : (
+                  <button onClick={resumeRecording}>▶</button>
+                )}
+
+                <button
+                  onClick={async () => {
+                    await stopRecording();
+                    setHasStarted(false);
+                  }}
+                >
+                  ⏹ Stop
+                </button>
+              </>
+            )}
+
+            <button onClick={sendRecordedAudio}>📤 Send</button>
+
+          </Stack>
+        </Box>
+      </Dialog>
     </Box>
   );
 };

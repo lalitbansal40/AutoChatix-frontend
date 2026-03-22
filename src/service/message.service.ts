@@ -16,6 +16,11 @@ class MessageService {
     const res = await axiosServices.post("/message/send-text", data);
     return res.data;
   }
+
+  async sendMedia(formData: FormData) {
+    const res = await axiosServices.post("/message/send-media", formData);
+    return res.data;
+  }
 }
 
 export const messageService = new MessageService();

@@ -31,15 +31,81 @@ interface UserListProps {
   selectedUserId?: string;
 }
 
-function UserList({ setUser, data, isLoading, refetch,selectedUserId }: UserListProps) {
+function UserList({ setUser, data, isLoading, refetch, selectedUserId }: UserListProps) {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  const getLastMessagePreview = (msg: any) => {
+    if (!msg) return "";
+
+    const type = msg.type;
+    const isOutgoing = msg.direction === "OUT";
+
+    const text =
+      msg.text ||
+      msg.payload?.text?.body ||
+      msg.payload?.bodyText ||
+      msg.payload?.caption;
+
+    let preview = "";
+
+    switch (type) {
+      case "text":
+        preview = text;
+        break;
+
+      case "image":
+        preview = text || "📷 Photo";
+        break;
+
+      case "video":
+        preview = text || "🎥 Video";
+        break;
+
+      case "audio":
+        preview = "🎵 Voice message";
+        break;
+
+      case "document":
+        preview = text || `📄 ${msg.media?.filename || "Document"}`;
+        break;
+
+      case "contacts":
+        preview = `👤 ${text || "Contact"}`;
+        break;
+
+      case "location":
+        preview = "📍 Location";
+        break;
+
+      case "button":
+        preview = msg.payload?.bodyText;
+        break;
+
+      case "interactive":
+        preview =
+          msg.payload?.interactive?.button_reply?.title ||
+          msg.payload?.interactive?.list_reply?.title;
+        break;
+
+      default:
+        preview = text || "Message";
+    }
+
+    // 👉 WhatsApp style "You:"
+    if (isOutgoing) {
+      return `You: ${preview}`;
+    }
+
+    return preview;
+  };
 
   useEffect(() => {
     dispatch(getUsers());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
 
   if (isLoading) {
@@ -110,14 +176,8 @@ function UserList({ setUser, data, isLoading, refetch,selectedUserId }: UserList
                         whiteSpace: 'nowrap'
                       }}
                     >
-                      {
-                        user?.last_message_id?.payload?.bodyText ||
-                        user?.last_message_id?.payload?.text?.body ||
-                        user?.last_message_id?.payload?.interactive?.button_reply?.title ||
-                        user?.last_message_id?.payload?.interactive?.nfm_reply?.body ||
-                        user?.last_message_id?.payload?.text ||
-                        'No messages yet'
-                      }
+                      {getLastMessagePreview(user?.last_message_id)}
+
                     </Typography>
                     {user.unread_count > 0 ? (
                       <Box
