@@ -9,22 +9,16 @@ import {
   Grid,
   Stack,
   Theme,
-  Typography,
-  // IconButton, Slider
-  // Button,
-  // Link
+  Typography
 } from '@mui/material';
-// import { PlayArrow, Pause } from "@mui/icons-material";
 
-
-// project imports
 import UserAvatar from './UserAvatar';
 
-// types
 import { UserProfile } from 'types/user-profile';
 import { History } from 'types/chat';
 import { Box } from '@mui/system';
-// import { ThemeMode } from 'types/config';
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { Tooltip } from "@mui/material";
 
 interface ChatHistoryProps {
   data: History[];
@@ -58,6 +52,48 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
       payload?.text ||
       "Message"
     );
+  };
+
+  const getStatusUI = (history: any) => {
+    const status = history.status;
+
+    if (status === "SENT") return "✓";
+    if (status === "DELIVERED") return "✓✓";
+
+    if (status === "READ") {
+      return (
+        <Typography sx={{ fontSize: 11, color: "#4fc3f7" }}>
+          ✓✓
+        </Typography>
+      );
+    }
+
+    if (status === "FAILED") {
+      const errorText =
+        history.error?.message || "Message failed";
+
+      return (
+        <Tooltip
+          title={
+            <Typography sx={{ fontSize: 12 }}>
+              ⚠️ {errorText}
+            </Typography>
+          }
+          arrow
+          placement="top"
+        >
+          <InfoOutlinedIcon
+            sx={{
+              fontSize: 16,
+              color: "#d32f2f",
+              cursor: "pointer"
+            }}
+          />
+        </Tooltip>
+      );
+    }
+
+    return null;
   };
 
   const ReplyPreview = ({ message }: any) => {
@@ -261,11 +297,21 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
       // 🔥 IMPORTANT: use DB components (not request)
       const dbComponents = history?.payload?.templateData?.components || [];
 
+      const bodyComponent = dbComponents.find(
+        (c: any) => c.type === "BODY"
+      );
+
+      const bodyText =
+        bodyComponent?.text ||                // ✅ NEW (correct template text)
+        history.text ||                      // ✅ OLD fallback
+        payload?.text?.body ||               // ✅ extra fallback
+        "Template message";
+
       const header = requestTemplate?.components?.find(
         (c: any) => c.type === "header"
       );
 
-      const bodyText = history.text;
+
 
       const buttonsComponent = dbComponents.find(
         (c: any) => c.type === "BUTTONS"
@@ -830,9 +876,13 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
                   </Grid>
 
                   <Grid item xs={12} display="flex" justifyContent="flex-end">
-                    <Typography variant="caption">
-                      {new Date(history.createdAt).toLocaleTimeString()}
-                    </Typography>
+                    <Stack alignItems="flex-end">
+                      <Typography variant="caption">
+                        {new Date(history.createdAt).toLocaleTimeString()}
+                      </Typography>
+
+                      {getStatusUI(history)}
+                    </Stack>
                   </Grid>
                 </Grid>
 

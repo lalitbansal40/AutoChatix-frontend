@@ -39,7 +39,6 @@ const SendTemplateModal = ({ open, onClose, user, channelId }: Props) => {
             templateService.sendTemplate(channelId, payload),
 
         onSuccess: () => {
-            alert("Template sent successfully ✅");
             onClose();
         },
 

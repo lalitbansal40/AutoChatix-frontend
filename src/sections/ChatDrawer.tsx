@@ -103,7 +103,7 @@ function ChatDrawer({ handleDrawerOpen, openChatDrawer, setUser, selectedUserId 
     if (selected) {
       setUser(selected);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUserId, contactData]);
 
   return (
@@ -187,6 +187,41 @@ function ChatDrawer({ handleDrawerOpen, openChatDrawer, setUser, selectedUserId 
                   </InputAdornment>
                 }
               />
+
+              <Button variant="outlined" component="label" fullWidth>
+                Import Contacts
+                <input
+                  type="file"
+                  hidden
+                  accept=".csv,.xlsx"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file || !channelId) return;
+
+                    await contactService.importContacts(channelId, file);
+                    contactRefetch();
+                  }}
+                />
+              </Button>
+
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={async () => {
+                  if (!channelId) return;
+
+                  const res = await contactService.exportContacts(channelId);
+
+                  const url = window.URL.createObjectURL(new Blob([res.data]));
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.setAttribute("download", "contacts.csv");
+                  document.body.appendChild(link);
+                  link.click();
+                }}
+              >
+                Export Contacts
+              </Button>
 
             </Stack>
           </Stack>

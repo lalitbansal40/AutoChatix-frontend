@@ -47,6 +47,23 @@ class ContactService {
   async markAsRead(contactId: string) {
     return axiosServices.patch(`/message/read/${contactId}`);
   }
+
+  async importContacts(channelId: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file); // 🔥 name MUST be "file"
+
+    return axiosServices.post(`contact/import/${channelId}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  }
+
+  async exportContacts(channelId: string) {
+    return axiosServices.get(`contact/export/${channelId}`, {
+      responseType: "blob",
+    });
+  }
 }
 
 export const contactService = new ContactService();
