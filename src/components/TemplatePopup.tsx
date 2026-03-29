@@ -18,6 +18,8 @@ import { useQuery } from "@tanstack/react-query";
 import { CircularProgress } from "@mui/material";
 import { whatsapp_language } from "config";
 import axiosServices from "utils/axios";
+import { useSnackbar } from "notistack";
+
 
 interface Props {
     open: boolean;
@@ -28,6 +30,8 @@ interface Props {
 
 
 const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
+    const [loading, setLoading] = useState(false);
+    const { enqueueSnackbar } = useSnackbar();
     const { id: channelId } = useParams();
     const [buttons, setButtons] = useState<any[]>([]);
     const [bodyExamples, setBodyExamples] = useState<string[]>([]);
@@ -75,31 +79,32 @@ const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
     };
 
     const handleSubmit = async () => {
+        if (loading) return;
         try {
             const components: any[] = [];
 
-            // ✅ HEADER VALIDATION
+            // HEADER VALIDATION
             if (
                 form.headerType !== "NONE" &&
                 form.headerType !== "TEXT" &&
                 !form.media
             ) {
-                alert("Please upload media for header");
+                enqueueSnackbar("Please upload media for header", { variant: "error" });
                 return;
             }
 
-            // ✅ EXTRA CHECK (VERY IMPORTANT 🔥)
+            // EXTRA CHECK (VERY IMPORTANT)
             if (
                 form.headerType !== "NONE" &&
                 form.headerType !== "TEXT" &&
                 form.media &&
                 !form.media.includes(".")
             ) {
-                alert("Invalid media URL (missing file extension like .jpg/.png)");
+                enqueueSnackbar("Invalid media URL (missing file extension like .jpg/.png)", { variant: "error" });
                 return;
             }
 
-            // ✅ BUTTONS
+            // BUTTONS
             if (buttons.length > 0) {
                 components.push({
                     type: "BUTTONS",
@@ -119,7 +124,7 @@ const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
                 });
             }
 
-            // ✅ HEADER FIX (STRICT META FORMAT 🔥)
+            // HEADER FIX (STRICT META FORMAT 🔥)
             if (form.headerType !== "NONE") {
                 const headerComponent: any = {
                     type: "HEADER",
@@ -128,7 +133,7 @@ const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
 
                 if (form.headerType === "TEXT") {
                     if (!form.headerText) {
-                        alert("Header text is required");
+                        enqueueSnackbar("Header text is required", { variant: "error" });
                         return;
                     }
                     headerComponent.text = form.headerText;
@@ -148,14 +153,14 @@ const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
                 const hasEmpty = bodyExamples.some((v) => !v);
 
                 if (hasEmpty) {
-                    alert("Please fill all example values");
+                    enqueueSnackbar("Please fill all example values", { variant: "error" });
                     return;
                 }
             }
 
-            // ✅ BODY
+            // BODY
             if (!form.body) {
-                alert("Body is required");
+                enqueueSnackbar("Body is required", { variant: "error" });
                 return;
             }
 
@@ -173,7 +178,7 @@ const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
 
             components.push(bodyComponent);
 
-            // ✅ NAME FORMAT FIX (Meta requirement)
+            // NAME FORMAT FIX (Meta requirement)
             const formattedName = form.name
                 .toLowerCase()
                 .replace(/[^a-z0-9_]/g, "_");
@@ -186,21 +191,27 @@ const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
             };
 
             console.log("FINAL PAYLOAD:", payload);
+            setLoading(true);
 
-            // ✅ WAIT FOR API RESPONSE
             await onSubmit(payload);
 
-            // ✅ SUCCESS → CLOSE
-            onClose();
+
+            enqueueSnackbar(
+                initialData ? "Template updated successfully" : "Template created successfully",
+                { variant: "success" }
+            );
+            onClose(); // sirf ek baar
 
         } catch (err: any) {
             console.error("Submit error:", err);
-
-            alert(
+            enqueueSnackbar(
                 err?.response?.data?.error_user_msg ||
                 err?.message ||
-                "Something went wrong"
+                "Something went wrong",
+                { variant: "error" }
             );
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -224,7 +235,7 @@ const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
 
             const url = res.data.url;
 
-            // ✅ S3 URL set karo
+            // S3 URL set karo
             handleChange("media", url);
 
         } catch (err) {
@@ -238,18 +249,18 @@ const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
             const headerComp = templateData.components?.find((c: any) => c.type === "HEADER");
             const buttonsComp = templateData.components?.find((c: any) => c.type === "BUTTONS");
 
-            // ✅ BODY EXAMPLES
+            // BODY EXAMPLES
             if (bodyComp?.example?.body_text?.[0]) {
                 setBodyExamples(bodyComp.example.body_text[0]);
             }
 
-            // ✅ HEADER MEDIA
+            // HEADER MEDIA
             let mediaUrl = "";
             if (headerComp?.example?.header_handle?.[0]) {
                 mediaUrl = headerComp.example.header_handle[0];
             }
 
-            // ✅ BUTTONS
+            // BUTTONS
             if (buttonsComp?.buttons) {
                 const formattedButtons = buttonsComp.buttons.map((btn: any) => ({
                     id: Date.now() + Math.random(),
@@ -262,7 +273,7 @@ const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
                 setButtons(formattedButtons);
             }
 
-            // ✅ FORM SET
+            // FORM SET
             setForm({
                 name: templateData.name,
                 language: templateData.language,
@@ -759,8 +770,15 @@ const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
 
             <DialogActions>
                 <Button onClick={onClose}>Cancel</Button>
-                <Button variant="contained" onClick={handleSubmit}>
-                    {initialData ? "Update" : "Create"}
+                <Button variant="contained" onClick={handleSubmit} disabled={loading}>
+                    {loading ? (
+                        <>
+                            <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
+                            {initialData ? "Updating..." : "Creating..."}
+                        </>
+                    ) : (
+                        initialData ? "Update" : "Create"
+                    )}
                 </Button>
             </DialogActions>
         </Dialog>

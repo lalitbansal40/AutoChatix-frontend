@@ -172,7 +172,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
       );
     }
 
-    // ✅ DEFAULT (OLD FLOW)
+    //   DEFAULT (OLD FLOW)
     return (
       <Stack
         sx={{
@@ -301,11 +301,40 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
         (c: any) => c.type === "BODY"
       );
 
-      const bodyText =
-        bodyComponent?.text ||                // ✅ NEW (correct template text)
-        history.text ||                      // ✅ OLD fallback
-        payload?.text?.body ||               // ✅ extra fallback
-        "Template message";
+      const getRenderedBody = () => {
+        //   DB TEMPLATE
+        if (bodyComponent?.text) {
+          let text = bodyComponent.text;
+
+          // 🔥 TRY FROM REQUEST FIRST
+          let bodyParams =
+            payload?.request?.template?.components?.find(
+              (c: any) => c.type === "body"
+            )?.parameters || [];
+
+          // 🔥 FALLBACK (IMPORTANT 🔥)
+          if (!bodyParams.length && history.text) {
+            return history.text; // already rendered from backend
+          }
+
+          // 🔥 REPLACE VARIABLES
+          text = text.replace(/{{(\d+)}}/g, (_: any, i: any) => {
+            return bodyParams[i - 1]?.text || `{{${i}}}`;
+          });
+
+          return text;
+        }
+
+        //   OLD SAFE FALLBACK
+        return (
+          history.text ||
+          payload?.text?.body ||
+          payload?.bodyText ||
+          "Template message"
+        );
+      };
+
+      const bodyText = getRenderedBody();
 
       const header = requestTemplate?.components?.find(
         (c: any) => c.type === "header"

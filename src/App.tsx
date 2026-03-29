@@ -4,7 +4,6 @@ import ThemeCustomization from 'themes';
 import Locales from 'components/Locales';
 // import RTLLayout from 'components/RTLLayout';
 import ScrollTop from 'components/ScrollTop';
-import Snackbar from 'components/@extended/Snackbar';
 import Notistack from 'components/third-party/Notistack';
 import 'react-phone-input-2/lib/style.css';
 // auth-provider
@@ -21,7 +20,6 @@ const App = () => (
           <>
             <Notistack>
               <Routes />
-              <Snackbar />
             </Notistack>
           </>
         </AuthProvider>

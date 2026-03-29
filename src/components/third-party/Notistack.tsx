@@ -1,4 +1,4 @@
-//material-ui
+// material-ui
 import { styled } from '@mui/material/styles';
 
 // third-party
@@ -8,24 +8,29 @@ import { SnackbarProvider } from 'notistack';
 import { useSelector } from 'store';
 
 // assets
-import { CheckCircleOutlined, CloseCircleOutlined, InfoCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  InfoCircleOutlined,
+  WarningOutlined
+} from '@ant-design/icons';
 
-// custom styles
+//   FIX: style wrapper correctly target content
 const StyledSnackbarProvider = styled(SnackbarProvider)(({ theme }) => ({
-  '&.notistack-MuiContent-default': {
-    backgroundColor: theme.palette.primary.main
-  },
-  '&.notistack-MuiContent-error': {
-    backgroundColor: theme.palette.error.main
-  },
-  '&.notistack-MuiContent-success': {
+  '& .notistack-MuiContent-success': {
     backgroundColor: theme.palette.success.main
   },
-  '&.notistack-MuiContent-info': {
+  '& .notistack-MuiContent-error': {
+    backgroundColor: theme.palette.error.main
+  },
+  '& .notistack-MuiContent-info': {
     backgroundColor: theme.palette.info.main
   },
-  '&.notistack-MuiContent-warning': {
+  '& .notistack-MuiContent-warning': {
     backgroundColor: theme.palette.warning.main
+  },
+  '& .notistack-MuiContent-default': {
+    backgroundColor: theme.palette.primary.main
   }
 }));
 
@@ -37,10 +42,15 @@ const Notistack = ({ children }: any) => {
 
   return (
     <StyledSnackbarProvider
-      maxSnack={snackbar.maxStack}
-      dense={snackbar.dense}
+      maxSnack={snackbar?.maxStack || 3}
+      dense={snackbar?.dense || false}
+      anchorOrigin={{
+        vertical: 'bottom',
+        horizontal: 'right'
+      }}
+      autoHideDuration={3000}
       iconVariant={
-        snackbar.iconVariant === 'useemojis'
+        snackbar?.iconVariant === 'useemojis'
           ? {
               success: <CheckCircleOutlined style={iconSX} />,
               error: <CloseCircleOutlined style={iconSX} />,
@@ -49,7 +59,7 @@ const Notistack = ({ children }: any) => {
             }
           : undefined
       }
-      hideIconVariant={snackbar.iconVariant === 'hide' ? true : false}
+      hideIconVariant={snackbar?.iconVariant === 'hide'}
     >
       {children}
     </StyledSnackbarProvider>

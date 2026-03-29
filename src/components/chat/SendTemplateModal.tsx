@@ -11,10 +11,11 @@ import {
     Stack,
     Box,
 } from "@mui/material";
-import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { templateService } from "service/template.service";
 import { useMutation } from "@tanstack/react-query";
+import { useSnackbar } from "notistack";
+import { useQuery } from "@tanstack/react-query";
 interface Props {
     open: boolean;
     onClose: () => void;
@@ -23,16 +24,26 @@ interface Props {
 }
 
 const SendTemplateModal = ({ open, onClose, user, channelId }: Props) => {
+    const { enqueueSnackbar } = useSnackbar();
     const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
     const [bodyValues, setBodyValues] = useState<string[]>([]);
 
-    // ✅ FETCH TEMPLATES
-    const { data: templatesData, isLoading } = useQuery({
-        queryKey: ["templates", channelId],
-        queryFn: () => templateService.getTemplates(channelId),
+    //   FETCH TEMPLATES
+    const { data, isLoading } = useQuery({
+        queryKey: ["templates", channelId, "APPROVED"],
+        queryFn: async () => {
+            const res = await templateService.getTemplates(channelId, {
+                status: "APPROVED",
+                limit: 100, // 🔥 IMPORTANT
+            });
+
+            return res.data;
+        },
         enabled: !!channelId && open,
-        select: (res) => res.data || [],
     });
+
+    const templatesList = data || [];
+
 
     const { mutate: sendTemplate, isPending: sending } = useMutation({
         mutationFn: (payload: any) =>
@@ -43,28 +54,30 @@ const SendTemplateModal = ({ open, onClose, user, channelId }: Props) => {
         },
 
         onError: (err: any) => {
-            alert(err?.response?.data?.message || "Failed to send ❌");
+            enqueueSnackbar(err?.response?.data?.message || "Failed to send ❌", {
+                variant: "error",
+            });
         },
     });
 
-    // ✅ EXTRACT BODY COMPONENT
+    //   EXTRACT BODY COMPONENT
     const bodyComponent = useMemo(() => {
         return selectedTemplate?.components?.find((c: any) => c.type === "BODY");
     }, [selectedTemplate]);
 
-    // ✅ EXTRACT VARIABLES
+    //   EXTRACT VARIABLES
     const variables = useMemo(() => {
         return bodyComponent?.text?.match(/{{\d+}}/g) || [];
     }, [bodyComponent]);
 
-    // ✅ HANDLE INPUT CHANGE
+    //   HANDLE INPUT CHANGE
     const handleBodyChange = (index: number, value: string) => {
         const updated = [...bodyValues];
         updated[index] = value;
         setBodyValues(updated);
     };
 
-    // ✅ RENDER BODY WITH VALUES
+    //   RENDER BODY WITH VALUES
     const renderedText = useMemo(() => {
         if (!bodyComponent?.text) return "";
 
@@ -73,7 +86,7 @@ const SendTemplateModal = ({ open, onClose, user, channelId }: Props) => {
         });
     }, [bodyComponent, bodyValues]);
 
-    // ✅ HEADER
+    //   HEADER
     const headerComponent = selectedTemplate?.components?.find(
         (c: any) => c.type === "HEADER"
     );
@@ -86,6 +99,10 @@ const SendTemplateModal = ({ open, onClose, user, channelId }: Props) => {
         (c: any) => c.type === "BUTTONS"
     );
 
+
+
+
+
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
             <DialogTitle>Send Template</DialogTitle>
@@ -96,9 +113,10 @@ const SendTemplateModal = ({ open, onClose, user, channelId }: Props) => {
                     <Stack spacing={2} flex={1}>
                         {/* TEMPLATE SELECT */}
                         <Autocomplete
-                            options={templatesData || []}
+                            options={templatesList}
+                            isOptionEqualToValue={(option, value) => option.name === value.name}
                             loading={isLoading}
-                            getOptionLabel={(option) => option.name || ""}
+                            getOptionLabel={(option) => option?.name || ""}
                             value={selectedTemplate}
                             onChange={(_, value) => {
                                 setSelectedTemplate(value);

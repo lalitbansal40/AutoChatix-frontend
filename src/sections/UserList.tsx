@@ -125,7 +125,6 @@ function UserList({ setUser, data, isLoading, refetch, selectedUserId }: UserLis
   return (
     <List component="nav">
       {data?.filter(Boolean)?.map((user: any) => {
-        console.log("USER DATA:", user);
         return (
           <Fragment key={user._id}>
             <ListItemButton

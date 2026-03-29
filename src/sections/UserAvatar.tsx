@@ -6,7 +6,7 @@ import AvatarStatus from './AvatarStatus';
 import { UserProfile } from 'types/user-profile';
 import Avatar from 'components/@extended/Avatar';
 
-// ✅ Webpack version (CRA compatible)
+//   Webpack version (CRA compatible)
 const avatarImage = require.context(
   'assets/images/users',
   false,

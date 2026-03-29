@@ -9,13 +9,27 @@ export interface CreateTemplatePayload {
 }
 
 class TemplateService {
-  // ✅ Get all templates
-  async getTemplates(channelId: string) {
-    const response = await axiosServices.get(`/templates/${channelId}`);
+  //   Get all templates
+  async getTemplates(
+    channelId: string,
+    params?: {
+      category?: string;
+      status?: string;
+      search?: string;
+      limit?: number;
+      after?: string;
+      before?: string;
+      page?: number; // 🔥 ADD THIS
+    },
+  ) {
+    const response = await axiosServices.get(`/templates/${channelId}`, {
+      params,
+    });
+
     return response.data;
   }
 
-  // ✅ Get single template
+  //   Get single template
   async getTemplateById(channelId: string, templateId: string) {
     const response = await axiosServices.get(
       `/templates/${channelId}/${templateId}`,
@@ -23,7 +37,7 @@ class TemplateService {
     return response.data;
   }
 
-  // ✅ Create template (dynamic)
+  //   Create template (dynamic)
   async createTemplate(channelId: string, payload: CreateTemplatePayload) {
     const response = await axiosServices.post(
       `/templates/${channelId}`,
@@ -32,7 +46,7 @@ class TemplateService {
     return response.data;
   }
 
-  // ✅ Update template (recreate)
+  //   Update template (recreate)
   async updateTemplate(
     channelId: string,
     templateId: string,
@@ -45,10 +59,10 @@ class TemplateService {
     return response.data;
   }
 
-  // ✅ Delete template
-  async deleteTemplate(channelId: string, templateId: string) {
+  //   Delete template
+  async deleteTemplate(channelId: string, templateName: string) {
     const response = await axiosServices.delete(
-      `/templates/${channelId}/${templateId}`,
+      `/templates/${channelId}/${templateName}`,
     );
     return response.data;
   }
@@ -65,6 +79,26 @@ class TemplateService {
       `/templates/send-template/${channelId}`,
       payload,
     );
+    return response.data;
+  }
+
+  async sendBulkTemplate(channelId: string, data: FormData) {
+    console.log("SENDING BULK TEMPLATE WITH DATA", data); // 🔥 debug
+    const response = await axiosServices.post(
+      `/templates/send-bulk/${channelId}`,
+      data,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+
+    return response.data;
+  }
+
+  async syncTemplates(channelId: string) {
+    const response = await axiosServices.post(`/templates/sync/${channelId}`);
     return response.data;
   }
 }

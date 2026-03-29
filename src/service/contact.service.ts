@@ -1,10 +1,17 @@
 import axiosServices from "utils/axios";
 
 class ContactService {
-  async getContacts(channelId: string, search?: string) {
+  async getContacts(
+    channelId: string,
+    search?: string,
+    cursor?: string,
+    limit: number = 20,
+  ) {
     const response = await axiosServices.get(`contact/${channelId}`, {
       params: {
         search: search || undefined,
+        cursor: cursor || undefined, // 🔥 ADD THIS
+        limit, // 🔥 ADD THIS
       },
     });
 
@@ -25,7 +32,7 @@ class ContactService {
     const response = await axiosServices.post(`contact/${channelId}`, {
       name,
       phone,
-      attributes, // ✅ now supported
+      attributes, //   now supported
     });
 
     return response.data;

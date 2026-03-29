@@ -20,7 +20,7 @@ import { channelService } from 'service/channel.service';
 import UserList from './UserList';
 import MainCard from 'components/MainCard';
 import SimpleBar from 'components/third-party/SimpleBar';
-
+import { useInfiniteQuery } from '@tanstack/react-query';
 // assets
 import {
   SearchOutlined
@@ -38,7 +38,7 @@ interface ChatDrawerProps {
   handleDrawerOpen: () => void;
   openChatDrawer: boolean | undefined;
   setUser: (u: UserProfile) => void;
-  selectedUserId?: string | null; // ✅ ADD
+  selectedUserId?: string | null; //   ADD
 }
 
 function ChatDrawer({ handleDrawerOpen, openChatDrawer, setUser, selectedUserId }: ChatDrawerProps) {
@@ -58,15 +58,33 @@ function ChatDrawer({ handleDrawerOpen, openChatDrawer, setUser, selectedUserId 
     queryFn: () => channelService.getChannels()
   });
 
-  const { data: contactData, isLoading: contactLoading, refetch: contactRefetch } = useQuery({
+  const {
+    data: contactData,
+    isLoading: contactLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch: contactRefetch
+  } = useInfiniteQuery({
     queryKey: ['contacts', debouncedSearch, channelId],
-    queryFn: async () => {
-      const res = await contactService.getContacts(channelId, debouncedSearch);
-      return res.data;
+    initialPageParam: null, // 🔥 THIS IS REQUIRED
+    queryFn: async ({ pageParam }) => {
+      const res = await contactService.getContacts(
+        channelId,
+        debouncedSearch,
+        pageParam as string | undefined,
+        20
+      );
+      return res;
     },
-    placeholderData: (previousData) => previousData
+    getNextPageParam: (lastPage: any) => {
+      return lastPage.nextCursor || undefined;
+    },
+    enabled: !!channelId
   });
 
+  const contacts =
+    contactData?.pages?.flatMap((page: any) => page.data) || [];
   const channels = data?.data || [];
 
   const handleSearch = async (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | undefined) => {
@@ -94,12 +112,11 @@ function ChatDrawer({ handleDrawerOpen, openChatDrawer, setUser, selectedUserId 
   }, [channels]);
 
   useEffect(() => {
-    if (!selectedUserId || !contactData?.length) return;
+    if (!selectedUserId || !contacts.length) return;
 
-    const selected = contactData.find(
+    const selected = contacts.find(
       (c: any) => c._id === selectedUserId
     );
-
     if (selected) {
       setUser(selected);
     }
@@ -228,14 +245,31 @@ function ChatDrawer({ handleDrawerOpen, openChatDrawer, setUser, selectedUserId 
         </Box>
 
         <SimpleBar
+          onScroll={(e: any) => {
+            const target = e.target;
+
+            if (
+              target.scrollTop + target.clientHeight >= target.scrollHeight - 50 &&
+              hasNextPage &&
+              !isFetchingNextPage
+            ) {
+              fetchNextPage(); // 🔥 pagination trigger
+            }
+          }}
           sx={{
             overflowX: 'hidden',
             height: matchDownLG ? 'calc(100vh - 120px)' : 'calc(100vh - 428px)',
-            minHeight: matchDownLG ? 0 : 620
+            minHeight: matchDownLG ? 0 : 530
           }}
         >
           <Box sx={{ p: 3, pt: 0 }}>
-            <UserList setUser={setUser} data={contactData} isLoading={contactLoading} refetch={contactRefetch} selectedUserId={selectedUserId || undefined} />
+            <UserList
+              setUser={setUser}
+              data={contacts} // 🔥 IMPORTANT
+              isLoading={contactLoading}
+              refetch={contactRefetch}
+              selectedUserId={selectedUserId || undefined}
+            />
           </Box>
         </SimpleBar>
       </MainCard>

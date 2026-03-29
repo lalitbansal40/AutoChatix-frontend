@@ -23,6 +23,8 @@ import 'react-phone-input-2/lib/style.css';
 // formik
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
+import { useSnackbar } from "notistack";
+
 
 interface CreateContactModalProps {
   contactModalOpen: boolean;
@@ -39,6 +41,8 @@ export const CreateContactModal = ({
   contactCreateRefresh,
   contactId
 }: CreateContactModalProps) => {
+  const { enqueueSnackbar } = useSnackbar();
+
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [attributes, setAttributes] = useState<any[]>([]);
@@ -76,9 +80,13 @@ export const CreateContactModal = ({
         resetForm();
         handleClose();
         contactCreateRefresh();
+        enqueueSnackbar(
+          isEdit ? 'Contact updated successfully' : 'Contact created successfully',
+          { variant: 'success' }
+        );
       } catch (error) {
         console.error(error);
-        alert('Failed to save contact');
+        enqueueSnackbar('Failed to save contact', { variant: 'error' });
       } finally {
         setLoading(false);
       }
@@ -176,7 +184,7 @@ export const CreateContactModal = ({
     });
 
     formik.setFieldValue('attributes', merged);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attributes]);
 
   return (

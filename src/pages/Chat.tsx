@@ -42,9 +42,6 @@ import { getUserChats } from 'store/reducers/chat';
 
 // assets
 import {
-  AudioMutedOutlined,
-  DeleteOutlined,
-  DownloadOutlined,
   EditOutlined,
   PaperClipOutlined,
   SmileOutlined,
@@ -114,15 +111,6 @@ const Chat = () => {
 
   const [data, setData] = useState<HistoryProps[]>([]);
   const chatState = useSelector((state: any) => state?.chat || {});
-  const [anchorEl, setAnchorEl] = useState<Element | ((element: Element) => Element) | null | undefined>(null);
-
-  // const handleClickSort = (event: React.MouseEvent<HTMLButtonElement> | undefined) => {
-  //   setAnchorEl(event?.currentTarget);
-  // };
-
-  const handleCloseSort = () => {
-    setAnchorEl(null);
-  };
 
   const handleUserChange = () => {
     setEmailDetails((prev) => !prev);
@@ -227,7 +215,7 @@ const Chat = () => {
   const handleSendAll = async () => {
     if (!user?._id || !user?.channel_id) return;
 
-    // ✅ TEXT ONLY CASE
+    //   TEXT ONLY CASE
     if (selectedFiles.length === 0 && message.trim()) {
       await messageService.sendMessage({
         channelId: user.channel_id,
@@ -360,11 +348,6 @@ const Chat = () => {
     setOpenChatDrawer(!matchDownSM);
   }, [matchDownSM]);
 
-  // useEffect(() => {
-  //   if (chatState?.user) {
-  //     setUser(chatState.user);
-  //   }
-  // }, [chatState?.user]);
 
   useEffect(() => {
     if (chatState?.chats) {
@@ -372,12 +355,6 @@ const Chat = () => {
     }
   }, [chatState?.chats]);
 
-  // useEffect(() => {
-  //   // hide left drawer when email app opens
-  //   dispatch(openDrawer(false));
-  //   dispatch(getUser(1));
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, []);
 
   useEffect(() => {
     if (user?.name) {
@@ -439,7 +416,7 @@ const Chat = () => {
   return (
     <Box sx={{ display: 'flex' }}>
       <ChatDrawer openChatDrawer={openChatDrawer} handleDrawerOpen={handleDrawerOpen} setUser={setUser} selectedUserId={contactIdFromUrl} />
-      <Main theme={theme} open={openChatDrawer}>
+      <Main theme={theme} open={openChatDrawer} sx={{height:530}}>
         <Grid container>
           <Grid
             item
@@ -523,55 +500,14 @@ const Chat = () => {
                     </Box>
 
                   </Grid>
-                  <Grid item>
-                    <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={1}>
-                      {/* <IconButton onClick={handleClickSort} size="large" color="secondary">
-                          <MoreOutlined />
-                        </IconButton> */}
-                      <Menu
-                        id="simple-menu"
-                        //   anchorEl={anchorEl}
-                        keepMounted
-                        open={Boolean(anchorEl)}
-                        onClose={handleCloseSort}
-                        anchorOrigin={{
-                          vertical: 'bottom',
-                          horizontal: 'right'
-                        }}
-                        transformOrigin={{
-                          vertical: 'top',
-                          horizontal: 'right'
-                        }}
-                        sx={{
-                          p: 0,
-                          '& .MuiMenu-list': {
-                            p: 0
-                          }
-                        }}
-                      >
-                        <MenuItem onClick={handleCloseSort}>
-                          <DownloadOutlined style={{ paddingRight: 8 }} />
-                          <Typography>Archive</Typography>
-                        </MenuItem>
-                        <MenuItem onClick={handleCloseSort}>
-                          <AudioMutedOutlined style={{ paddingRight: 8 }} />
-                          <Typography>Muted</Typography>
-                        </MenuItem>
-                        <MenuItem onClick={handleCloseSort}>
-                          <DeleteOutlined style={{ paddingRight: 8 }} />
-                          <Typography>Delete</Typography>
-                        </MenuItem>
-                      </Menu>
-                    </Stack>
-                  </Grid>
                 </Grid>
                 <Grid item xs={12}>
                   <SimpleBar
                     scrollableNodeProps={{ ref: scrollRef }}
                     sx={{
                       overflowX: 'hidden',
-                      height: 'calc(100vh - 410px)',
-                      minHeight: 420
+                      height: 'calc(100vh - 355px)',
+                      minHeight: 520
                     }}
                   >
                     <Box sx={{ pl: 1, pr: 3 }}>
