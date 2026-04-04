@@ -104,23 +104,11 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
 
     // 🔥 TEMPLATE SUPPORT
     if (type === "template") {
-      const template = payload?.request?.template;
-      const dbTemplate = payload?.templateData;
+      // ... existing code (same as yours)
+    }
 
-      const bodyText =
-        message.text ||
-        dbTemplate?.components?.find((c: any) => c.type === "BODY")?.text ||
-        "Template message";
-
-      const header = template?.components?.find(
-        (c: any) => c.type === "header"
-      );
-
-      const headerUrl =
-        header?.parameters?.[0]?.image?.link ||
-        header?.parameters?.[0]?.video?.link ||
-        header?.parameters?.[0]?.document?.link;
-
+    // ✅🔥 ADD THIS BLOCK EXACTLY HERE
+    if (type === "interactive_media") {
       return (
         <Stack
           sx={{
@@ -132,47 +120,50 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
             maxWidth: 260
           }}
         >
-          {/* 🔥 SMALL HEADER PREVIEW */}
-          {headerUrl && (
+          {/* MEDIA PREVIEW */}
+          {payload?.type === "image" && (
             <img
-              src={headerUrl}
+              src={payload?.url}
               style={{
                 width: 50,
                 height: 50,
-                objectFit: "cover",
                 borderRadius: 6,
+                objectFit: "cover",
                 marginBottom: 4
               }}
             />
           )}
 
-          {/* 🔥 BODY TEXT */}
+          {payload?.type === "video" && (
+            <video
+              src={payload?.url}
+              style={{
+                width: 50,
+                height: 50,
+                borderRadius: 6
+              }}
+            />
+          )}
+
+          {/* CAPTION */}
           <Typography
             variant="caption"
             sx={{
               fontWeight: 600,
               overflow: "hidden",
               textOverflow: "ellipsis",
-              display: "-webkit-box",
               WebkitLineClamp: 2,
+              display: "-webkit-box",
               WebkitBoxOrient: "vertical"
             }}
           >
-            {bodyText}
-          </Typography>
-
-          {/* 🔥 TEMPLATE LABEL */}
-          <Typography
-            variant="caption"
-            sx={{ fontSize: 10, color: "gray" }}
-          >
-            Template
+            {payload?.caption || "Media"}
           </Typography>
         </Stack>
       );
     }
 
-    //   DEFAULT (OLD FLOW)
+    // 🔥 DEFAULT (OLD FLOW)
     return (
       <Stack
         sx={{
@@ -211,38 +202,81 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
       return <Typography>{response}</Typography>;
     }
 
+    const formatKey = (key: string) =>
+      key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+    const renderObject = (obj: any) => {
+      return Object.entries(obj).map(([key, value]: any) => {
+
+        // 🔥 NESTED OBJECT (like values)
+        if (typeof value === "object" && value !== null) {
+          return (
+            <Stack key={key} spacing={0.5} sx={{ mt: 1 }}>
+              <Typography fontWeight={600} fontSize={13}>
+                {formatKey(key)}
+              </Typography>
+
+              <Stack
+                sx={{
+                  border: "1px solid #eee",
+                  borderRadius: 2,
+                  overflow: "hidden"
+                }}
+              >
+                {Object.entries(value).map(([k, v]: any, i, arr) => (
+                  <Stack
+                    key={k}
+                    direction="row"
+                    justifyContent="space-between"
+                    sx={{
+                      px: 1.5,
+                      py: 1,
+                      background: i % 2 === 0 ? "#fafafa" : "#fff",
+                      borderBottom:
+                        i !== arr.length - 1 ? "1px solid #eee" : "none"
+                    }}
+                  >
+                    <Typography fontSize={12} fontWeight={500}>
+                      {formatKey(k)}
+                    </Typography>
+
+                    <Typography fontSize={12}>
+                      {String(v)}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            </Stack>
+          );
+        }
+
+        // 🔥 NORMAL VALUE
+        return (
+          <Stack
+            key={key}
+            direction="row"
+            justifyContent="space-between"
+            sx={{ px: 0.5, py: 0.5 }}
+          >
+            <Typography fontSize={12} fontWeight={500}>
+              {formatKey(key)}
+            </Typography>
+
+            <Typography fontSize={12}>
+              {String(value)}
+            </Typography>
+          </Stack>
+        );
+      });
+    };
+
     return (
       <Stack spacing={1}>
         <Typography variant="body2" fontWeight={600}>
           Flow Response
         </Typography>
 
-        <table style={{ borderCollapse: "collapse", width: "100%" }}>
-          <tbody>
-            {Object.entries(data).map(([key, value]: any) => (
-              <tr key={key}>
-                <td
-                  style={{
-                    border: "1px solid #ddd",
-                    padding: 6,
-                    fontWeight: 600
-                  }}
-                >
-                  {key}
-                </td>
-
-                <td
-                  style={{
-                    border: "1px solid #ddd",
-                    padding: 6
-                  }}
-                >
-                  {String(value)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {renderObject(data)}
       </Stack>
     );
   };
@@ -287,6 +321,76 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
             height: 40
           }}
         />
+      );
+    }
+
+    if (type === "interactive_media") {
+      return (
+        <Stack
+          sx={{
+            borderRadius: 3,
+            overflow: "hidden",
+            background: "#fff",
+            maxWidth: 300
+          }}
+        >
+          {/* 🔥 MEDIA */}
+          {payload?.type === "image" && (
+            <img
+              src={payload?.url}
+              style={{
+                width: "100%",
+                maxHeight: 200,
+                objectFit: "cover"
+              }}
+            />
+          )}
+
+          {payload?.type === "video" && (
+            <video
+              src={payload?.url}
+              controls
+              style={{ width: "100%" }}
+            />
+          )}
+
+          {/* 🔥 CAPTION */}
+          {payload?.caption && (
+            <Stack sx={{ p: 1.5 }}>
+              <Typography sx={{ whiteSpace: "pre-line", fontSize: 14 }}>
+                {payload.caption}
+              </Typography>
+            </Stack>
+          )}
+
+          {/* 🔥 BUTTONS (WHATSAPP STYLE) */}
+          {payload?.buttons?.length > 0 && (
+            <Stack sx={{ borderTop: "1px solid #eee" }}>
+              {payload.buttons.map((btn: any, i: number) => (
+                <Box
+                  key={i}
+                  sx={{
+                    textAlign: "center",
+                    py: 1.3,
+                    fontSize: 14,
+                    color: "#00a884",
+                    fontWeight: 500,
+                    borderBottom:
+                      i !== payload.buttons.length - 1
+                        ? "1px solid #eee"
+                        : "none",
+                    cursor: "pointer",
+                    "&:hover": {
+                      background: "#f5f5f5"
+                    }
+                  }}
+                >
+                  {btn.title}
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </Stack>
       );
     }
 
