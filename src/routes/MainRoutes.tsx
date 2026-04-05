@@ -7,6 +7,8 @@ import Loadable from 'components/Loadable';
 import AuthGuard from 'utils/route-guard/AuthGuard';
 import Channels from 'pages/Channels';
 import ChannelManage from 'pages/ChannelMangae';
+import Automations from 'pages/Automation';
+import AutomationBuilder from 'pages/AutomationBuilder';
 
 // pages routing
 const MaintenanceError = Loadable(lazy(() => import('pages/maintenance/404')));
@@ -37,6 +39,14 @@ const MainRoutes = {
         {
           path: 'Channels',
           element: <Channels />
+        },
+        {
+          path: 'Automations',
+          element: <Automations />
+        },
+        {
+          path: 'Automations/:id',
+          element: <AutomationBuilder />
         },
         {
           path: 'Channels/:id',

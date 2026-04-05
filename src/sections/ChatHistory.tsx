@@ -554,6 +554,39 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
         );
       }
     }
+
+    if (type === "address_message") {
+      const bodyText =
+        payload?.text?.body ||
+        payload?.bodyText ||
+        "Please provide your address";
+
+      return (
+        <Stack spacing={1}>
+          {/* MESSAGE */}
+          <Typography>{bodyText}</Typography>
+
+          {/* 🔥 CTA BUTTON */}
+          <Stack
+            sx={{
+              border: "1px solid #25D366",
+              color: "#25D366",
+              borderRadius: 2,
+              px: 2,
+              py: 1,
+              cursor: "pointer",
+              width: "fit-content",
+              fontWeight: 500,
+              "&:hover": {
+                background: "#f1fdf5"
+              }
+            }}
+          >
+            📍 Provide Address
+          </Stack>
+        </Stack>
+      );
+    }
     // ================= TEXT =================
     if (type === "text") {
       return <Typography>{text}</Typography>;

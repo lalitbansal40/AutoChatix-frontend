@@ -35,6 +35,13 @@ const other: NavItemType = {
       type: 'item',
       url: '/channels',
       icon: icons.RobotOutlined
+    },
+    {
+      id: 'Automations',
+      title: <FormattedMessage id="Automations" />,
+      type: 'item',
+      url: '/automations',
+      icon: icons.DeploymentUnitOutlined
     }
   ]
 };
