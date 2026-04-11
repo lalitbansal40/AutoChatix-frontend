@@ -14,7 +14,7 @@ const Automations = () => {
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["automations"],
     queryFn: () => automationService.getAutomations(),
-    select: (response) => response.data,
+    select: (response) => response,
   });
 
   if (isLoading) {

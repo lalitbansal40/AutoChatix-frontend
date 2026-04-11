@@ -101,6 +101,16 @@ class TemplateService {
     const response = await axiosServices.post(`/templates/sync/${channelId}`);
     return response.data;
   }
+  async getWhatsappFlows() {
+    try {
+      const response = await axiosServices.get(`/templates/whatsapp-flows`);
+
+      return response.data.data;
+    } catch (error) {
+      console.error("❌ getWhatsappFlows error:", error);
+      throw error;
+    }
+  }
 }
 
 export const templateService = new TemplateService();

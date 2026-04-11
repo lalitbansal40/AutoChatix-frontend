@@ -7,8 +7,7 @@ import {
   Typography,
   Button,
   MenuItem,
-  Select,
-  TextField,
+  Select
 } from "@mui/material";
 import ReactFlow, {
   Background,
@@ -39,11 +38,50 @@ type CustomNodeData = {
    NODE CONFIG
 ========================= */
 const NODE_CONFIG: any = {
-  auto_reply: { message: "", buttons: [], media: null },
-  address_message: { message: "Enter address" },
-  google_sheet: { spreadsheet_id: "", sheet_name: "", map: {} },
+  trigger: {
+    conditions: {
+      match_type: "contains",
+      keywords: [],
+    },
+  },
+
+  auto_reply: {
+    message: "",
+    buttons: [],
+  },
+
+  ask_location: {
+    message: "",
+    save_to: "address",
+  },
+
+  address_message: {
+    message: "",
+  },
+
+  distance_check: {
+    reference_lat: "",
+    reference_lng: "",
+    max_distance_km: 10,
+  },
+
+  google_sheet: {
+    spreadsheet_id: "",
+    sheet_name: "",
+    map: {},
+  },
+
   razorpay_payment: {
-    config: { item_amount: "", delivery_amount: "" },
+    config: {
+      item_amount: "",
+      delivery_amount: "",
+    },
+  },
+
+  borzo_delivery: {
+    borzo_action: "calculate",
+    pickup: {},
+    drop: {},
   },
 };
 
@@ -235,7 +273,13 @@ const AutomationBuilder = () => {
   }
 
   return (
-    <Box height="calc(100vh - 70px)" sx={{ background: "#f5f5f5" }}>
+    <Box
+      height="calc(100vh - 70px)"
+      sx={{
+        background: "#f5f5f5",
+        position: "relative"   // 🔥 ADD THIS
+      }}
+    >
       {/* HEADER */}
       <Stack direction="row" spacing={2} p={2} flexWrap="wrap">
         <Select
@@ -245,10 +289,15 @@ const AutomationBuilder = () => {
           displayEmpty
         >
           <MenuItem value="">Select Node</MenuItem>
+          <MenuItem value="trigger">Trigger</MenuItem>
           <MenuItem value="auto_reply">Auto Reply</MenuItem>
+          <MenuItem value="ask_location">Ask Location</MenuItem>
           <MenuItem value="address_message">Address</MenuItem>
+          <MenuItem value="distance_check">Distance Check</MenuItem>
+          <MenuItem value="send_flow">Send Flow</MenuItem>
           <MenuItem value="google_sheet">Google Sheet</MenuItem>
           <MenuItem value="razorpay_payment">Payment</MenuItem>
+          <MenuItem value="borzo_delivery">Delivery</MenuItem>
         </Select>
 
         <Button onClick={() => createNode(nodeType)} variant="contained">
@@ -273,12 +322,21 @@ const AutomationBuilder = () => {
           ))}
         </Select>
 
-        <TextField
+        <Select
           size="small"
-          placeholder="Condition"
           value={condition}
           onChange={(e) => setCondition(e.target.value)}
-        />
+        >
+          <MenuItem value="">Condition</MenuItem>
+
+          {nodes
+            .find((n) => n.id === fromNode)
+            ?.data?.buttons?.map((btn: any) => (
+              <MenuItem key={btn.id} value={btn.id}>
+                {btn.title}
+              </MenuItem>
+            ))}
+        </Select>
 
         <Button variant="outlined" onClick={createEdge}>
           + Edge
