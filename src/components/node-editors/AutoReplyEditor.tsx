@@ -63,7 +63,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
   useEffect(() => {
     const fetchFlows = async () => {
       try {
-        const flows = await templateService.getWhatsappFlows();
+        const flows = await templateService.getWhatsappFlows("PUBLISHED");
         updateNodeData("flows", flows);
       } catch (err) {
         console.error(err);

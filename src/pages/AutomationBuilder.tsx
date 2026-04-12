@@ -17,6 +17,7 @@ import ReactFlow, {
   useEdgesState,
   Node,
   Edge,
+  addEdge, Connection, Handle, Position, NodeProps
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { useQuery } from "@tanstack/react-query";
@@ -113,12 +114,11 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
 
 const AutomationBuilder = () => {
   const { id } = useParams<{ id: string }>();
-
+  const [contextMenu, setContextMenu] = useState<any>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<CustomNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
-  const [nodeType, setNodeType] = useState("");
   const [fromNode, setFromNode] = useState("");
   const [toNode, setToNode] = useState("");
   const [condition, setCondition] = useState("");
@@ -127,7 +127,7 @@ const AutomationBuilder = () => {
      CREATE NODE
   ========================= */
   const createNode = (type: string) => {
-    if (!type) return;
+    if (!type || !contextMenu) return;
 
     const config = NODE_CONFIG[type] || {};
     const nodeId = `${type}_${Date.now()}`;
@@ -135,7 +135,10 @@ const AutomationBuilder = () => {
     const newNode: Node<CustomNodeData> = {
       id: nodeId,
       type: "default",
-      position: { x: 200, y: 200 },
+      position: {
+        x: contextMenu.x,
+        y: contextMenu.y,
+      },
       data: {
         id: nodeId,
         type,
@@ -145,8 +148,53 @@ const AutomationBuilder = () => {
     };
 
     setNodes((prev) => [...prev, newNode]);
+
+    // 🔥 AUTO CONNECT
+    if (selectedNode) {
+      setEdges((prev) => [
+        ...prev,
+        {
+          id: `${selectedNode.id}-${nodeId}`,
+          source: selectedNode.id,
+          target: nodeId,
+          animated: true,
+        },
+      ]);
+    }
+
+    setContextMenu(null);
   };
 
+  const CustomNode = ({ data }: NodeProps<CustomNodeData>) => {
+    return (
+      <Box sx={{ p: 1, border: "1px solid #ddd", borderRadius: 2 }}>
+        <div>{data.label}</div>
+
+        <Handle type="target" position={Position.Left} />
+        <Handle type="source" position={Position.Right} />
+      </Box>
+    );
+  };
+
+  const nodeTypes = {
+    default: CustomNode,
+  };
+
+  const onConnect = (params: Connection) => {
+    setEdges((eds) =>
+      addEdge(
+        {
+          ...params,
+          animated: true,
+        },
+        eds
+      )
+    );
+  };
+
+  const onEdgeClick = (_: any, edge: Edge) => {
+    setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+  };
   /* =========================
      CREATE EDGE
   ========================= */
@@ -165,6 +213,16 @@ const AutomationBuilder = () => {
     ]);
 
     setCondition("");
+  };
+
+  const handleCanvasClick = (event: any) => {
+    setSelectedNode(null); // ✅ close popup
+    const bounds = event.currentTarget.getBoundingClientRect();
+
+    setContextMenu({
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    });
   };
 
   /* =========================
@@ -199,6 +257,14 @@ const AutomationBuilder = () => {
     }
   };
 
+
+  const onEdgeContextMenu = (event: any, edge: Edge) => {
+    event.preventDefault();
+
+    if (window.confirm("Delete this connection?")) {
+      setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+    }
+  };
   /* =========================
      FETCH
   ========================= */
@@ -237,6 +303,12 @@ const AutomationBuilder = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, []);
+
   /* =========================
      UPDATE NODE
   ========================= */
@@ -272,6 +344,7 @@ const AutomationBuilder = () => {
     );
   }
 
+
   return (
     <Box
       height="calc(100vh - 70px)"
@@ -282,27 +355,53 @@ const AutomationBuilder = () => {
     >
       {/* HEADER */}
       <Stack direction="row" spacing={2} p={2} flexWrap="wrap">
-        <Select
-          size="small"
-          value={nodeType}
-          onChange={(e) => setNodeType(e.target.value)}
-          displayEmpty
-        >
-          <MenuItem value="">Select Node</MenuItem>
-          <MenuItem value="trigger">Trigger</MenuItem>
-          <MenuItem value="auto_reply">Auto Reply</MenuItem>
-          <MenuItem value="ask_location">Ask Location</MenuItem>
-          <MenuItem value="address_message">Address</MenuItem>
-          <MenuItem value="distance_check">Distance Check</MenuItem>
-          <MenuItem value="send_flow">Send Flow</MenuItem>
-          <MenuItem value="google_sheet">Google Sheet</MenuItem>
-          <MenuItem value="razorpay_payment">Payment</MenuItem>
-          <MenuItem value="borzo_delivery">Delivery</MenuItem>
-        </Select>
+        {contextMenu && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: contextMenu.y,
+              left: contextMenu.x,
+              background: "#fff",
+              borderRadius: 2,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+              zIndex: 2000,
+              p: 1,
+              minWidth: 180,
+            }}
+          >
+            <MenuItem onClick={() => createNode("trigger")}>
+              Trigger
+            </MenuItem>
 
-        <Button onClick={() => createNode(nodeType)} variant="contained">
-          + Node
-        </Button>
+            <MenuItem onClick={() => createNode("auto_reply")}>
+              Auto Reply
+            </MenuItem>
+
+            <MenuItem onClick={() => createNode("ask_location")}>
+              Ask Location
+            </MenuItem>
+
+            <MenuItem onClick={() => createNode("address_message")}>
+              Address Message
+            </MenuItem>
+
+            <MenuItem onClick={() => createNode("distance_check")}>
+              Distance Check
+            </MenuItem>
+
+            <MenuItem onClick={() => createNode("google_sheet")}>
+              Google Sheet
+            </MenuItem>
+
+            <MenuItem onClick={() => createNode("razorpay_payment")}>
+              Payment
+            </MenuItem>
+
+            <MenuItem onClick={() => createNode("borzo_delivery")}>
+              Delivery
+            </MenuItem>
+          </Box>
+        )}
 
         <Select size="small" value={fromNode} onChange={(e) => setFromNode(e.target.value)}>
           <MenuItem value="">From</MenuItem>
@@ -348,18 +447,62 @@ const AutomationBuilder = () => {
       </Stack>
 
       {/* FLOW */}
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={(e, node) => setSelectedNode(node)}
-        fitView
+      <Box
+        sx={{ width: "100%", height: "100%" }}
+        onClick={(e) => {
+          const target = e.target as HTMLElement;
+
+          // 🔥 if clicked inside node → ignore
+          if (target.closest(".react-flow__node")) return;
+
+          // 🔥 otherwise it's canvas
+          handleCanvasClick(e);
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+
+          const target = e.target as HTMLElement;
+
+          if (target.closest(".react-flow__node")) return;
+
+          handleCanvasClick(e);
+        }}
       >
-        <MiniMap />
-        <Controls />
-        <Background />
-      </ReactFlow>
+        <ReactFlow
+          nodeTypes={nodeTypes}
+          deleteKeyCode={["Backspace", "Delete"]}
+          onNodesDelete={(deleted) => {
+            const deletedIds = deleted.map((n) => n.id);
+
+            setEdges((eds) =>
+              eds.filter(
+                (e) =>
+                  !deletedIds.includes(e.source) &&
+                  !deletedIds.includes(e.target)
+              )
+            );
+          }}
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={(e, node) => {
+            e.stopPropagation(); // 🔥 VERY IMPORTANT
+            setSelectedNode(node);
+          }}
+          onConnect={onConnect}
+          elementsSelectable={true}
+          nodesDraggable={true}
+          edgesFocusable={true}
+          onEdgeClick={onEdgeClick}
+          onEdgeContextMenu={onEdgeContextMenu}
+          fitView
+        >
+          <MiniMap />
+          <Controls />
+          <Background />
+        </ReactFlow>
+      </Box>
 
       {/* POPUP */}
       {selectedNode && (

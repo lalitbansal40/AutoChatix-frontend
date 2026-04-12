@@ -23,7 +23,7 @@ const AuthBackground = () => {
       }}
     >
       <img
-        src="https://chatvexa-public.s3.ap-south-1.amazonaws.com/Chatvexa_Ultimate_Transparent%20(2).png"
+        src="https://autochatix-assets.s3.ap-south-1.amazonaws.com/AutoChatix_Icon_Square.png"
         alt="background"
         style={{
           width: '100%',

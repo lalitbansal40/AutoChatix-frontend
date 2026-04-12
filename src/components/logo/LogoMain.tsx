@@ -18,7 +18,7 @@ const LogoMain = ({ reverse, ...others }: { reverse?: boolean }) => {
   return (
     <>
       <img
-        src="https://chatvexa-public.s3.ap-south-1.amazonaws.com/Chatvexa_Ultimate_Transparent%20(1).png"
+        src="https://autochatix-assets.s3.ap-south-1.amazonaws.com/AutoChatix_Full_Logo.png"
         alt="logo"
         width={250}
         height={80}

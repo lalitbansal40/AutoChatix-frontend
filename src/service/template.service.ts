@@ -101,9 +101,9 @@ class TemplateService {
     const response = await axiosServices.post(`/templates/sync/${channelId}`);
     return response.data;
   }
-  async getWhatsappFlows() {
+  async getWhatsappFlows(status?:string) {
     try {
-      const response = await axiosServices.get(`/templates/whatsapp-flows`);
+      const response = await axiosServices.get(`/templates/whatsapp-flows?status=${status}`);
 
       return response.data.data;
     } catch (error) {
