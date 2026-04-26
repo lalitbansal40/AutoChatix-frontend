@@ -32,6 +32,7 @@ export interface AutomationPayload {
   nodes?: NodeData[];
   edges?: EdgeData[]; // ✅ IMPORTANT ADD
   channel_id?: string;
+  channel_name?: string;
   status?: "active" | "paused";
 }
 

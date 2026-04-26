@@ -1,0 +1,48 @@
+/* =========================
+   REMOVE DEFAULT NODE STYLE
+========================= */
+
+/* 🔴 Remove outer wrapper border + shadow */
+.react-flow__node {
+  outline: none !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 🔴 Remove selected state border/shadow */
+.react-flow__node.selected {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* 🔴 Remove focus outline */
+.react-flow__node:focus {
+  outline: none !important;
+}
+
+/* 🔴 Remove default node container styling */
+.react-flow__node-default {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* 🔴 Fix inner wrapper (important for double layer) */
+.react-flow__node > div {
+  background: transparent !important;
+}
+
+/* =========================
+   OPTIONAL CLEANUP
+========================= */
+
+/* smooth edges */
+.react-flow__edge-path {
+  stroke-width: 2;
+}
+
+/* optional: remove mini shadow */
+.react-flow__renderer {
+  background: transparent;
+}

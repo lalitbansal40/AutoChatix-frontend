@@ -29,7 +29,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
     const updated = [
       ...buttons,
       {
-        id: `BTN_${Date.now()}`,
+        id: `BTN_${Date.now()}_${Math.random()}`,
         title: "New Button",
         type: "quick_reply",
       },
@@ -71,8 +71,26 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
     };
 
     fetchFlows();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (messageType === "list" && !node.data.sections) {
+      updateNodeData("sections", [
+        {
+          title: "Section 1",
+          rows: [
+            {
+              id: `row_${Date.now()}`,
+              title: "Option 1",
+              description: "",
+              nextNode: "",
+            },
+          ],
+        },
+      ]);
+    }
+  }, [messageType]);
   return (
     <Box sx={{ height: "100%", overflowY: "auto", pr: 1 }}>
       <Grid container rowSpacing={2}>
@@ -148,8 +166,12 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                       label={`Button ${i + 1}`}
                       value={btn.title}
                       onChange={(e) => {
-                        const updated = [...buttons];
-                        updated[i].title = e.target.value;
+                        const updated = buttons.map((btn: any, index: number) =>
+                          index === i
+                            ? { ...btn, title: e.target.value }
+                            : btn
+                        );
+
                         updateNodeData("buttons", updated);
                       }}
                     />
@@ -163,8 +185,12 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                       label="Type"
                       value={btn.type || "quick_reply"}
                       onChange={(e) => {
-                        const updated = [...buttons];
-                        updated[i].type = e.target.value;
+                        const updated = buttons.map((btn: any, index: number) =>
+                          index === i
+                            ? { ...btn, type: e.target.value }
+                            : btn
+                        );
+
                         updateNodeData("buttons", updated);
                       }}
                     >
@@ -183,8 +209,12 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                         label="Next Node"
                         value={btn.nextNode || ""}
                         onChange={(e) => {
-                          const updated = [...buttons];
-                          updated[i].nextNode = e.target.value;
+                          const updated = buttons.map((btn: any, index: number) =>
+                            index === i
+                              ? { ...btn, nextNode: e.target.value }
+                              : btn
+                          );
+
                           updateNodeData("buttons", updated);
                         }}
                       >
@@ -203,8 +233,12 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                         label="Select Flow"
                         value={btn.flowId || ""}
                         onChange={(e) => {
-                          const updated = [...buttons];
-                          updated[i].flowId = e.target.value;
+                          const updated = buttons.map((btn: any, index: number) =>
+                            index === i
+                              ? { ...btn, flowId: e.target.value }
+                              : btn
+                          );
+
                           updateNodeData("buttons", updated);
                         }}
                       >
@@ -222,8 +256,12 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                         label="URL"
                         value={btn.url || ""}
                         onChange={(e) => {
-                          const updated = [...buttons];
-                          updated[i].url = e.target.value;
+                          const updated = buttons.map((btn: any, index: number) =>
+                            index === i
+                              ? { ...btn, url: e.target.value }
+                              : btn
+                          );
+
                           updateNodeData("buttons", updated);
                         }}
                       />
@@ -246,6 +284,33 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
         {/* ================= LIST ================= */}
         {messageType === "list" && (
           <>
+            {/* INIT DEFAULT */}
+            {(!node.data.sections || node.data.sections.length === 0) && (
+              <Grid item xs={12}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    updateNodeData("sections", [
+                      {
+                        title: "Section 1",
+                        rows: [
+                          {
+                            id: `row_${Date.now()}`,
+                            title: "Option 1",
+                            description: "",
+                            nextNode: "",
+                          },
+                        ],
+                      },
+                    ]);
+                  }}
+                >
+                  + Add First Section
+                </Button>
+              </Grid>
+            )}
+
+            {/* MESSAGE */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -259,6 +324,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
               />
             </Grid>
 
+            {/* CTA */}
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -268,6 +334,159 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                   updateNodeData("cta", e.target.value)
                 }
               />
+            </Grid>
+
+            {/* SECTIONS */}
+            {(node.data.sections || []).map((section: any, si: number) => (
+              <Grid item xs={12} key={si}>
+                <Box sx={{ border: "1px solid #ddd", p: 2, borderRadius: 2 }}>
+
+                  {/* SECTION TITLE */}
+                  <TextField
+                    fullWidth
+                    label="Section Title"
+                    value={section.title}
+                    onChange={(e) => {
+                      const updated = JSON.parse(JSON.stringify(node.data.sections));
+                      updated[si].title = e.target.value;
+                      updateNodeData("sections", updated);
+                    }}
+                    sx={{ mb: 2 }}
+                  />
+
+                  {/* ROWS */}
+                  {(section.rows || []).map((row: any, ri: number) => (
+                    <Grid container spacing={2} key={row.id} sx={{ mb: 1 }}>
+
+                      <Grid item xs={3}>
+                        <TextField
+                          fullWidth
+                          label="Title"
+                          value={row.title}
+                          onChange={(e) => {
+                            const updated = JSON.parse(JSON.stringify(node.data.sections));
+                            updated[si].rows[ri].title = e.target.value;
+                            updateNodeData("sections", updated);
+                          }}
+                        />
+                      </Grid>
+
+                      <Grid item xs={3}>
+                        <TextField
+                          fullWidth
+                          label="Description"
+                          value={row.description || ""}
+                          onChange={(e) => {
+                            const updated = JSON.parse(JSON.stringify(node.data.sections));
+                            updated[si].rows[ri].description = e.target.value;
+                            updateNodeData("sections", updated);
+                          }}
+                        />
+                      </Grid>
+
+                      <Grid item xs={3}>
+                        <TextField
+                          select
+                          fullWidth
+                          label="Next Node"
+                          value={row.nextNode || ""}
+                          onChange={(e) => {
+                            const updated = JSON.parse(JSON.stringify(node.data.sections));
+                            updated[si].rows[ri].nextNode = e.target.value;
+                            updateNodeData("sections", updated);
+                          }}
+                        >
+                          {allNodes.map((n: any) => (
+                            <MenuItem key={n.id} value={n.id}>
+                              {n.id}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+
+                      {/* DELETE ROW */}
+                      <Grid item xs={3}>
+                        <Button
+                          color="error"
+                          onClick={() => {
+                            const updated = JSON.parse(JSON.stringify(node.data.sections));
+                            updated[si].rows.splice(ri, 1);
+                            updateNodeData("sections", updated);
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </Grid>
+
+                    </Grid>
+                  ))}
+
+                  {/* ADD ROW */}
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      const updated = JSON.parse(JSON.stringify(node.data.sections));
+
+                      if ((updated[si].rows || []).length >= 10) {
+                        alert("Max 10 options allowed");
+                        return;
+                      }
+
+                      updated[si].rows.push({
+                        id: `row_${Date.now()}`,
+                        title: "New Option",
+                        description: "",
+                        nextNode: "",
+                      });
+
+                      updateNodeData("sections", updated);
+                    }}
+                  >
+                    + Add Row
+                  </Button>
+
+                  {/* DELETE SECTION */}
+                  <Button
+                    color="error"
+                    sx={{ ml: 2 }}
+                    onClick={() => {
+                      const updated = JSON.parse(JSON.stringify(node.data.sections));
+                      updated.splice(si, 1);
+                      updateNodeData("sections", updated);
+                    }}
+                  >
+                    Delete Section
+                  </Button>
+
+                </Box>
+              </Grid>
+            ))}
+
+            {/* ADD SECTION */}
+            <Grid item xs={12}>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  const updated = node.data.sections || [];
+
+                  updateNodeData("sections", [
+                    ...updated,
+                    {
+                      title: "New Section",
+                      rows: [
+                        {
+                          id: `row_${Date.now()}`,
+                          title: "Option 1",
+                          description: "",
+                          nextNode: "",
+                        },
+                      ],
+                    },
+                  ]);
+                }}
+              >
+                + Add Section
+              </Button>
             </Grid>
           </>
         )}

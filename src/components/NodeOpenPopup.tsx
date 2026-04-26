@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { NODE_EDITORS } from "./node-editors";
+import { useState } from "react";
 
 const NodeOpenPopup = ({
   selectedNode,
@@ -18,6 +19,7 @@ const NodeOpenPopup = ({
   onClose,
   allNodes,
 }: any) => {
+  const [openList, setOpenList] = useState(false);
   if (!selectedNode) return null;
 
   const EditorComponent =
@@ -67,7 +69,7 @@ const NodeOpenPopup = ({
       {/* CONTENT */}
       <DialogContent sx={{ flex: 1, overflow: "hidden" }}>
         <Grid container spacing={2} sx={{ height: "100%" }}>
-          
+
           {/* LEFT: EDITOR */}
           <Grid item xs={12} md={8}>
             <Box sx={{ height: "100%", overflowY: "auto", pr: 1 }}>
@@ -162,6 +164,23 @@ const NodeOpenPopup = ({
                     </Button>
                   ))}
 
+                  {data.messageType === "list" && (
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      sx={{
+                        mb: 1,
+                        background: "#fff",
+                        color: "#000",
+                        textTransform: "none",
+                        borderRadius: 2,
+                      }}
+                      onClick={() => setOpenList(true)}
+                    >
+                      📋 {data.cta || "List Items"}
+                    </Button>
+                  )}
+
                   {/* TIME */}
                   <Typography
                     variant="caption"
@@ -191,6 +210,65 @@ const NodeOpenPopup = ({
           Save
         </Button>
       </DialogActions>
+      {openList && (
+        <Dialog
+          open={openList}
+          onClose={() => setOpenList(false)}
+          fullWidth
+          maxWidth="xs"
+        >
+          <DialogTitle>
+            {data.cta || "Select Option"}
+          </DialogTitle>
+
+          <DialogContent>
+
+            {(data.sections || []).map((section: any) => (
+              <Box key={section.title} sx={{ mb: 2 }}>
+
+                {/* SECTION TITLE */}
+                <Typography
+                  variant="subtitle2"
+                  sx={{ mb: 1, color: "#666" }}
+                >
+                  {section.title}
+                </Typography>
+
+                {/* ROWS */}
+                {(section.rows || []).map((row: any) => (
+                  <Box
+                    key={row.id}
+                    sx={{
+                      p: 1.5,
+                      borderBottom: "1px solid #eee",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => {
+                      console.log("Selected:", row);
+                      setOpenList(false);
+                    }}
+                  >
+                    <Typography variant="body2">
+                      {row.title}
+                    </Typography>
+
+                    {row.description && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                      >
+                        {row.description}
+                      </Typography>
+                    )}
+                  </Box>
+                ))}
+
+              </Box>
+            ))}
+
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 };

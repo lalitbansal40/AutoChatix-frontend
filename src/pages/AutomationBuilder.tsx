@@ -1,13 +1,10 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   Box,
   CircularProgress,
-  Stack,
   Typography,
   Button,
-  MenuItem,
-  Select
 } from "@mui/material";
 import ReactFlow, {
   Background,
@@ -24,8 +21,16 @@ import { useQuery } from "@tanstack/react-query";
 import automationService from "service/automation.service";
 import * as dagre from "dagre";
 import NodeOpenPopup from "components/NodeOpenPopup";
-
-
+import { MarkerType } from "reactflow";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  FormControlLabel,
+  RadioGroup,
+  Radio,
+  TextField
+} from "@mui/material";
 type CustomNodeData = {
   id: string;
   type: string;
@@ -106,86 +111,263 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
 
   nodes.forEach((node) => {
     const pos = dagreGraph.node(node.id);
-    node.position = { x: pos.x, y: pos.y };
+    node.position = {
+      x: pos.x - 110,
+      y: pos.y - 50,
+    };
   });
 
   return { nodes, edges };
 };
 
+const CustomNode = React.memo(({ data }: NodeProps<CustomNodeData>) => {
+  return (
+    <Box
+      sx={{
+        p: 1,
+        borderRadius: 3,
+        background: "#fff",
+        minWidth: 220,
+        boxShadow: "none",
+        border: "1px solid #eee",
+        overflow: "visible",
+      }}
+    >
+      {/* HEADER */}
+      <Typography fontSize={12} fontWeight={600} mb={1}>
+        {data.type}
+      </Typography>
+
+      {/* MESSAGE */}
+      {data.message && (
+        <Box
+          sx={{
+            background: "#dcf8c6",
+            p: 1,
+            borderRadius: 2,
+            fontSize: 12,
+            mb: 1,
+          }}
+        >
+          {data.message}
+        </Box>
+      )}
+
+      {/* BUTTONS */}
+      {Array.isArray(data.buttons) && data.buttons.length > 0 && (
+        data.buttons.map((btn: any, index: number) => {
+          const buttonId = btn?.id || `btn_${index}`;
+
+          return (
+            <Box
+              key={buttonId}
+              sx={{
+                mt: 1,
+                px: 1.5,
+                py: 1,
+                borderRadius: 2,
+                fontSize: 12,
+                background: "#f8f8f8", // ✅ light bg
+                position: "relative",
+              }}
+            >
+              <Typography fontSize={12}>
+                {btn?.title || "Untitled"}
+              </Typography>
+
+              {/* ✅ HANDLE */}
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={buttonId}
+                style={{
+                  width: 10,
+                  height: 10,
+                  background: "#25D366",
+                  borderRadius: "50%",
+                  position: "absolute",
+                  right: -6,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                }}
+              />
+            </Box>
+          );
+        })
+      )}
+      {/* TARGET HANDLE */}
+      {/* 🟢 TRIGGER → ONLY OUTGOING */}
+      {data.type === "trigger" && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          style={{
+            width: 10,
+            height: 10,
+            background: "#25D366",
+            borderRadius: "50%",
+            right: -6,
+          }}
+        />
+      )}
+
+      {/* 🟢 NORMAL NODES → INCOMING */}
+      {data.type !== "trigger" && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          style={{
+            width: 10,
+            height: 10,
+            background: "#555",
+            borderRadius: "50%",
+            left: -6,
+          }}
+        />
+      )}
+
+      {/* 🟢 NORMAL NODES → DEFAULT OUTGOING (no buttons case) */}
+      {data.type !== "trigger" &&
+        (!Array.isArray(data.buttons) || data.buttons.length === 0) && (
+          <Handle
+            type="source"
+            position={Position.Right}
+            style={{
+              width: 10,
+              height: 10,
+              background: "#25D366",
+              borderRadius: "50%",
+              right: -6,
+            }}
+          />
+        )}
+    </Box>
+  );
+});
+
+const nodeTypes = {
+  custom: CustomNode,
+};
+
 const AutomationBuilder = () => {
   const { id } = useParams<{ id: string }>();
-  const [contextMenu, setContextMenu] = useState<any>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<CustomNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [createNodePos, setCreateNodePos] = useState<any>(null);
+  const [openTriggerPopup, setOpenTriggerPopup] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [keywordsInput, setKeywordsInput] = useState("");
 
-  const [fromNode, setFromNode] = useState("");
-  const [toNode, setToNode] = useState("");
-  const [condition, setCondition] = useState("");
+  useEffect(() => {
+    if (selectedNode?.data?.keywords?.length) {
+      setKeywordsInput(selectedNode.data.keywords.join(", "));
+    } else {
+      setKeywordsInput("");
+    }
+  }, [selectedNode]);
+  const getTriggerLabel = (trigger: string) => {
+    const map: any = {
+      new_message_received: "Incoming Message",
+      outgoing_message: "Outgoing Message",
+      webhook_received: "Webhook",
+    };
+
+    return map[trigger] || trigger;
+  };
+
+
 
   /* =========================
      CREATE NODE
   ========================= */
   const createNode = (type: string) => {
-    if (!type || !contextMenu) return;
+    if (!type || !createNodePos) return;
 
     const config = NODE_CONFIG[type] || {};
     const nodeId = `${type}_${Date.now()}`;
 
     const newNode: Node<CustomNodeData> = {
       id: nodeId,
-      type: "default",
+      type: "custom",
       position: {
-        x: contextMenu.x,
-        y: contextMenu.y,
+        x: createNodePos.x - 100,
+        y: createNodePos.y - 50,
       },
       data: {
         id: nodeId,
         type,
         label: type,
         ...config,
-      },
+
+        messageType:
+          config.messageType || (type === "auto_reply" ? "text" : ""),
+
+        // 🔥 ADD THIS (only for trigger)
+        ...(type === "trigger" && {
+          triggerType: "all",
+          keywords: [], // 🔥 array
+        }),
+
+        onDelete: (id: string) => {
+          setNodes((nds) => nds.filter((n) => n.id !== id));
+          setEdges((eds) =>
+            eds.filter((e) => e.source !== id && e.target !== id)
+          );
+        },
+      }
     };
 
-    setNodes((prev) => [...prev, newNode]);
+    setNodes((prev) => {
+      const updated = [...prev, newNode];
 
-    // 🔥 AUTO CONNECT
-    if (selectedNode) {
-      setEdges((prev) => [
-        ...prev,
-        {
-          id: `${selectedNode.id}-${nodeId}`,
-          source: selectedNode.id,
-          target: nodeId,
-          animated: true,
-        },
-      ]);
-    }
+      // 🔥 auto connect from trigger
+      const trigger = updated.find((n) => n.data.type === "trigger");
 
-    setContextMenu(null);
+      if (trigger && type !== "trigger") {
+        setEdges((eds) => [
+          ...eds,
+          {
+            id: `${trigger.id}-${nodeId}`,
+            source: trigger.id,
+            target: nodeId,
+            type: "smoothstep" as any,
+            animated: true,
+            style: {
+              stroke: "#25D366",
+              strokeWidth: 2,
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+            },
+          }
+        ]);
+      }
+
+      return updated;
+    });
+
+    setCreateNodePos(null);
+    setSelectedNode(newNode);
+
   };
 
-  const CustomNode = ({ data }: NodeProps<CustomNodeData>) => {
-    return (
-      <Box sx={{ p: 1, border: "1px solid #ddd", borderRadius: 2 }}>
-        <div>{data.label}</div>
-
-        <Handle type="target" position={Position.Left} />
-        <Handle type="source" position={Position.Right} />
-      </Box>
-    );
-  };
-
-  const nodeTypes = {
-    default: CustomNode,
-  };
 
   const onConnect = (params: Connection) => {
     setEdges((eds) =>
       addEdge(
         {
           ...params,
+          type: "smoothstep" as any, // 🔥 important
+          label: params.sourceHandle || "",
           animated: true,
+          style: {
+            stroke: "#25D366",
+            strokeWidth: 2,
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+          },
         },
         eds
       )
@@ -195,31 +377,15 @@ const AutomationBuilder = () => {
   const onEdgeClick = (_: any, edge: Edge) => {
     setEdges((eds) => eds.filter((e) => e.id !== edge.id));
   };
-  /* =========================
-     CREATE EDGE
-  ========================= */
-  const createEdge = () => {
-    if (!fromNode || !toNode) return;
-
-    setEdges((prev) => [
-      ...prev,
-      {
-        id: `${fromNode}-${toNode}-${Date.now()}`,
-        source: fromNode,
-        target: toNode,
-        label: condition,
-        animated: true,
-      },
-    ]);
-
-    setCondition("");
-  };
 
   const handleCanvasClick = (event: any) => {
-    setSelectedNode(null); // ✅ close popup
+    const target = event.target as HTMLElement;
+
+    if (target.closest(".react-flow__node")) return;
+
     const bounds = event.currentTarget.getBoundingClientRect();
 
-    setContextMenu({
+    setCreateNodePos({
       x: event.clientX - bounds.left,
       y: event.clientY - bounds.top,
     });
@@ -230,30 +396,61 @@ const AutomationBuilder = () => {
   ========================= */
   const saveAutomation = async () => {
     try {
-      const formattedNodes = nodes.map((n) => {
-        return {
-          ...n.data,        // ✅ already typed
-          id: n.id,         // override safe
-          type: n.data.type // ensure exists
-        };
-      });
+      // 🔒 BASIC VALIDATION
+      if (!nodes || nodes.length === 0) {
+        alert("⚠️ Please add at least one node");
+        return;
+      }
 
+      // 🔒 TRIGGER VALIDATION
+      const triggerNodes = nodes.filter(
+        (n) => n.data?.type === "trigger"
+      );
+
+      if (triggerNodes.length === 0) {
+        alert("⚠️ Trigger node is required");
+        return;
+      }
+
+      if (triggerNodes.length > 1) {
+        alert("⚠️ Only one trigger node allowed");
+        return;
+      }
+
+      // 🔒 NODE DATA FORMAT
+      const formattedNodes = nodes.map((n) => ({
+        ...n.data,
+        id: n.id,
+        type: n.data?.type || "auto_reply",
+      }));
+
+      // 🔒 EDGE FORMAT
       const formattedEdges = edges.map((e) => ({
         from: e.source,
         to: e.target,
         condition:
-          typeof e.label === "string" ? e.label : "", // ✅ strict fix
+          typeof e.label === "string"
+            ? e.label
+            : e.sourceHandle || "", // 🔥 fallback for button connect
       }));
+
+      // 🔥 LOADING START
+      setSaving(true);
 
       await automationService.updateAutomation(id!, {
         nodes: formattedNodes,
         edges: formattedEdges,
       });
 
-      alert("✅ Saved");
-    } catch (err) {
-      console.error(err);
-      alert("❌ Save failed");
+    } catch (err: any) {
+      console.error("❌ Save Error:", err);
+
+      alert(
+        err?.response?.data?.message ||
+        "❌ Failed to save automation"
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -274,6 +471,8 @@ const AutomationBuilder = () => {
     enabled: !!id,
   });
 
+  const automation = data?.data || data;
+
   /* =========================
      LOAD FLOW
   ========================= */
@@ -282,17 +481,25 @@ const AutomationBuilder = () => {
 
     const flowNodes: Node<CustomNodeData>[] = data.nodes.map((node: any) => ({
       id: node.id,
-      type: "default",
+      type: "custom",
       position: { x: 0, y: 0 },
       data: { ...node, label: node.type },
     }));
-
     const flowEdges: Edge[] = data.edges.map((edge: any, i: number) => ({
       id: `${edge.from}-${edge.to}-${i}`,
       source: edge.from,
       target: edge.to,
       label: edge.condition || "",
+      sourceHandle: edge.condition || "", // 🔥 ADD THIS
+      type: "smoothstep" as any,
       animated: true,
+      style: {
+        stroke: "#25D366",
+        strokeWidth: 2,
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+      },
     }));
 
     const { nodes: layoutedNodes, edges: layoutedEdges } =
@@ -304,10 +511,47 @@ const AutomationBuilder = () => {
   }, [data]);
 
   useEffect(() => {
-    const handleClick = () => setContextMenu(null);
+    if (nodes.length === 0) {
+      const triggerNode: Node<CustomNodeData> = {
+        id: "trigger",
+        type: "custom",
+        position: { x: 200, y: 200 },
+        data: {
+          id: "trigger",
+          type: "trigger",
+          label: "trigger",
+
+          // 🔥 THIS WAS MISSING
+          triggerType: "all",
+          keywords: "",
+        },
+      };
+
+      setNodes([triggerNode]);
+    }
+  }, []);
+
+
+  useEffect(() => {
+    const handleClick = (e: any) => {
+      const target = e.target as HTMLElement;
+
+      // ✅ Node create popup pe click → ignore
+      if (target.closest("[data-node-popup]")) return;
+
+      // 🔥 ADD THIS (VERY IMPORTANT)
+      if (target.closest(".MuiDialog-root")) return;
+
+      // 🔥 ADD THIS (ReactFlow nodes pe click ignore)
+      if (target.closest(".react-flow__node")) return;
+
+      setCreateNodePos(null);
+    };
+
     window.addEventListener("click", handleClick);
     return () => window.removeEventListener("click", handleClick);
   }, []);
+
 
   /* =========================
      UPDATE NODE
@@ -316,15 +560,31 @@ const AutomationBuilder = () => {
     if (!selectedNode) return;
 
     setNodes((nds) =>
-      nds.map((n) =>
-        n.id === selectedNode.id
-          ? { ...n, data: { ...n.data, [key]: value } }
-          : n
-      )
+      nds.map((n) => {
+        if (n.id !== selectedNode.id) return n;
+
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            [key]: value,
+            _updatedAt: Date.now(), // 🔥 FORCE RERENDER (IMPORTANT)
+          },
+        };
+      })
     );
 
     setSelectedNode((prev) =>
-      prev ? { ...prev, data: { ...prev.data, [key]: value } } : prev
+      prev
+        ? {
+          ...prev,
+          data: {
+            ...prev.data,
+            [key]: value,
+            _updatedAt: Date.now(), // 🔥 sync popup + node
+          },
+        }
+        : prev
     );
   };
 
@@ -353,111 +613,58 @@ const AutomationBuilder = () => {
         position: "relative"   // 🔥 ADD THIS
       }}
     >
+
       {/* HEADER */}
-      <Stack direction="row" spacing={2} p={2} flexWrap="wrap">
-        {contextMenu && (
-          <Box
-            sx={{
-              position: "absolute",
-              top: contextMenu.y,
-              left: contextMenu.x,
-              background: "#fff",
-              borderRadius: 2,
-              boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
-              zIndex: 2000,
-              p: 1,
-              minWidth: 180,
-            }}
-          >
-            <MenuItem onClick={() => createNode("trigger")}>
-              Trigger
-            </MenuItem>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          px: 3,
+          py: 2,
+          background: "#ffffff",
+          borderBottom: "1px solid #e5e7eb",
+          position: "sticky",
+          top: 0,
+          zIndex: 1000,
+        }}
+      >
+        {/* LEFT SIDE */}
+        <Box display="flex" gap={3} alignItems="center">
 
-            <MenuItem onClick={() => createNode("auto_reply")}>
-              Auto Reply
-            </MenuItem>
+          <Typography variant="subtitle2">
+            <b>Automation:</b> {automation?.name || "Untitled"}
+          </Typography>
 
-            <MenuItem onClick={() => createNode("ask_location")}>
-              Ask Location
-            </MenuItem>
+          <Typography variant="subtitle2">
+            <b>Channel:</b> {automation?.channel_name || "-"}
+          </Typography>
 
-            <MenuItem onClick={() => createNode("address_message")}>
-              Address Message
-            </MenuItem>
+          <Typography variant="subtitle2">
+            <b>Trigger:</b> {getTriggerLabel(automation?.trigger)}
+          </Typography>
 
-            <MenuItem onClick={() => createNode("distance_check")}>
-              Distance Check
-            </MenuItem>
+        </Box>
 
-            <MenuItem onClick={() => createNode("google_sheet")}>
-              Google Sheet
-            </MenuItem>
-
-            <MenuItem onClick={() => createNode("razorpay_payment")}>
-              Payment
-            </MenuItem>
-
-            <MenuItem onClick={() => createNode("borzo_delivery")}>
-              Delivery
-            </MenuItem>
-          </Box>
-        )}
-
-        <Select size="small" value={fromNode} onChange={(e) => setFromNode(e.target.value)}>
-          <MenuItem value="">From</MenuItem>
-          {nodes.map((n) => (
-            <MenuItem key={n.id} value={n.id}>
-              {n.data?.label || n.data?.type}
-            </MenuItem>
-          ))}
-        </Select>
-
-        <Select size="small" value={toNode} onChange={(e) => setToNode(e.target.value)}>
-          <MenuItem value="">To</MenuItem>
-          {nodes.map((n) => (
-            <MenuItem key={n.id} value={n.id}>
-              {n.data?.label || n.data?.type}
-            </MenuItem>
-          ))}
-        </Select>
-
-        <Select
-          size="small"
-          value={condition}
-          onChange={(e) => setCondition(e.target.value)}
+        {/* RIGHT SIDE */}
+        <Button
+          variant="contained"
+          color="success"
+          onClick={saveAutomation}
+          sx={{
+            borderRadius: 2,
+            px: 3,
+            fontWeight: 600,
+          }}
         >
-          <MenuItem value="">Condition</MenuItem>
-
-          {nodes
-            .find((n) => n.id === fromNode)
-            ?.data?.buttons?.map((btn: any) => (
-              <MenuItem key={btn.id} value={btn.id}>
-                {btn.title}
-              </MenuItem>
-            ))}
-        </Select>
-
-        <Button variant="outlined" onClick={createEdge}>
-          + Edge
+          {saving ? "Saving..." : "Save"}
         </Button>
-
-        <Button variant="contained" color="success" onClick={saveAutomation}>
-          Save
-        </Button>
-      </Stack>
+      </Box>
 
       {/* FLOW */}
       <Box
         sx={{ width: "100%", height: "100%" }}
-        onClick={(e) => {
-          const target = e.target as HTMLElement;
-
-          // 🔥 if clicked inside node → ignore
-          if (target.closest(".react-flow__node")) return;
-
-          // 🔥 otherwise it's canvas
-          handleCanvasClick(e);
-        }}
+        onClick={handleCanvasClick}
         onContextMenu={(e) => {
           e.preventDefault();
 
@@ -470,8 +677,24 @@ const AutomationBuilder = () => {
       >
         <ReactFlow
           nodeTypes={nodeTypes}
+          nodes={nodes}
+          edges={edges}
+
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          nodeOrigin={[0.5, 0.5]}
+
           deleteKeyCode={["Backspace", "Delete"]}
+
           onNodesDelete={(deleted) => {
+            const filtered = deleted.filter((n) => n.data?.type !== "trigger");
+
+            if (filtered.length !== deleted.length) {
+              alert("Trigger node cannot be deleted");
+              return;
+            }
+
             const deletedIds = deleted.map((n) => n.id);
 
             setEdges((eds) =>
@@ -482,36 +705,143 @@ const AutomationBuilder = () => {
               )
             );
           }}
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+
           onNodeClick={(e, node) => {
-            e.stopPropagation(); // 🔥 VERY IMPORTANT
+            e.stopPropagation();
+
+            if (node.data.type === "trigger") {
+              setSelectedNode(node); // ✅ needed for update
+              setOpenTriggerPopup(true);
+              return; // 🔥 VERY IMPORTANT
+            }
+
             setSelectedNode(node);
           }}
-          onConnect={onConnect}
-          elementsSelectable={true}
-          nodesDraggable={true}
-          edgesFocusable={true}
+
           onEdgeClick={onEdgeClick}
           onEdgeContextMenu={onEdgeContextMenu}
+
+          elementsSelectable
+          nodesDraggable
+          edgesFocusable
+
           fitView
+
+          /* 🔥 MAIN FIX (LINES PROBLEM SOLVED HERE) */
+          defaultEdgeOptions={{
+            type: "smoothstep" as any,
+            animated: true,
+            style: {
+              stroke: "#25D366",
+              strokeWidth: 2,
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed, // 👉 arrow end
+            },
+          }}
         >
           <MiniMap />
           <Controls />
-          <Background />
+          <Background gap={20} size={1} />
         </ReactFlow>
       </Box>
 
+      {createNodePos && (
+        <Box
+          data-node-popup
+          sx={{
+            position: "absolute",
+            top: createNodePos.y,
+            left: createNodePos.x,
+            background: "#fff",
+            borderRadius: 2,
+            boxShadow: "0 10px 20px rgba(0,0,0,0.2)",
+            p: 1,
+            zIndex: 2000,
+          }}
+        >
+          {Object.keys(NODE_CONFIG).map((type) => (
+            <Box
+              key={type}
+              sx={{ p: 1, cursor: "pointer" }}
+              onClick={() => {
+                createNode(type);
+                setCreateNodePos(null);
+              }}
+            >
+              {type}
+            </Box>
+          ))}
+        </Box>
+      )}
+
       {/* POPUP */}
-      {selectedNode && (
+      {selectedNode && selectedNode.data.type !== "trigger" && (
         <NodeOpenPopup
           selectedNode={selectedNode}
           onClose={() => setSelectedNode(null)}
           updateNodeData={updateNodeData}
+          allNodes={nodes}
         />
       )}
+
+      <Dialog
+        open={openTriggerPopup}
+        onClose={() => setOpenTriggerPopup(false)}
+        maxWidth="sm"     // 🔥 add
+        fullWidth         // 🔥 add
+      >
+        <DialogTitle>Trigger Settings</DialogTitle>
+
+        <DialogContent>
+          <RadioGroup
+            value={selectedNode?.data?.triggerType || "all"}
+            onChange={(e) =>
+              updateNodeData("triggerType", e.target.value)
+            }
+          >
+            <FormControlLabel
+              value="all"
+              control={<Radio />}
+              label="All Messages"
+            />
+
+            <FormControlLabel
+              value="keyword"
+              control={<Radio />}
+              label="Match Exact Keywords"
+            />
+          </RadioGroup>
+
+          {/* 🔥 Keyword input */}
+          {selectedNode?.data?.triggerType === "keyword" && (
+            <TextField
+              fullWidth
+              placeholder="hello, hi, price"
+              value={keywordsInput}
+              onChange={(e) => setKeywordsInput(e.target.value)}
+              sx={{ mt: 1 }}   // 🔥 spacing
+            />
+          )}
+
+          <Button
+            variant="contained"
+            fullWidth
+            sx={{ mt: 2 }}
+            onClick={() => {
+              const keywordsArray = keywordsInput
+                .split(",")
+                .map((k) => k.trim())
+                .filter((k) => k.length > 0);
+
+              updateNodeData("keywords", keywordsArray); // 🔥 array save
+              setOpenTriggerPopup(false);
+            }}
+          >
+            Save
+          </Button>
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };
