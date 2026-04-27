@@ -15,7 +15,9 @@ import { templateService } from "service/template.service";
 
 const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
   const [messageType, setMessageType] = useState(
-    node.data.messageType || "text"
+    node.data.type === "list"
+      ? "list"
+      : node.data.messageType || "text"
   );
   const [uploading, setUploading] = useState(false);
 
@@ -90,9 +92,15 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
         },
       ]);
     }
-  }, [messageType]);
+  }, [messageType, node.data.sections]);
   return (
-    <Box sx={{ height: "100%", overflowY: "auto", pr: 1 }}>
+    <Box
+      sx={{
+        height: "80vh",   // 👈 fixed viewport height
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <Grid container rowSpacing={2}>
         {/* HEADER */}
         <Grid item xs={12}>
@@ -106,6 +114,13 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
             onChange={(e, v) => {
               setMessageType(v);
               updateNodeData("messageType", v);
+
+              // 🔥 TYPE SYNC (VERY IMPORTANT)
+              if (v === "list") {
+                updateNodeData("type", "list");
+              } else if (node.data.type === "list") {
+                updateNodeData("type", "auto_reply");
+              }
             }}
             variant="scrollable"
           >
@@ -329,10 +344,8 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
               <TextField
                 fullWidth
                 label="CTA Button Text"
-                value={node.data.cta || ""}
-                onChange={(e) =>
-                  updateNodeData("cta", e.target.value)
-                }
+                value={node.data.button_text || ""}
+                onChange={(e) => updateNodeData("button_text", e.target.value)}
               />
             </Grid>
 

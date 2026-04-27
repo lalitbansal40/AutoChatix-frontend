@@ -31,6 +31,7 @@ import {
   Radio,
   TextField
 } from "@mui/material";
+import CustomEdge from "components/customedge";
 type CustomNodeData = {
   id: string;
   type: string;
@@ -38,6 +39,10 @@ type CustomNodeData = {
   message?: string;
   buttons?: any[];
   [key: string]: any;
+};
+
+const edgeTypes = {
+  custom: CustomEdge,
 };
 
 /* =========================
@@ -54,6 +59,7 @@ const NODE_CONFIG: any = {
   auto_reply: {
     message: "",
     buttons: [],
+    list: [],
   },
 
   ask_location: {
@@ -143,9 +149,10 @@ const CustomNode = React.memo(({ data }: NodeProps<CustomNodeData>) => {
         <Box
           sx={{
             background: "#dcf8c6",
-            p: 1,
-            borderRadius: 2,
+            p: 0.5,
+            borderRadius: 1,
             fontSize: 12,
+            maxWidth: 220,
             mb: 1,
           }}
         >
@@ -195,6 +202,55 @@ const CustomNode = React.memo(({ data }: NodeProps<CustomNodeData>) => {
           );
         })
       )}
+
+      {/* 🔥 LIST ITEMS */}
+      {Array.isArray(data.list) && data.list.length > 0 &&
+        data.list.map((item: any, index: number) => {
+          const itemId = item?.id || `list_${index}`;
+
+          return (
+            <Box
+              key={itemId}
+              sx={{
+                mt: 1,
+                px: 1.5,
+                py: 1,
+                borderRadius: 2,
+                fontSize: 12,
+                background: "#eef6ff", // 🔥 different color
+                position: "relative",
+                border: "1px solid #dbeafe",
+              }}
+            >
+              <Typography fontSize={12} fontWeight={500}>
+                {item?.title || "Untitled"}
+              </Typography>
+
+              {item?.description && (
+                <Typography fontSize={11} color="#666">
+                  {item.description}
+                </Typography>
+              )}
+
+              {/* 🔥 HANDLE (same as button) */}
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={itemId}
+                style={{
+                  width: 10,
+                  height: 10,
+                  background: "#2563eb", // 🔥 blue for list
+                  borderRadius: "50%",
+                  position: "absolute",
+                  right: -6,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                }}
+              />
+            </Box>
+          );
+        })}
       {/* TARGET HANDLE */}
       {/* 🟢 TRIGGER → ONLY OUTGOING */}
       {data.type === "trigger" && (
@@ -228,7 +284,8 @@ const CustomNode = React.memo(({ data }: NodeProps<CustomNodeData>) => {
 
       {/* 🟢 NORMAL NODES → DEFAULT OUTGOING (no buttons case) */}
       {data.type !== "trigger" &&
-        (!Array.isArray(data.buttons) || data.buttons.length === 0) && (
+        (!Array.isArray(data.buttons) || data.buttons.length === 0) &&
+        (!Array.isArray(data.list) || data.list.length === 0) && (
           <Handle
             type="source"
             position={Position.Right}
@@ -331,7 +388,7 @@ const AutomationBuilder = () => {
             id: `${trigger.id}-${nodeId}`,
             source: trigger.id,
             target: nodeId,
-            type: "smoothstep" as any,
+            type: "custom" as any,
             animated: true,
             style: {
               stroke: "#25D366",
@@ -358,7 +415,7 @@ const AutomationBuilder = () => {
       addEdge(
         {
           ...params,
-          type: "smoothstep" as any, // 🔥 important
+          type: "custom" as any, // 🔥 important
           label: params.sourceHandle || "",
           animated: true,
           style: {
@@ -418,11 +475,51 @@ const AutomationBuilder = () => {
       }
 
       // 🔒 NODE DATA FORMAT
-      const formattedNodes = nodes.map((n) => ({
-        ...n.data,
-        id: n.id,
-        type: n.data?.type || "auto_reply",
-      }));
+      const formattedNodes = nodes.map((n) => {
+        let sections = n.data.sections || [];
+
+        // 🔥 convert list → sections (existing logic)
+        if (!sections.length && n.data?.list?.length) {
+          sections = [
+            {
+              title: n.data.sectionTitle || "Options",
+              rows: n.data.list.map((item: any) => ({
+                id: item.id,
+                title: item.title,
+                description: item.description,
+              })),
+            },
+          ];
+        }
+
+        // 🔥 AUTO TYPE DETECT
+        const nodeType =
+          sections.length > 0
+            ? "list"
+            : n.data?.type || "auto_reply";
+
+        return {
+          ...n.data,
+          id: n.id,
+          type: nodeType,
+          sections,
+
+          // ✅ BODY FIX (message → body)
+          body:
+            nodeType === "list"
+              ? n.data.message
+              : n.data.body,
+
+          // 🔥 FINAL CTA FIX (IMPORTANT)
+          button_text:
+            nodeType === "list"
+              ? n.data.button_text || n.data.cta || "Select"
+              : n.data.button_text,
+
+          // ❌ REMOVE OLD FIELD
+          cta: undefined,
+        };
+      });
 
       // 🔒 EDGE FORMAT
       const formattedEdges = edges.map((e) => ({
@@ -431,7 +528,7 @@ const AutomationBuilder = () => {
         condition:
           typeof e.label === "string"
             ? e.label
-            : e.sourceHandle || "", // 🔥 fallback for button connect
+            : e.sourceHandle || "",
       }));
 
       // 🔥 LOADING START
@@ -479,19 +576,39 @@ const AutomationBuilder = () => {
   useEffect(() => {
     if (!data) return;
 
-    const flowNodes: Node<CustomNodeData>[] = data.nodes.map((node: any) => ({
-      id: node.id,
-      type: "custom",
-      position: { x: 0, y: 0 },
-      data: { ...node, label: node.type },
-    }));
+    const flowNodes: Node<CustomNodeData>[] = data.nodes.map((node: any) => {
+
+      let list: any[] = [];
+
+      // ✅ convert sections → flat list
+      if (node.type === "list" && node.sections?.length) {
+        list = node.sections.flatMap((section: any) =>
+          section.rows.map((row: any) => ({
+            id: row.id,
+            title: row.title,
+            description: row.description,
+          }))
+        );
+      }
+
+      return {
+        id: node.id,
+        type: "custom",
+        position: { x: 0, y: 0 },
+        data: {
+          ...node,
+          list, // 🔥 IMPORTANT
+          label: node.type,
+        },
+      };
+    });
     const flowEdges: Edge[] = data.edges.map((edge: any, i: number) => ({
       id: `${edge.from}-${edge.to}-${i}`,
       source: edge.from,
       target: edge.to,
       label: edge.condition || "",
       sourceHandle: edge.condition || "", // 🔥 ADD THIS
-      type: "smoothstep" as any,
+      type: "custom" as any,
       animated: true,
       style: {
         stroke: "#25D366",
@@ -523,7 +640,7 @@ const AutomationBuilder = () => {
 
           // 🔥 THIS WAS MISSING
           triggerType: "all",
-          keywords: "",
+          keywords: []
         },
       };
 
@@ -728,16 +845,9 @@ const AutomationBuilder = () => {
           fitView
 
           /* 🔥 MAIN FIX (LINES PROBLEM SOLVED HERE) */
+          edgeTypes={edgeTypes}
           defaultEdgeOptions={{
-            type: "smoothstep" as any,
-            animated: true,
-            style: {
-              stroke: "#25D366",
-              strokeWidth: 2,
-            },
-            markerEnd: {
-              type: MarkerType.ArrowClosed, // 👉 arrow end
-            },
+            type: "custom", // 🔥 THIS IS IMPORTANT
           }}
         >
           <MiniMap />

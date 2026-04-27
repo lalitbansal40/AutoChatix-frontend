@@ -164,7 +164,7 @@ const NodeOpenPopup = ({
                     </Button>
                   ))}
 
-                  {data.messageType === "list" && (
+                  {(data.type === "list" || data.messageType === "list") && (
                     <Button
                       variant="contained"
                       fullWidth
