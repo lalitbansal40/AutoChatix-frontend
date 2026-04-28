@@ -8,6 +8,7 @@ import {
   Grid,
   Button,
   Typography,
+  TextField,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { NODE_EDITORS } from "./node-editors";
@@ -146,6 +147,15 @@ const NodeOpenPopup = ({
                   <Typography variant="body2" mb={2}>
                     {data.message || "Your message preview..."}
                   </Typography>
+
+                  {data.type === "ask_input" && (
+                    <TextField
+                      placeholder="User will type here..."
+                      size="small"
+                      fullWidth
+                      disabled
+                    />
+                  )}
 
                   {/* ================= BUTTONS ================= */}
                   {(data.buttons || []).map((btn: any) => (

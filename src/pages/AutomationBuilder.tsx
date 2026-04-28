@@ -32,6 +32,10 @@ import {
   TextField
 } from "@mui/material";
 import CustomEdge from "components/customedge";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import { IconButton, Menu, MenuItem } from "@mui/material";
+
+
 type CustomNodeData = {
   id: string;
   type: string;
@@ -55,11 +59,21 @@ const NODE_CONFIG: any = {
       keywords: [],
     },
   },
+  set_contact_attribute: {
+    attribute_name: "",
+    attribute_value: "",
+  },
 
   auto_reply: {
     message: "",
     buttons: [],
     list: [],
+  },
+
+  ask_input: {
+    message: "Please enter your response 👇",
+    input_type: "text",
+    save_to: "response",
   },
 
   ask_location: {
@@ -126,7 +140,8 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
   return { nodes, edges };
 };
 
-const CustomNode = React.memo(({ data }: NodeProps<CustomNodeData>) => {
+const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
+  const { disconnectRow } = data;
   return (
     <Box
       sx={{
@@ -136,13 +151,38 @@ const CustomNode = React.memo(({ data }: NodeProps<CustomNodeData>) => {
         minWidth: 220,
         boxShadow: "none",
         border: "1px solid #eee",
-        overflow: "visible",
+        overflow: "visible"
+
       }}
     >
       {/* HEADER */}
-      <Typography fontSize={12} fontWeight={600} mb={1}>
-        {data.type}
-      </Typography>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={1}
+      >
+        <Typography fontSize={12} fontWeight={600}>
+          {data.type}
+        </Typography>
+
+        {/* 🔥 3 DOT MENU */}
+        {data.type !== "trigger" && (
+          <>
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                data.setMenuAnchor?.(e.currentTarget);
+              }}
+            >
+              <MoreVertIcon fontSize="small" />
+            </IconButton>
+          </>
+        )}
+      </Box>
 
       {/* MESSAGE */}
       {data.message && (
@@ -157,6 +197,18 @@ const CustomNode = React.memo(({ data }: NodeProps<CustomNodeData>) => {
           }}
         >
           {data.message}
+        </Box>
+      )}
+
+      {data.type === "set_contact_attribute" && (
+        <Box sx={{ background: "#fef3c7", p: 0.5, borderRadius: 1, fontSize: 11 }}>
+          {Array.isArray(data.attribute_name)
+            ? data.attribute_name.map((k: any, i: number) => (
+              <div key={i}>
+                {k || "?"} = {data.attribute_value?.[i] || "?"}
+              </div>
+            ))
+            : `${data.attribute_name || "?"} = ${data.attribute_value || "?"}`}
         </Box>
       )}
 
@@ -210,6 +262,10 @@ const CustomNode = React.memo(({ data }: NodeProps<CustomNodeData>) => {
 
           return (
             <Box
+              onClick={(e) => {
+                e.stopPropagation(); // 🔥 MUST
+                disconnectRow?.(id, itemId); // ✅ correct
+              }}
               key={itemId}
               sx={{
                 mt: 1,
@@ -220,6 +276,9 @@ const CustomNode = React.memo(({ data }: NodeProps<CustomNodeData>) => {
                 background: "#eef6ff", // 🔥 different color
                 position: "relative",
                 border: "1px solid #dbeafe",
+                "&:hover": {
+                  background: "#dbeafe",
+                },
               }}
             >
               <Typography fontSize={12} fontWeight={500}>
@@ -315,6 +374,21 @@ const AutomationBuilder = () => {
   const [openTriggerPopup, setOpenTriggerPopup] = useState(false);
   const [saving, setSaving] = useState(false);
   const [keywordsInput, setKeywordsInput] = useState("");
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+
+  const closeMenu = () => setAnchorEl(null);
+
+  const disconnectRow = (nodeId: string, rowId: string) => {
+    setEdges((eds) =>
+      eds.filter(
+        (e) =>
+          !(
+            e.source === nodeId &&
+            e.sourceHandle === rowId
+          )
+      )
+    );
+  };
 
   useEffect(() => {
     if (selectedNode?.data?.keywords?.length) {
@@ -366,6 +440,9 @@ const AutomationBuilder = () => {
           keywords: [], // 🔥 array
         }),
 
+        setMenuAnchor: (el: HTMLElement) => {
+          setAnchorEl(el);
+        },
         onDelete: (id: string) => {
           setNodes((nds) => nds.filter((n) => n.id !== id));
           setEdges((eds) =>
@@ -377,30 +454,6 @@ const AutomationBuilder = () => {
 
     setNodes((prev) => {
       const updated = [...prev, newNode];
-
-      // 🔥 auto connect from trigger
-      const trigger = updated.find((n) => n.data.type === "trigger");
-
-      if (trigger && type !== "trigger") {
-        setEdges((eds) => [
-          ...eds,
-          {
-            id: `${trigger.id}-${nodeId}`,
-            source: trigger.id,
-            target: nodeId,
-            type: "custom" as any,
-            animated: true,
-            style: {
-              stroke: "#25D366",
-              strokeWidth: 2,
-            },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-            },
-          }
-        ]);
-      }
-
       return updated;
     });
 
@@ -411,11 +464,19 @@ const AutomationBuilder = () => {
 
 
   const onConnect = (params: Connection) => {
-    setEdges((eds) =>
-      addEdge(
+    setEdges((eds) => {
+      const exists = eds.find(
+        (e) =>
+          e.source === params.source &&
+          e.sourceHandle === params.sourceHandle
+      );
+
+      if (exists) return eds;
+
+      return addEdge(
         {
           ...params,
-          type: "custom" as any, // 🔥 important
+          type: "custom" as any,
           label: params.sourceHandle || "",
           animated: true,
           style: {
@@ -427,13 +488,10 @@ const AutomationBuilder = () => {
           },
         },
         eds
-      )
-    );
+      );
+    });
   };
 
-  const onEdgeClick = (_: any, edge: Edge) => {
-    setEdges((eds) => eds.filter((e) => e.id !== edge.id));
-  };
 
   const handleCanvasClick = (event: any) => {
     const target = event.target as HTMLElement;
@@ -504,19 +562,25 @@ const AutomationBuilder = () => {
           type: nodeType,
           sections,
 
-          // ✅ BODY FIX (message → body)
+          // 🔥 ADD THIS LINE (IMPORTANT)
+          position: n.position,
+          ...(n.data.type === "set_contact_attribute" && {
+            config: {
+              key: n.data.attribute_name,
+              value: n.data.attribute_value,
+            },
+          }),
+
           body:
             nodeType === "list"
               ? n.data.message
               : n.data.body,
 
-          // 🔥 FINAL CTA FIX (IMPORTANT)
           button_text:
             nodeType === "list"
               ? n.data.button_text || n.data.cta || "Select"
               : n.data.button_text,
 
-          // ❌ REMOVE OLD FIELD
           cta: undefined,
         };
       });
@@ -533,6 +597,8 @@ const AutomationBuilder = () => {
 
       // 🔥 LOADING START
       setSaving(true);
+
+
 
       await automationService.updateAutomation(id!, {
         nodes: formattedNodes,
@@ -594,11 +660,25 @@ const AutomationBuilder = () => {
       return {
         id: node.id,
         type: "custom",
-        position: { x: 0, y: 0 },
+        position: node.position || { x: 0, y: 0 },
         data: {
           ...node,
           list, // 🔥 IMPORTANT
           label: node.type,
+          // 🔥 ADD THIS
+          attribute_name: node.config?.key || "",
+          attribute_value: node.config?.value || "",
+          disconnectRow,
+          setMenuAnchor: (el: HTMLElement) => {
+            setSelectedNode({
+              id: node.id,
+              type: "custom",
+              position: node.position || { x: 0, y: 0 },
+              data: node, // 🔥 FULL DATA
+            } as any);
+
+            setAnchorEl(el);
+          },
         },
       };
     });
@@ -619,11 +699,24 @@ const AutomationBuilder = () => {
       },
     }));
 
-    const { nodes: layoutedNodes, edges: layoutedEdges } =
-      getLayoutedElements(flowNodes, flowEdges);
+    const hasSavedPositions = flowNodes.some(
+      (n) =>
+        n.position &&
+        (n.position.x !== 0 || n.position.y !== 0)
+    );
 
-    setNodes(layoutedNodes);
-    setEdges(layoutedEdges);
+    if (hasSavedPositions) {
+      // ✅ USE DB POSITIONS
+      setNodes(flowNodes);
+      setEdges(flowEdges);
+    } else {
+      // ✅ FIRST TIME AUTO LAYOUT
+      const { nodes: layoutedNodes, edges: layoutedEdges } =
+        getLayoutedElements(flowNodes, flowEdges);
+
+      setNodes(layoutedNodes);
+      setEdges(layoutedEdges);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
@@ -673,32 +766,30 @@ const AutomationBuilder = () => {
   /* =========================
      UPDATE NODE
   ========================= */
-  const updateNodeData = (key: string, value: any) => {
-    if (!selectedNode) return;
-
+  const updateNodeData = (id: string, newData: any) => {
     setNodes((nds) =>
-      nds.map((n) => {
-        if (n.id !== selectedNode.id) return n;
-
-        return {
-          ...n,
-          data: {
-            ...n.data,
-            [key]: value,
-            _updatedAt: Date.now(), // 🔥 FORCE RERENDER (IMPORTANT)
-          },
-        };
-      })
+      nds.map((node) =>
+        node.id === id
+          ? {
+            ...node,
+            data: {
+              ...node.data,
+              ...newData,
+              _updatedAt: Date.now(),
+            },
+          }
+          : node
+      )
     );
 
     setSelectedNode((prev) =>
-      prev
+      prev && prev.id === id
         ? {
           ...prev,
           data: {
             ...prev.data,
-            [key]: value,
-            _updatedAt: Date.now(), // 🔥 sync popup + node
+            ...newData,
+            _updatedAt: Date.now(),
           },
         }
         : prev
@@ -724,6 +815,8 @@ const AutomationBuilder = () => {
 
   return (
     <Box
+      display="flex"
+      flexDirection="column"
       height="calc(100vh - 70px)"
       sx={{
         background: "#f5f5f5",
@@ -743,7 +836,7 @@ const AutomationBuilder = () => {
           borderBottom: "1px solid #e5e7eb",
           position: "sticky",
           top: 0,
-          zIndex: 1000,
+          zIndex: 10,
         }}
       >
         {/* LEFT SIDE */}
@@ -780,7 +873,7 @@ const AutomationBuilder = () => {
 
       {/* FLOW */}
       <Box
-        sx={{ width: "100%", height: "100%" }}
+        sx={{ flex: 1 }}
         onClick={handleCanvasClick}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -796,6 +889,15 @@ const AutomationBuilder = () => {
           nodeTypes={nodeTypes}
           nodes={nodes}
           edges={edges}
+          onNodeDragStop={(e, node) => {
+            setNodes((nds) =>
+              nds.map((n) =>
+                n.id === node.id
+                  ? { ...n, position: node.position }
+                  : n
+              )
+            );
+          }}
 
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
@@ -835,7 +937,6 @@ const AutomationBuilder = () => {
             setSelectedNode(node);
           }}
 
-          onEdgeClick={onEdgeClick}
           onEdgeContextMenu={onEdgeContextMenu}
 
           elementsSelectable
@@ -854,6 +955,47 @@ const AutomationBuilder = () => {
           <Controls />
           <Background gap={20} size={1} />
         </ReactFlow>
+
+        <Menu
+          anchorEl={anchorEl}
+          open={!!anchorEl}
+          onClose={closeMenu}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MenuItem
+            onClick={() => {
+              closeMenu();
+              if (selectedNode) {
+                setAnchorEl(null); // menu close
+                setSelectedNode(selectedNode); // popup open already handled
+              }
+            }}
+          >
+            ✏️ Edit
+          </MenuItem>
+
+          <MenuItem
+            onClick={() => {
+              if (!selectedNode) return;
+              const id = selectedNode.id;
+
+              setNodes((nds) =>
+                nds.filter((n) => n.id !== id)
+              );
+
+              setEdges((eds) =>
+                eds.filter(
+                  (e) => e.source !== id && e.target !== id
+                )
+              );
+
+              setSelectedNode(null);
+              closeMenu();
+            }}
+          >
+            🗑 Delete
+          </MenuItem>
+        </Menu>
       </Box>
 
       {createNodePos && (
@@ -886,7 +1028,7 @@ const AutomationBuilder = () => {
       )}
 
       {/* POPUP */}
-      {selectedNode && selectedNode.data.type !== "trigger" && (
+      {selectedNode && !anchorEl && selectedNode.data?.type && selectedNode.data.type !== "trigger" && (
         <NodeOpenPopup
           selectedNode={selectedNode}
           onClose={() => setSelectedNode(null)}

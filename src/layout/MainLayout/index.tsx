@@ -44,12 +44,12 @@ const MainLayout = () => {
       <Header />
       {!isHorizontal ? <Drawer /> : <HorizontalBar />}
 
-      <Box component="main" sx={{ width: 'calc(100% - 260px)', flexGrow: 1, p: { xs: 2, sm: 3 } }}>
-        <Toolbar sx={{ mt: isHorizontal ? 8 : 'inherit' }} />
+      <Box component="main" sx={{ width: 'calc(100% - 100px)', flexGrow: 1, p: 0 }}>
+        <Toolbar sx={{ mt: isHorizontal ? 0 : 'inherit' }} />
         <Container
           maxWidth={container ? 'xl' : false}
           sx={{
-            ...(container && { px: { xs: 0, sm: 2 } }),
+            ...(container && { px: { xs: 0, sm: 0 } }),
             position: 'relative',
             minHeight: 'calc(100vh - 110px)',
             display: 'flex',

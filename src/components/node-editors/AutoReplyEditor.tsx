@@ -36,7 +36,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
         type: "quick_reply",
       },
     ];
-    updateNodeData("buttons", updated);
+    updateNodeData(node.id, { buttons: updated });
   };
 
   const handleFileUpload = async (e: any, type: string) => {
@@ -48,10 +48,8 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
 
       const url = await mediaService.uploadMedia(file);
 
-      updateNodeData("media", {
-        type,
-        url,
-        name: file.name, // 🔥 ADD THIS
+      updateNodeData(node.id, {
+        media: { type, url, name: file.name }
       });
 
     } catch (err) {
@@ -66,7 +64,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
     const fetchFlows = async () => {
       try {
         const flows = await templateService.getWhatsappFlows("PUBLISHED");
-        updateNodeData("flows", flows);
+        updateNodeData(node.id, { flows });
       } catch (err) {
         console.error(err);
       }
@@ -78,19 +76,21 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
 
   useEffect(() => {
     if (messageType === "list" && !node.data.sections) {
-      updateNodeData("sections", [
-        {
-          title: "Section 1",
-          rows: [
-            {
-              id: `row_${Date.now()}`,
-              title: "Option 1",
-              description: "",
-              nextNode: "",
-            },
-          ],
-        },
-      ]);
+      updateNodeData(node.id, {
+        sections: [
+          {
+            title: "Section 1",
+            rows: [
+              {
+                id: `row_${Date.now()}`,
+                title: "Option 1",
+                description: "",
+                nextNode: "",
+              },
+            ],
+          },
+        ]
+      });
     }
   }, [messageType, node.data.sections]);
   return (
@@ -146,7 +146,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
               rows={4}
               value={node.data.message || ""}
               onChange={(e) =>
-                updateNodeData("message", e.target.value)
+                updateNodeData(node.id, { message: e.target.value })
               }
             />
           </Grid>
@@ -164,7 +164,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                 rows={3}
                 value={node.data.message || ""}
                 onChange={(e) =>
-                  updateNodeData("message", e.target.value)
+                  updateNodeData(node.id, { message: e.target.value })
                 }
               />
             </Grid>
@@ -187,7 +187,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                             : btn
                         );
 
-                        updateNodeData("buttons", updated);
+                        updateNodeData(node.id, { buttons: updated });
                       }}
                     />
                   </Grid>
@@ -206,7 +206,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                             : btn
                         );
 
-                        updateNodeData("buttons", updated);
+                        updateNodeData(node.id, { buttons: updated });
                       }}
                     >
                       <MenuItem value="quick_reply">Quick Reply</MenuItem>
@@ -230,7 +230,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                               : btn
                           );
 
-                          updateNodeData("buttons", updated);
+                          updateNodeData(node.id, { buttons: updated });
                         }}
                       >
                         {nodesList.map((n: any) => (
@@ -254,7 +254,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                               : btn
                           );
 
-                          updateNodeData("buttons", updated);
+                          updateNodeData(node.id, { buttons: updated });
                         }}
                       >
                         {(data.flows || []).map((f: any) => (
@@ -277,7 +277,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                               : btn
                           );
 
-                          updateNodeData("buttons", updated);
+                          updateNodeData(node.id, { buttons: updated });
                         }}
                       />
                     )}
@@ -334,7 +334,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                 rows={3}
                 value={node.data.message || ""}
                 onChange={(e) =>
-                  updateNodeData("message", e.target.value)
+                  updateNodeData(node.id, { message: e.target.value })
                 }
               />
             </Grid>
@@ -345,7 +345,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                 fullWidth
                 label="CTA Button Text"
                 value={node.data.button_text || ""}
-                onChange={(e) => updateNodeData("button_text", e.target.value)}
+                onChange={(e) => updateNodeData(node.id, { button_text: e.target.value })}
               />
             </Grid>
 
@@ -362,7 +362,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                     onChange={(e) => {
                       const updated = JSON.parse(JSON.stringify(node.data.sections));
                       updated[si].title = e.target.value;
-                      updateNodeData("sections", updated);
+                      updateNodeData(node.id, { sections: updated });
                     }}
                     sx={{ mb: 2 }}
                   />
@@ -379,7 +379,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                           onChange={(e) => {
                             const updated = JSON.parse(JSON.stringify(node.data.sections));
                             updated[si].rows[ri].title = e.target.value;
-                            updateNodeData("sections", updated);
+                            updateNodeData(node.id, { sections: updated });
                           }}
                         />
                       </Grid>
@@ -392,7 +392,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                           onChange={(e) => {
                             const updated = JSON.parse(JSON.stringify(node.data.sections));
                             updated[si].rows[ri].description = e.target.value;
-                            updateNodeData("sections", updated);
+                            updateNodeData(node.id, { sections: updated });
                           }}
                         />
                       </Grid>
@@ -406,7 +406,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                           onChange={(e) => {
                             const updated = JSON.parse(JSON.stringify(node.data.sections));
                             updated[si].rows[ri].nextNode = e.target.value;
-                            updateNodeData("sections", updated);
+                            updateNodeData(node.id, { sections: updated });
                           }}
                         >
                           {allNodes.map((n: any) => (
@@ -424,7 +424,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                           onClick={() => {
                             const updated = JSON.parse(JSON.stringify(node.data.sections));
                             updated[si].rows.splice(ri, 1);
-                            updateNodeData("sections", updated);
+                            updateNodeData(node.id, { sections: updated });
                           }}
                         >
                           Delete
@@ -452,7 +452,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                         nextNode: "",
                       });
 
-                      updateNodeData("sections", updated);
+                      updateNodeData(node.id, { sections: updated });
                     }}
                   >
                     + Add Row
@@ -465,7 +465,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                     onClick={() => {
                       const updated = JSON.parse(JSON.stringify(node.data.sections));
                       updated.splice(si, 1);
-                      updateNodeData("sections", updated);
+                      updateNodeData(node.id, { sections: updated });
                     }}
                   >
                     Delete Section
@@ -512,7 +512,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
               label="Ask Address Message"
               value={node.data.message || ""}
               onChange={(e) =>
-                updateNodeData("message", e.target.value)
+                updateNodeData(node.id, { message: e.target.value })
               }
             />
           </Grid>
@@ -526,7 +526,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
               label="Ask Location Message"
               value={node.data.message || ""}
               onChange={(e) =>
-                updateNodeData("message", e.target.value)
+                updateNodeData(node.id, { message: e.target.value })
               }
             />
           </Grid>
@@ -541,7 +541,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                 label="Header"
                 value={node.data.header || ""}
                 onChange={(e) =>
-                  updateNodeData("header", e.target.value)
+                  updateNodeData(node.id, { header: e.target.value })
                 }
               />
             </Grid>
@@ -551,14 +551,16 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                 variant="outlined"
                 onClick={() => {
                   const items = node.data.items || [];
-                  updateNodeData("items", [
-                    ...items,
-                    {
-                      id: `item_${Date.now()}`,
-                      title: "New Item",
-                      description: "",
-                    },
-                  ]);
+                  updateNodeData(node.id, {
+                    items: [
+                      ...items,
+                      {
+                        id: `item_${Date.now()}`,
+                        title: "New Item",
+                        description: "",
+                      },
+                    ]
+                  });
                 }}
               >
                 + Add Card
