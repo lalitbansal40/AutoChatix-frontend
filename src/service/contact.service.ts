@@ -47,12 +47,12 @@ class ContactService {
       attributes?: Record<string, any>;
     },
   ) {
-    const response = await axiosServices.patch(`contact/${contactId}`, payload);
+    const response = await axiosServices.put(`contact/${contactId}`, payload);
     return response.data;
   }
 
   async markAsRead(contactId: string) {
-    return axiosServices.patch(`/message/read/${contactId}`);
+    return axiosServices.put(`/message/read/${contactId}`);
   }
 
   async importContacts(channelId: string, file: File) {

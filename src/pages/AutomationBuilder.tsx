@@ -373,8 +373,9 @@ const AutomationBuilder = () => {
   const [createNodePos, setCreateNodePos] = useState<any>(null);
   const [openTriggerPopup, setOpenTriggerPopup] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [keywordsInput, setKeywordsInput] = useState("");
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [input, setInput] = useState("");
 
   const closeMenu = () => setAnchorEl(null);
 
@@ -390,13 +391,15 @@ const AutomationBuilder = () => {
     );
   };
 
+
   useEffect(() => {
-    if (selectedNode?.data?.keywords?.length) {
-      setKeywordsInput(selectedNode.data.keywords.join(", "));
+    if (selectedNode?.data?.keywords) {
+      setKeywords(selectedNode.data.keywords);
     } else {
-      setKeywordsInput("");
+      setKeywords([]);
     }
   }, [selectedNode]);
+
   const getTriggerLabel = (trigger: string) => {
     const map: any = {
       new_message_received: "Incoming Message",
@@ -621,9 +624,7 @@ const AutomationBuilder = () => {
   const onEdgeContextMenu = (event: any, edge: Edge) => {
     event.preventDefault();
 
-    if (window.confirm("Delete this connection?")) {
-      setEdges((eds) => eds.filter((e) => e.id !== edge.id));
-    }
+    setEdges((eds) => eds.filter((e) => e.id !== edge.id));
   };
   /* =========================
      FETCH
@@ -1049,7 +1050,10 @@ const AutomationBuilder = () => {
           <RadioGroup
             value={selectedNode?.data?.triggerType || "all"}
             onChange={(e) =>
-              updateNodeData("triggerType", e.target.value)
+              selectedNode &&
+              updateNodeData(selectedNode.id, {
+                triggerType: e.target.value,
+              })
             }
           >
             <FormControlLabel
@@ -1067,13 +1071,54 @@ const AutomationBuilder = () => {
 
           {/* 🔥 Keyword input */}
           {selectedNode?.data?.triggerType === "keyword" && (
-            <TextField
-              fullWidth
-              placeholder="hello, hi, price"
-              value={keywordsInput}
-              onChange={(e) => setKeywordsInput(e.target.value)}
-              sx={{ mt: 1 }}   // 🔥 spacing
-            />
+            <Box>
+              <Box display="flex" gap={1}>
+                <TextField
+                  fullWidth
+                  placeholder="Enter keyword"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                />
+
+                <Button
+                  variant="contained"
+                  onClick={() => {
+                    if (!input.trim()) return;
+
+                    setKeywords((prev) => [...prev, input.trim()]);
+                    setInput("");
+                  }}
+                >
+                  Add
+                </Button>
+              </Box>
+
+              <Box mt={1} display="flex" gap={1} flexWrap="wrap">
+                {keywords.map((k, i) => (
+                  <Box
+                    key={i}
+                    px={2}
+                    py={0.5}
+                    bgcolor="#25D366"
+                    color="#fff"
+                    borderRadius={2}
+                    display="flex"
+                    alignItems="center"
+                    gap={1}
+                  >
+                    {k}
+                    <span
+                      style={{ cursor: "pointer" }}
+                      onClick={() =>
+                        setKeywords((prev) => prev.filter((_, idx) => idx !== i))
+                      }
+                    >
+                      ✕
+                    </span>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
           )}
 
           <Button
@@ -1081,12 +1126,11 @@ const AutomationBuilder = () => {
             fullWidth
             sx={{ mt: 2 }}
             onClick={() => {
-              const keywordsArray = keywordsInput
-                .split(",")
-                .map((k) => k.trim())
-                .filter((k) => k.length > 0);
+              selectedNode &&
+                updateNodeData(selectedNode.id, {
+                  keywords: keywords,
+                });
 
-              updateNodeData("keywords", keywordsArray); // 🔥 array save
               setOpenTriggerPopup(false);
             }}
           >

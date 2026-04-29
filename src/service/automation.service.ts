@@ -107,11 +107,11 @@ class AutomationService {
   ========================= */
   async toggleAutomation(id: string) {
     try {
-      const response = await axiosServices.patch(
+      const response = await axiosServices.put(
         `/automations/${id}/toggle`
       );
 
-      return response.data.data;
+      return response.data;
     } catch (error) {
       console.error("❌ toggleAutomation error:", error);
       throw error;
