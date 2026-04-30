@@ -405,6 +405,8 @@ const AutomationBuilder = () => {
       new_message_received: "Incoming Message",
       outgoing_message: "Outgoing Message",
       webhook_received: "Webhook",
+      call_completed: "Call Completed",   // 🔥 ADD
+      call_missed: "Call Missed",         // 🔥 ADD
     };
 
     return map[trigger] || trigger;
@@ -1047,27 +1049,100 @@ const AutomationBuilder = () => {
         <DialogTitle>Trigger Settings</DialogTitle>
 
         <DialogContent>
-          <RadioGroup
-            value={selectedNode?.data?.triggerType || "all"}
-            onChange={(e) =>
-              selectedNode &&
-              updateNodeData(selectedNode.id, {
-                triggerType: e.target.value,
-              })
-            }
-          >
-            <FormControlLabel
-              value="all"
-              control={<Radio />}
-              label="All Messages"
-            />
+          {/* ================= MESSAGE TRIGGER ================= */}
+          {automation?.trigger === "new_message_received" && (
+            <>
+              <RadioGroup
+                value={selectedNode?.data?.triggerType || "all"}
+                onChange={(e) =>
+                  selectedNode &&
+                  updateNodeData(selectedNode.id, {
+                    triggerType: e.target.value,
+                  })
+                }
+              >
+                <FormControlLabel
+                  value="all"
+                  control={<Radio />}
+                  label="All Messages"
+                />
 
-            <FormControlLabel
-              value="keyword"
-              control={<Radio />}
-              label="Match Exact Keywords"
-            />
-          </RadioGroup>
+                <FormControlLabel
+                  value="keyword"
+                  control={<Radio />}
+                  label="Match Exact Keywords"
+                />
+              </RadioGroup>
+
+              {/* 🔥 Keyword input */}
+              {selectedNode?.data?.triggerType === "keyword" && (
+                <Box>
+                  <Box display="flex" gap={1}>
+                    <TextField
+                      fullWidth
+                      placeholder="Enter keyword"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                    />
+
+                    <Button
+                      variant="contained"
+                      onClick={() => {
+                        if (!input.trim()) return;
+
+                        setKeywords((prev) => [...prev, input.trim()]);
+                        setInput("");
+                      }}
+                    >
+                      Add
+                    </Button>
+                  </Box>
+
+                  <Box mt={1} display="flex" gap={1} flexWrap="wrap">
+                    {keywords.map((k, i) => (
+                      <Box
+                        key={i}
+                        px={2}
+                        py={0.5}
+                        bgcolor="#25D366"
+                        color="#fff"
+                        borderRadius={2}
+                        display="flex"
+                        alignItems="center"
+                        gap={1}
+                      >
+                        {k}
+                        <span
+                          style={{ cursor: "pointer" }}
+                          onClick={() =>
+                            setKeywords((prev) =>
+                              prev.filter((_, idx) => idx !== i)
+                            )
+                          }
+                        >
+                          ✕
+                        </span>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+            </>
+          )}
+
+          {/* ================= CALL COMPLETED ================= */}
+          {automation?.trigger === "call_completed" && (
+            <Typography color="text.secondary" sx={{ mt: 2 }}>
+              This automation will run when a call is completed.
+            </Typography>
+          )}
+
+          {/* ================= CALL MISSED ================= */}
+          {automation?.trigger === "call_missed" && (
+            <Typography color="text.secondary" sx={{ mt: 2 }}>
+              This automation will run when a call is missed.
+            </Typography>
+          )}
 
           {/* 🔥 Keyword input */}
           {selectedNode?.data?.triggerType === "keyword" && (
@@ -1126,10 +1201,12 @@ const AutomationBuilder = () => {
             fullWidth
             sx={{ mt: 2 }}
             onClick={() => {
-              selectedNode &&
-                updateNodeData(selectedNode.id, {
-                  keywords: keywords,
-                });
+              if (automation?.trigger === "new_message_received") {
+                selectedNode &&
+                  updateNodeData(selectedNode.id, {
+                    keywords: keywords,
+                  });
+              }
 
               setOpenTriggerPopup(false);
             }}

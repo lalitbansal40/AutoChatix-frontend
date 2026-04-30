@@ -212,6 +212,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                       <MenuItem value="quick_reply">Quick Reply</MenuItem>
                       <MenuItem value="flow">WhatsApp Flow</MenuItem>
                       <MenuItem value="url">Open URL</MenuItem>
+                      <MenuItem value="call">Call</MenuItem>
                     </TextField>
                   </Grid>
 
@@ -275,6 +276,24 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                             index === i
                               ? { ...btn, url: e.target.value }
                               : btn
+                          );
+
+                          updateNodeData(node.id, { buttons: updated });
+                        }}
+                      />
+                    )}
+
+                    {btn.type === "call" && (
+                      <TextField
+                        fullWidth
+                        label="Phone Number"
+                        placeholder="+919664114023"
+                        value={btn.phone_number || ""}
+                        onChange={(e) => {
+                          const updated = buttons.map((b: any, index: number) =>
+                            index === i
+                              ? { ...b, phone_number: e.target.value }
+                              : b
                           );
 
                           updateNodeData(node.id, { buttons: updated });

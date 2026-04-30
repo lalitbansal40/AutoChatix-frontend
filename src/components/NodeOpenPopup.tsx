@@ -13,6 +13,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import { NODE_EDITORS } from "./node-editors";
 import { useState } from "react";
+import { handleButtonAction } from "utils/buttonActions";
 
 const NodeOpenPopup = ({
   selectedNode,
@@ -166,10 +167,13 @@ const NodeOpenPopup = ({
                       fullWidth
                       sx={{
                         mb: 1,
-                        background: "#fff",
+                        background: btn.type === "call" ? "#25D366" : "#fff",
+                        color: btn.type === "call" ? "#fff" : "#000",
                         textTransform: "none",
                       }}
+                      onClick={() => handleButtonAction(btn)}
                     >
+                      {btn.type === "call" ? "📞 " : ""}
                       {btn.title}
                     </Button>
                   ))}

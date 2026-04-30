@@ -138,11 +138,22 @@ const CreateAutomationModal = ({ open, onClose, onSuccess }: any) => {
                         <MenuItem value="new_message_received">
                             Incoming Message
                         </MenuItem>
+
                         <MenuItem value="outgoing_message">
                             Outgoing Message
                         </MenuItem>
+
                         <MenuItem value="webhook_received">
                             Webhook
+                        </MenuItem>
+
+                        {/* 🔥 NEW */}
+                        <MenuItem value="call_completed">
+                            Call Completed
+                        </MenuItem>
+
+                        <MenuItem value="call_missed">
+                            Call Missed
                         </MenuItem>
                     </TextField>
                 </Box>

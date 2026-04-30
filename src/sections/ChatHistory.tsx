@@ -1,11 +1,12 @@
 /* eslint-disable jsx-a11y/alt-text */
 /* eslint-disable jsx-a11y/iframe-has-title */
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // material-ui
 import {
   Card,
   CardContent,
+  Dialog,
   Grid,
   Stack,
   Theme,
@@ -26,7 +27,29 @@ interface ChatHistoryProps {
   user: UserProfile;
 }
 
+const getMessageText = (history: any) => {
+  const payload = history?.payload || {};
+
+  // 🔥 LIST FIX
+  if (history?.type === "list") {
+    return payload?.body || "";
+  }
+
+  return (
+    history?.text ||
+    payload?.text?.body ||
+    payload?.bodyText ||
+    payload?.caption ||
+    payload?.interactive?.button_reply?.title ||
+    payload?.interactive?.list_reply?.title ||
+    payload?.interactive?.nfm_reply?.response_json ||
+    payload?.text ||
+    ""
+  );
+};
+
 const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
+  const [listModal, setListModal] = useState<any>(null);
   const wrapper = useRef(document.createElement('div'));
   const el = wrapper.current;
 
@@ -41,9 +64,15 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
   const getReplyText = (msg: any) => {
     if (!msg) return "";
 
-    const payload = msg.payload;
+    const payload = msg.payload || {};
+
+    // 🔥 LIST FIX
+    if (msg.type === "list") {
+      return payload?.body || "List message";
+    }
 
     return (
+      msg?.text ||
       payload?.bodyText ||
       payload?.text?.body ||
       payload?.interactive?.button_reply?.title ||
@@ -291,13 +320,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
     const media = history?.media || {};
 
     // 🔥 TEXT (priority order)
-    const text =
-      history?.text ||
-      payload?.caption ||
-      payload?.text?.body ||
-      payload?.bodyText ||
-      payload?.caption ||
-      payload?.text;
+    const text = getMessageText(history);
 
     // 🔥 UNIVERSAL URL (old + new)
     const url =
@@ -322,6 +345,29 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
           }}
         />
       );
+    }
+
+    if (type === "interactive") {
+      const title =
+        payload?.interactive?.button_reply?.title ||
+        payload?.interactive?.list_reply?.title;
+
+      if (title) {
+        return (
+          <Typography
+            sx={{
+              bgcolor: "#DCF8C6",
+              px: 1.5,
+              py: 0.7,
+              borderRadius: 2,
+              width: "fit-content",
+              fontSize: 14
+            }}
+          >
+            {title}
+          </Typography>
+        );
+      }
     }
 
     if (type === "interactive_media") {
@@ -681,6 +727,37 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
           style={{ borderRadius: 8 }}
           src={`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`}
         />
+      );
+    }
+
+    if (type === "list") {
+      return (
+        <Stack spacing={1}>
+          {/* BODY */}
+          <Typography sx={{ whiteSpace: "pre-line" }}>
+            {payload?.body}
+          </Typography>
+
+          {/* BUTTON */}
+          <Stack
+            onClick={() => setListModal(payload)} // 🔥 CLICK HANDLER
+            sx={{
+              border: "1px solid #eee",
+              borderRadius: 2,
+              px: 2,
+              py: 1,
+              color: "#00a884",
+              fontWeight: 500,
+              cursor: "pointer",
+              width: "fit-content",
+              "&:hover": {
+                background: "#f5f5f5"
+              }
+            }}
+          >
+            {payload?.buttonText}
+          </Stack>
+        </Stack>
       );
     }
 
@@ -1079,6 +1156,54 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
           </Grid>
         );
       })}
+
+      {listModal && (
+        <Dialog
+          open={!!listModal}
+          onClose={() => setListModal(null)}
+          fullWidth
+          maxWidth="xs"
+        >
+          <Stack spacing={2} sx={{ p: 2 }}>
+
+            {/* TITLE */}
+            <Typography fontWeight={600}>
+              {listModal?.sections?.[0]?.title || "Select Option"}
+            </Typography>
+
+            {/* OPTIONS */}
+            {listModal?.sections?.map((section: any, i: number) => (
+              <Stack key={i} spacing={1}>
+                {section.rows.map((row: any) => (
+                  <Box
+                    key={row.id}
+                    sx={{
+                      border: "1px solid #eee",
+                      borderRadius: 2,
+                      px: 2,
+                      py: 1.5,
+                      cursor: "pointer",
+                      "&:hover": {
+                        background: "#f5f5f5"
+                      }
+                    }}
+                  >
+                    <Typography fontWeight={500}>
+                      {row.title}
+                    </Typography>
+
+                    {row.description && (
+                      <Typography fontSize={12} color="text.secondary">
+                        {row.description}
+                      </Typography>
+                    )}
+                  </Box>
+                ))}
+              </Stack>
+            ))}
+          </Stack>
+        </Dialog>
+      )}
     </Grid>
   );
 };
