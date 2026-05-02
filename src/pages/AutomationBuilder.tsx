@@ -142,18 +142,18 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
 
 /* ── per-node-type visual config ── */
 const NODE_STYLE: Record<string, { color: string; bg: string; icon: string; label: string }> = {
-  trigger:               { color: "#f97316", bg: "#fff7ed", icon: "⚡", label: "Trigger" },
-  auto_reply:            { color: "#25D366", bg: "#f0fdf4", icon: "💬", label: "Auto Reply" },
-  list:                  { color: "#2563eb", bg: "#eff6ff", icon: "📋", label: "List" },
-  carousel:              { color: "#ec4899", bg: "#fdf2f8", icon: "🎠", label: "Carousel" },
-  ask_input:             { color: "#8b5cf6", bg: "#f5f3ff", icon: "✏️", label: "Ask Input" },
-  ask_location:          { color: "#0ea5e9", bg: "#f0f9ff", icon: "📍", label: "Ask Location" },
-  address_message:       { color: "#0ea5e9", bg: "#f0f9ff", icon: "🏠", label: "Address" },
+  trigger: { color: "#f97316", bg: "#fff7ed", icon: "⚡", label: "Trigger" },
+  auto_reply: { color: "#25D366", bg: "#f0fdf4", icon: "💬", label: "Auto Reply" },
+  list: { color: "#2563eb", bg: "#eff6ff", icon: "📋", label: "List" },
+  carousel: { color: "#ec4899", bg: "#fdf2f8", icon: "🎠", label: "Carousel" },
+  ask_input: { color: "#8b5cf6", bg: "#f5f3ff", icon: "✏️", label: "Ask Input" },
+  ask_location: { color: "#0ea5e9", bg: "#f0f9ff", icon: "📍", label: "Ask Location" },
+  address_message: { color: "#0ea5e9", bg: "#f0f9ff", icon: "🏠", label: "Address" },
   set_contact_attribute: { color: "#f59e0b", bg: "#fffbeb", icon: "🏷️", label: "Set Attribute" },
-  google_sheet:          { color: "#16a34a", bg: "#f0fdf4", icon: "📊", label: "Google Sheets" },
-  razorpay_payment:      { color: "#2563eb", bg: "#eff6ff", icon: "💳", label: "Razorpay" },
-  borzo_delivery:        { color: "#dc2626", bg: "#fef2f2", icon: "🚚", label: "Borzo" },
-  distance_check:        { color: "#6366f1", bg: "#eef2ff", icon: "📏", label: "Distance" },
+  google_sheet: { color: "#16a34a", bg: "#f0fdf4", icon: "📊", label: "Google Sheets" },
+  razorpay_payment: { color: "#2563eb", bg: "#eff6ff", icon: "💳", label: "Razorpay" },
+  borzo_delivery: { color: "#dc2626", bg: "#fef2f2", icon: "🚚", label: "Borzo" },
+  distance_check: { color: "#6366f1", bg: "#eef2ff", icon: "📏", label: "Distance" },
 };
 const DEFAULT_STYLE = { color: "#6b7280", bg: "#f9fafb", icon: "⚙️", label: "Node" };
 
@@ -347,7 +347,8 @@ const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
         (!Array.isArray(data.buttons) || data.buttons.length === 0) &&
         (!Array.isArray(data.list) || data.list.length === 0) && (
           <Handle type="source" position={Position.Right}
-            style={{ width: 10, height: 10,
+            style={{
+              width: 10, height: 10,
               background: "#25D366",
               borderRadius: "50%",
               right: -6,
@@ -535,6 +536,27 @@ const AutomationBuilder = () => {
         return;
       }
 
+      const normalizeCards = (cards: any[]) => {
+        return cards?.map((card) => {
+          let buttons = card.buttons;
+
+          // ❌ agar string hai → force empty array
+          if (typeof buttons === "string") {
+            buttons = [];
+          }
+
+          // ❌ agar array nahi hai → empty
+          if (!Array.isArray(buttons)) {
+            buttons = [];
+          }
+
+          return {
+            ...card,
+            buttons,
+          };
+        });
+      };
+
       // 🔒 NODE DATA FORMAT
       const formattedNodes = nodes.map((n) => {
         let sections = n.data.sections || [];
@@ -564,9 +586,12 @@ const AutomationBuilder = () => {
           id: n.id,
           type: nodeType,
           sections,
-
-          // 🔥 ADD THIS LINE (IMPORTANT)
           position: n.position,
+
+          // 🔥 THIS LINE ADD KAR (IMPORTANT)
+          cards: n.data.cards
+            ? normalizeCards(n.data.cards)
+            : n.data.cards,
           ...(n.data.type === "set_contact_attribute" && {
             config: {
               key: n.data.attribute_name,
@@ -1138,7 +1163,7 @@ const AutomationBuilder = () => {
                 </Typography>
                 <Stack spacing={1}>
                   {[
-                    { value: "all",     icon: "📩", title: "All Messages",  desc: "Fire for every incoming message" },
+                    { value: "all", icon: "📩", title: "All Messages", desc: "Fire for every incoming message" },
                     { value: "keyword", icon: "🔑", title: "Keyword Match", desc: "Only fire when message matches a keyword" },
                   ].map((opt) => {
                     const active = (selectedNode?.data?.triggerType || "all") === opt.value;
