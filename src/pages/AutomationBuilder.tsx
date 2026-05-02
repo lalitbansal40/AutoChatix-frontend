@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
   CircularProgress,
   Typography,
   Button,
+  Chip,
+  Stack,
+  Tooltip,
 } from "@mui/material";
+import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
+import SaveIcon from "@mui/icons-material/Save";
 import ReactFlow, {
   Background,
   Controls,
@@ -22,17 +27,10 @@ import automationService from "service/automation.service";
 import * as dagre from "dagre";
 import NodeOpenPopup from "components/NodeOpenPopup";
 import { MarkerType } from "reactflow";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  FormControlLabel,
-  RadioGroup,
-  Radio,
-  TextField
-} from "@mui/material";
+import { Dialog, DialogContent, TextField } from "@mui/material";
 import CustomEdge from "components/customedge";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import CloseIcon from "@mui/icons-material/Close";
 import { IconButton, Menu, MenuItem } from "@mui/material";
 
 
@@ -92,8 +90,10 @@ const NODE_CONFIG: any = {
   },
 
   google_sheet: {
+    integration_slug: "google_sheet",
     spreadsheet_id: "",
     sheet_name: "",
+    action: "create",
     map: {},
   },
 
@@ -140,217 +140,214 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
   return { nodes, edges };
 };
 
+/* ── per-node-type visual config ── */
+const NODE_STYLE: Record<string, { color: string; bg: string; icon: string; label: string }> = {
+  trigger:               { color: "#f97316", bg: "#fff7ed", icon: "⚡", label: "Trigger" },
+  auto_reply:            { color: "#25D366", bg: "#f0fdf4", icon: "💬", label: "Auto Reply" },
+  list:                  { color: "#2563eb", bg: "#eff6ff", icon: "📋", label: "List" },
+  carousel:              { color: "#ec4899", bg: "#fdf2f8", icon: "🎠", label: "Carousel" },
+  ask_input:             { color: "#8b5cf6", bg: "#f5f3ff", icon: "✏️", label: "Ask Input" },
+  ask_location:          { color: "#0ea5e9", bg: "#f0f9ff", icon: "📍", label: "Ask Location" },
+  address_message:       { color: "#0ea5e9", bg: "#f0f9ff", icon: "🏠", label: "Address" },
+  set_contact_attribute: { color: "#f59e0b", bg: "#fffbeb", icon: "🏷️", label: "Set Attribute" },
+  google_sheet:          { color: "#16a34a", bg: "#f0fdf4", icon: "📊", label: "Google Sheets" },
+  razorpay_payment:      { color: "#2563eb", bg: "#eff6ff", icon: "💳", label: "Razorpay" },
+  borzo_delivery:        { color: "#dc2626", bg: "#fef2f2", icon: "🚚", label: "Borzo" },
+  distance_check:        { color: "#6366f1", bg: "#eef2ff", icon: "📏", label: "Distance" },
+};
+const DEFAULT_STYLE = { color: "#6b7280", bg: "#f9fafb", icon: "⚙️", label: "Node" };
+
 const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
   const { disconnectRow } = data;
+  const ns = NODE_STYLE[data.type] || DEFAULT_STYLE;
+
   return (
     <Box
       sx={{
-        p: 1,
-        borderRadius: 3,
+        borderRadius: "10px",
         background: "#fff",
-        minWidth: 220,
-        boxShadow: "none",
-        border: "1px solid #eee",
-        overflow: "visible"
-
+        minWidth: 240,
+        maxWidth: 280,
+        boxShadow: "0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
+        border: "1px solid #e5e7eb",
+        borderLeft: `4px solid ${ns.color}`,
+        overflow: "visible",
       }}
     >
-      {/* HEADER */}
+      {/* ── HEADER ── */}
       <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={1}
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          px: 1.5,
+          pt: 1.25,
+          pb: 1,
+        }}
       >
-        <Typography fontSize={12} fontWeight={600}>
-          {data.type}
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+          <Box sx={{
+            width: 22, height: 22, borderRadius: "6px",
+            bgcolor: ns.bg,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 12,
+          }}>
+            {ns.icon}
+          </Box>
+          <Typography
+            sx={{ fontSize: 11, fontWeight: 700, color: ns.color, letterSpacing: 0.4, textTransform: "uppercase" }}
+          >
+            {ns.label}
+          </Typography>
+        </Box>
 
-        {/* 🔥 3 DOT MENU */}
         {data.type !== "trigger" && (
-          <>
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-
-                data.setMenuAnchor?.(e.currentTarget);
-              }}
-            >
-              <MoreVertIcon fontSize="small" />
-            </IconButton>
-          </>
+          <IconButton
+            size="small"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); data.setMenuAnchor?.(e.currentTarget); }}
+            sx={{ p: 0.25, color: "#9ca3af", "&:hover": { color: "#374151" } }}
+          >
+            <MoreVertIcon sx={{ fontSize: 15 }} />
+          </IconButton>
         )}
       </Box>
 
-      {/* MESSAGE */}
-      {data.message && (
-        <Box
-          sx={{
-            background: "#dcf8c6",
-            p: 0.5,
-            borderRadius: 1,
-            fontSize: 12,
-            maxWidth: 220,
-            mb: 1,
-          }}
-        >
-          {data.message}
-        </Box>
-      )}
+      {/* ── DIVIDER ── */}
+      <Box sx={{ height: "1px", bgcolor: "#f3f4f6", mx: 1.5 }} />
 
-      {data.type === "set_contact_attribute" && (
-        <Box sx={{ background: "#fef3c7", p: 0.5, borderRadius: 1, fontSize: 11 }}>
-          {Array.isArray(data.attribute_name)
-            ? data.attribute_name.map((k: any, i: number) => (
-              <div key={i}>
-                {k || "?"} = {data.attribute_value?.[i] || "?"}
-              </div>
-            ))
-            : `${data.attribute_name || "?"} = ${data.attribute_value || "?"}`}
-        </Box>
-      )}
+      {/* ── BODY ── */}
+      <Box sx={{ px: 1.5, py: 1 }}>
 
-      {/* BUTTONS */}
-      {Array.isArray(data.buttons) && data.buttons.length > 0 && (
-        data.buttons.map((btn: any, index: number) => {
-          const buttonId = btn?.id || `btn_${index}`;
+        {/* MESSAGE PREVIEW */}
+        {data.message && (
+          <Typography
+            sx={{
+              fontSize: 11.5,
+              color: "#374151",
+              lineHeight: 1.55,
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              mb: 1,
+              whiteSpace: "pre-line",
+            }}
+          >
+            {data.message}
+          </Typography>
+        )}
 
-          return (
-            <Box
-              key={buttonId}
-              sx={{
-                mt: 1,
-                px: 1.5,
-                py: 1,
-                borderRadius: 2,
-                fontSize: 12,
-                background: "#f8f8f8", // ✅ light bg
-                position: "relative",
-              }}
-            >
-              <Typography fontSize={12}>
-                {btn?.title || "Untitled"}
+        {/* SET CONTACT ATTRIBUTE */}
+        {data.type === "set_contact_attribute" && (
+          <Box sx={{ bgcolor: "#fffbeb", border: "1px solid #fde68a", borderRadius: 1.5, px: 1, py: 0.5 }}>
+            {(Array.isArray(data.attribute_name) ? data.attribute_name : [data.attribute_name]).map((k: any, i: number) => (
+              <Typography key={i} fontSize={10.5} color="#92400e" fontFamily="monospace">
+                {k || "?"} = {Array.isArray(data.attribute_value) ? data.attribute_value[i] : data.attribute_value || "?"}
               </Typography>
+            ))}
+          </Box>
+        )}
 
-              {/* ✅ HANDLE */}
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={buttonId}
-                style={{
-                  width: 10,
-                  height: 10,
-                  background: "#25D366",
-                  borderRadius: "50%",
-                  position: "absolute",
-                  right: -6,
-                  top: "50%",
-                  transform: "translateY(-50%)",
+        {/* GOOGLE SHEET */}
+        {data.type === "google_sheet" && (
+          <Box sx={{ bgcolor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 1.5, px: 1, py: 0.75 }}>
+            {data.sheet_name && <Typography fontSize={10.5} color="#166534">📋 {data.sheet_name}</Typography>}
+            {data.action && <Typography fontSize={10.5} color="#166534" sx={{ textTransform: "capitalize" }}>⚡ {data.action}</Typography>}
+            {data.map && Object.keys(data.map).length > 0 && (
+              <Typography fontSize={10} color="#6b7280">{Object.keys(data.map).length} column(s) mapped</Typography>
+            )}
+          </Box>
+        )}
+
+        {/* BUTTONS */}
+        {Array.isArray(data.buttons) && data.buttons.length > 0 && (
+          data.buttons.map((btn: any, index: number) => {
+            const buttonId = btn?.id || `btn_${index}`;
+            return (
+              <Box
+                key={buttonId}
+                sx={{
+                  mt: 0.75,
+                  px: 1.25,
+                  py: 0.75,
+                  borderRadius: "8px",
+                  background: "#f8fffe",
+                  border: "1px solid #d1fae5",
+                  position: "relative",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
                 }}
-              />
-            </Box>
-          );
-        })
-      )}
-
-      {/* 🔥 LIST ITEMS */}
-      {Array.isArray(data.list) && data.list.length > 0 &&
-        data.list.map((item: any, index: number) => {
-          const itemId = item?.id || `list_${index}`;
-
-          return (
-            <Box
-              onClick={(e) => {
-                e.stopPropagation(); // 🔥 MUST
-                disconnectRow?.(id, itemId); // ✅ correct
-              }}
-              key={itemId}
-              sx={{
-                mt: 1,
-                px: 1.5,
-                py: 1,
-                borderRadius: 2,
-                fontSize: 12,
-                background: "#eef6ff", // 🔥 different color
-                position: "relative",
-                border: "1px solid #dbeafe",
-                "&:hover": {
-                  background: "#dbeafe",
-                },
-              }}
-            >
-              <Typography fontSize={12} fontWeight={500}>
-                {item?.title || "Untitled"}
-              </Typography>
-
-              {item?.description && (
-                <Typography fontSize={11} color="#666">
-                  {item.description}
+              >
+                <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#25D366", flexShrink: 0 }} />
+                <Typography fontSize={11} color="#065f46" fontWeight={500} noWrap sx={{ flex: 1 }}>
+                  {btn?.title || "Untitled"}
                 </Typography>
-              )}
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={buttonId}
+                  style={{ width: 10, height: 10, background: "#25D366", borderRadius: "50%", position: "absolute", right: -6, top: "50%", transform: "translateY(-50%)" }}
+                />
+              </Box>
+            );
+          })
+        )}
 
-              {/* 🔥 HANDLE (same as button) */}
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={itemId}
-                style={{
-                  width: 10,
-                  height: 10,
-                  background: "#2563eb", // 🔥 blue for list
-                  borderRadius: "50%",
-                  position: "absolute",
-                  right: -6,
-                  top: "50%",
-                  transform: "translateY(-50%)",
+        {/* LIST ITEMS */}
+        {Array.isArray(data.list) && data.list.length > 0 &&
+          data.list.map((item: any, index: number) => {
+            const itemId = item?.id || `list_${index}`;
+            return (
+              <Box
+                onClick={(e) => { e.stopPropagation(); disconnectRow?.(id, itemId); }}
+                key={itemId}
+                sx={{
+                  mt: 0.75,
+                  px: 1.25,
+                  py: 0.75,
+                  borderRadius: "8px",
+                  background: "#eff6ff",
+                  border: "1px solid #bfdbfe",
+                  position: "relative",
+                  cursor: "pointer",
+                  "&:hover": { background: "#dbeafe" },
                 }}
-              />
-            </Box>
-          );
-        })}
-      {/* TARGET HANDLE */}
-      {/* 🟢 TRIGGER → ONLY OUTGOING */}
+              >
+                <Typography fontSize={11} fontWeight={500} color="#1e40af" noWrap>
+                  {item?.title || "Untitled"}
+                </Typography>
+                {item?.description && (
+                  <Typography fontSize={10} color="#6b7280" noWrap>{item.description}</Typography>
+                )}
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={itemId}
+                  style={{ width: 10, height: 10, background: "#2563eb", borderRadius: "50%", position: "absolute", right: -6, top: "50%", transform: "translateY(-50%)" }}
+                />
+              </Box>
+            );
+          })
+        }
+      </Box>
+
+      {/* ── HANDLES ── */}
       {data.type === "trigger" && (
-        <Handle
-          type="source"
-          position={Position.Right}
-          style={{
-            width: 10,
-            height: 10,
-            background: "#25D366",
-            borderRadius: "50%",
-            right: -6,
-          }}
+        <Handle type="source" position={Position.Right}
+          style={{ width: 10, height: 10, background: "#25D366", borderRadius: "50%", right: -6 }}
         />
       )}
-
-      {/* 🟢 NORMAL NODES → INCOMING */}
       {data.type !== "trigger" && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          style={{
-            width: 10,
-            height: 10,
-            background: "#555",
-            borderRadius: "50%",
-            left: -6,
-          }}
+        <Handle type="target" position={Position.Left}
+          style={{ width: 10, height: 10, background: "#9ca3af", border: "2px solid #fff", borderRadius: "50%", left: -6 }}
         />
       )}
-
-      {/* 🟢 NORMAL NODES → DEFAULT OUTGOING (no buttons case) */}
       {data.type !== "trigger" &&
         (!Array.isArray(data.buttons) || data.buttons.length === 0) &&
         (!Array.isArray(data.list) || data.list.length === 0) && (
-          <Handle
-            type="source"
-            position={Position.Right}
-            style={{
-              width: 10,
-              height: 10,
+          <Handle type="source" position={Position.Right}
+            style={{ width: 10, height: 10,
               background: "#25D366",
               borderRadius: "50%",
               right: -6,
@@ -367,6 +364,7 @@ const nodeTypes = {
 
 const AutomationBuilder = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [nodes, setNodes, onNodesChange] = useNodesState<CustomNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -801,17 +799,20 @@ const AutomationBuilder = () => {
 
   if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" mt={10}>
-        <CircularProgress />
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh" gap={2}>
+        <CircularProgress sx={{ color: "#25D366" }} />
+        <Typography color="text.secondary" fontSize={14}>Loading automation…</Typography>
       </Box>
     );
   }
 
   if (isError) {
     return (
-      <Typography color="error" textAlign="center">
-        Failed to load automation
-      </Typography>
+      <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100vh" gap={1.5}>
+        <Typography fontSize={36}>⚠️</Typography>
+        <Typography color="error" fontSize={14} fontWeight={600}>Failed to load automation</Typography>
+        <Typography color="text.secondary" fontSize={12}>Please check your connection and try again</Typography>
+      </Box>
     );
   }
 
@@ -822,52 +823,92 @@ const AutomationBuilder = () => {
       flexDirection="column"
       height="calc(100vh - 70px)"
       sx={{
-        background: "#f5f5f5",
-        position: "relative"   // 🔥 ADD THIS
+        background: "#f8fafc",
+        position: "relative",
       }}
     >
 
-      {/* HEADER */}
+      {/* ── HEADER ── */}
       <Box
         sx={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          px: 3,
-          py: 2,
+          px: 2.5,
+          py: 1.25,
           background: "#ffffff",
           borderBottom: "1px solid #e5e7eb",
           position: "sticky",
           top: 0,
           zIndex: 10,
+          minHeight: 56,
         }}
       >
-        {/* LEFT SIDE */}
-        <Box display="flex" gap={3} alignItems="center">
+        {/* LEFT */}
+        <Stack direction="row" alignItems="center" spacing={2}>
+          <Tooltip title="Back to Automations">
+            <Button
+              size="small"
+              startIcon={<ArrowBackIosNewIcon sx={{ fontSize: "13px !important" }} />}
+              onClick={() => navigate("/automations")}
+              sx={{ color: "#6b7280", minWidth: 0, px: 1, py: 0.5, fontSize: 12, "&:hover": { bgcolor: "#f3f4f6" } }}
+            >
+              Back
+            </Button>
+          </Tooltip>
 
-          <Typography variant="subtitle2">
-            <b>Automation:</b> {automation?.name || "Untitled"}
-          </Typography>
+          <Box sx={{ width: "1px", height: 20, bgcolor: "#e5e7eb" }} />
 
-          <Typography variant="subtitle2">
-            <b>Channel:</b> {automation?.channel_name || "-"}
-          </Typography>
+          <Box>
+            <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} sx={{ fontSize: 14 }}>
+              {automation?.name || "Untitled Automation"}
+            </Typography>
+          </Box>
 
-          <Typography variant="subtitle2">
-            <b>Trigger:</b> {getTriggerLabel(automation?.trigger)}
-          </Typography>
+          <Stack direction="row" spacing={1}>
+            {automation?.channel_name && (
+              <Chip
+                label={automation.channel_name}
+                size="small"
+                sx={{ fontSize: 11, height: 22, bgcolor: "#eff6ff", color: "#1d4ed8", fontWeight: 600 }}
+              />
+            )}
+            {automation?.trigger && (
+              <Chip
+                label={`⚡ ${getTriggerLabel(automation.trigger)}`}
+                size="small"
+                sx={{ fontSize: 11, height: 22, bgcolor: "#fff7ed", color: "#c2410c", fontWeight: 600 }}
+              />
+            )}
+            {automation?.status && (
+              <Chip
+                label={automation.status}
+                size="small"
+                sx={{
+                  fontSize: 11, height: 22, fontWeight: 600,
+                  bgcolor: automation.status === "active" ? "#f0fdf4" : "#f9fafb",
+                  color: automation.status === "active" ? "#16a34a" : "#6b7280",
+                }}
+              />
+            )}
+          </Stack>
+        </Stack>
 
-        </Box>
-
-        {/* RIGHT SIDE */}
+        {/* RIGHT */}
         <Button
           variant="contained"
-          color="success"
+          startIcon={saving ? undefined : <SaveIcon sx={{ fontSize: 16 }} />}
           onClick={saveAutomation}
+          disabled={saving}
           sx={{
-            borderRadius: 2,
-            px: 3,
+            borderRadius: "8px",
+            px: 2.5,
+            py: 0.75,
             fontWeight: 600,
+            fontSize: 13,
+            bgcolor: "#16a34a",
+            "&:hover": { bgcolor: "#15803d" },
+            boxShadow: "0 1px 4px rgba(22,163,74,0.3)",
           }}
         >
           {saving ? "Saving..." : "Save"}
@@ -1009,24 +1050,47 @@ const AutomationBuilder = () => {
             top: createNodePos.y,
             left: createNodePos.x,
             background: "#fff",
-            borderRadius: 2,
-            boxShadow: "0 10px 20px rgba(0,0,0,0.2)",
-            p: 1,
+            borderRadius: "12px",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)",
+            p: 1.5,
             zIndex: 2000,
+            minWidth: 280,
+            border: "1px solid #e5e7eb",
           }}
         >
-          {Object.keys(NODE_CONFIG).map((type) => (
-            <Box
-              key={type}
-              sx={{ p: 1, cursor: "pointer" }}
-              onClick={() => {
-                createNode(type);
-                setCreateNodePos(null);
-              }}
-            >
-              {type}
-            </Box>
-          ))}
+          <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", px: 0.5, pb: 1, letterSpacing: 0.5, textTransform: "uppercase" }}>
+            Add Node
+          </Typography>
+          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
+            {Object.keys(NODE_CONFIG).map((type) => {
+              const ns = NODE_STYLE[type] || DEFAULT_STYLE;
+              return (
+                <Box
+                  key={type}
+                  onClick={() => { createNode(type); setCreateNodePos(null); }}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    px: 1.25,
+                    py: 1,
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    border: "1px solid #f3f4f6",
+                    transition: "all 0.15s",
+                    "&:hover": { bgcolor: ns.bg, borderColor: ns.color, "& .node-label": { color: ns.color } },
+                  }}
+                >
+                  <Box sx={{ width: 28, height: 28, borderRadius: "7px", bgcolor: ns.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>
+                    {ns.icon}
+                  </Box>
+                  <Typography className="node-label" sx={{ fontSize: 12, fontWeight: 600, color: "#374151", lineHeight: 1.2 }}>
+                    {ns.label}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Box>
         </Box>
       )}
 
@@ -1043,177 +1107,170 @@ const AutomationBuilder = () => {
       <Dialog
         open={openTriggerPopup}
         onClose={() => setOpenTriggerPopup(false)}
-        maxWidth="sm"     // 🔥 add
-        fullWidth         // 🔥 add
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "16px", overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,0.2)" } }}
+        BackdropProps={{ sx: { backgroundColor: "rgba(0,0,0,0.4)" } }}
       >
-        <DialogTitle>Trigger Settings</DialogTitle>
+        {/* ── HEADER ── */}
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2.5, py: 1.75, bgcolor: "#fff7ed", borderBottom: "1px solid #fed7aa" }}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Box sx={{ width: 36, height: 36, borderRadius: "10px", bgcolor: "#fff", border: "1px solid #fed7aa", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+              ⚡
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>Trigger Settings</Typography>
+              <Typography variant="caption" color="text.secondary">Configure when this automation fires</Typography>
+            </Box>
+          </Stack>
+          <IconButton size="small" onClick={() => setOpenTriggerPopup(false)} sx={{ color: "#9ca3af", "&:hover": { color: "#374151", bgcolor: "#f3f4f6" } }}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Box>
 
-        <DialogContent>
-          {/* ================= MESSAGE TRIGGER ================= */}
+        {/* ── CONTENT ── */}
+        <DialogContent sx={{ p: 2.5 }}>
           {automation?.trigger === "new_message_received" && (
-            <>
-              <RadioGroup
-                value={selectedNode?.data?.triggerType || "all"}
-                onChange={(e) =>
-                  selectedNode &&
-                  updateNodeData(selectedNode.id, {
-                    triggerType: e.target.value,
-                  })
-                }
-              >
-                <FormControlLabel
-                  value="all"
-                  control={<Radio />}
-                  label="All Messages"
-                />
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+              <Box>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.6, mb: 1.25 }}>
+                  Trigger On
+                </Typography>
+                <Stack spacing={1}>
+                  {[
+                    { value: "all",     icon: "📩", title: "All Messages",  desc: "Fire for every incoming message" },
+                    { value: "keyword", icon: "🔑", title: "Keyword Match", desc: "Only fire when message matches a keyword" },
+                  ].map((opt) => {
+                    const active = (selectedNode?.data?.triggerType || "all") === opt.value;
+                    return (
+                      <Box
+                        key={opt.value}
+                        onClick={() => selectedNode && updateNodeData(selectedNode.id, { triggerType: opt.value })}
+                        sx={{
+                          display: "flex", alignItems: "center", gap: 1.5, p: 1.5, borderRadius: "10px",
+                          border: "2px solid", borderColor: active ? "#f97316" : "#e5e7eb",
+                          bgcolor: active ? "#fff7ed" : "#f9fafb",
+                          cursor: "pointer", transition: "all 0.15s", userSelect: "none",
+                          "&:hover": { borderColor: "#f97316", bgcolor: "#fff7ed" },
+                        }}
+                      >
+                        <Typography fontSize={22}>{opt.icon}</Typography>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography fontSize={13} fontWeight={700} color={active ? "#c2410c" : "#374151"}>{opt.title}</Typography>
+                          <Typography fontSize={11} color="text.secondary">{opt.desc}</Typography>
+                        </Box>
+                        <Box sx={{
+                          width: 18, height: 18, borderRadius: "50%",
+                          border: "2px solid", borderColor: active ? "#f97316" : "#d1d5db",
+                          bgcolor: active ? "#f97316" : "transparent",
+                          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                        }}>
+                          {active && <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "#fff" }} />}
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </Box>
 
-                <FormControlLabel
-                  value="keyword"
-                  control={<Radio />}
-                  label="Match Exact Keywords"
-                />
-              </RadioGroup>
-
-              {/* 🔥 Keyword input */}
               {selectedNode?.data?.triggerType === "keyword" && (
                 <Box>
-                  <Box display="flex" gap={1}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.6, mb: 1 }}>
+                    Keywords
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 1, mb: 1.5 }}>
                     <TextField
-                      fullWidth
-                      placeholder="Enter keyword"
+                      fullWidth size="small"
+                      placeholder="e.g. hello, order, menu…"
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e: any) => {
+                        if (e.key === "Enter" && input.trim()) {
+                          setKeywords((prev) => [...prev, input.trim()]);
+                          setInput("");
+                        }
+                      }}
+                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}
                     />
-
                     <Button
                       variant="contained"
                       onClick={() => {
                         if (!input.trim()) return;
-
                         setKeywords((prev) => [...prev, input.trim()]);
                         setInput("");
                       }}
+                      sx={{ borderRadius: "8px", bgcolor: "#f97316", "&:hover": { bgcolor: "#ea580c" }, fontWeight: 600, px: 2.5, flexShrink: 0, boxShadow: "none" }}
                     >
                       Add
                     </Button>
                   </Box>
-
-                  <Box mt={1} display="flex" gap={1} flexWrap="wrap">
-                    {keywords.map((k, i) => (
-                      <Box
-                        key={i}
-                        px={2}
-                        py={0.5}
-                        bgcolor="#25D366"
-                        color="#fff"
-                        borderRadius={2}
-                        display="flex"
-                        alignItems="center"
-                        gap={1}
-                      >
-                        {k}
-                        <span
-                          style={{ cursor: "pointer" }}
-                          onClick={() =>
-                            setKeywords((prev) =>
-                              prev.filter((_, idx) => idx !== i)
-                            )
-                          }
+                  {keywords.length > 0 ? (
+                    <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap" }}>
+                      {keywords.map((k, i) => (
+                        <Box
+                          key={i}
+                          sx={{ display: "flex", alignItems: "center", gap: 0.5, px: 1.25, py: 0.4, borderRadius: "20px", bgcolor: "#fff7ed", border: "1px solid #fed7aa", fontSize: 12, fontWeight: 600, color: "#c2410c" }}
                         >
-                          ✕
-                        </span>
-                      </Box>
-                    ))}
-                  </Box>
+                          {k}
+                          <Box
+                            component="span"
+                            onClick={() => setKeywords((prev) => prev.filter((_, idx) => idx !== i))}
+                            sx={{ ml: 0.5, cursor: "pointer", fontSize: 10, lineHeight: 1, opacity: 0.7, "&:hover": { opacity: 1 } }}
+                          >
+                            ✕
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Typography fontSize={12} color="text.secondary" sx={{ fontStyle: "italic" }}>
+                      Type a keyword and press Enter or click Add
+                    </Typography>
+                  )}
                 </Box>
               )}
-            </>
-          )}
-
-          {/* ================= CALL COMPLETED ================= */}
-          {automation?.trigger === "call_completed" && (
-            <Typography color="text.secondary" sx={{ mt: 2 }}>
-              This automation will run when a call is completed.
-            </Typography>
-          )}
-
-          {/* ================= CALL MISSED ================= */}
-          {automation?.trigger === "call_missed" && (
-            <Typography color="text.secondary" sx={{ mt: 2 }}>
-              This automation will run when a call is missed.
-            </Typography>
-          )}
-
-          {/* 🔥 Keyword input */}
-          {selectedNode?.data?.triggerType === "keyword" && (
-            <Box>
-              <Box display="flex" gap={1}>
-                <TextField
-                  fullWidth
-                  placeholder="Enter keyword"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                />
-
-                <Button
-                  variant="contained"
-                  onClick={() => {
-                    if (!input.trim()) return;
-
-                    setKeywords((prev) => [...prev, input.trim()]);
-                    setInput("");
-                  }}
-                >
-                  Add
-                </Button>
-              </Box>
-
-              <Box mt={1} display="flex" gap={1} flexWrap="wrap">
-                {keywords.map((k, i) => (
-                  <Box
-                    key={i}
-                    px={2}
-                    py={0.5}
-                    bgcolor="#25D366"
-                    color="#fff"
-                    borderRadius={2}
-                    display="flex"
-                    alignItems="center"
-                    gap={1}
-                  >
-                    {k}
-                    <span
-                      style={{ cursor: "pointer" }}
-                      onClick={() =>
-                        setKeywords((prev) => prev.filter((_, idx) => idx !== i))
-                      }
-                    >
-                      ✕
-                    </span>
-                  </Box>
-                ))}
-              </Box>
             </Box>
           )}
 
+          {automation?.trigger === "call_completed" && (
+            <Box sx={{ p: 2, borderRadius: "10px", bgcolor: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+              <Typography fontSize={13} color="#166534">
+                📞 This automation fires when a call is completed.
+              </Typography>
+            </Box>
+          )}
+
+          {automation?.trigger === "call_missed" && (
+            <Box sx={{ p: 2, borderRadius: "10px", bgcolor: "#fef2f2", border: "1px solid #fecaca" }}>
+              <Typography fontSize={13} color="#991b1b">
+                📵 This automation fires when a call is missed.
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+
+        {/* ── FOOTER ── */}
+        <Box sx={{ px: 2.5, py: 1.75, borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setOpenTriggerPopup(false)}
+            sx={{ borderRadius: "8px", fontWeight: 600, fontSize: 13, px: 2.5, color: "#374151", borderColor: "#e5e7eb", "&:hover": { borderColor: "#9ca3af", bgcolor: "#f9fafb" } }}
+          >
+            Cancel
+          </Button>
           <Button
             variant="contained"
-            fullWidth
-            sx={{ mt: 2 }}
             onClick={() => {
               if (automation?.trigger === "new_message_received") {
-                selectedNode &&
-                  updateNodeData(selectedNode.id, {
-                    keywords: keywords,
-                  });
+                selectedNode && updateNodeData(selectedNode.id, { keywords });
               }
-
               setOpenTriggerPopup(false);
             }}
+            sx={{ borderRadius: "8px", fontWeight: 600, fontSize: 13, px: 2.5, bgcolor: "#f97316", "&:hover": { bgcolor: "#ea580c" }, boxShadow: "none" }}
           >
-            Save
+            Save Settings
           </Button>
-        </DialogContent>
+        </Box>
       </Dialog>
     </Box>
   );

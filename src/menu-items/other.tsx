@@ -2,7 +2,7 @@
 import { FormattedMessage } from 'react-intl';
 
 // assets
-import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined } from '@ant-design/icons';
+import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined } from '@ant-design/icons';
 
 // type
 import { NavItemType } from 'types/menu';
@@ -12,7 +12,9 @@ const icons = {
   ChromeOutlined,
   QuestionOutlined,
   DeploymentUnitOutlined,
-  MessageOutlined, RobotOutlined
+  MessageOutlined,
+  RobotOutlined,
+  ApiOutlined,
 };
 
 // ==============================|| MENU ITEMS - SUPPORT ||============================== //
@@ -42,6 +44,13 @@ const other: NavItemType = {
       type: 'item',
       url: '/automations',
       icon: icons.DeploymentUnitOutlined
+    },
+    {
+      id: 'Integrations',
+      title: <FormattedMessage id="Integrations" />,
+      type: 'item',
+      url: '/integrations',
+      icon: icons.ApiOutlined
     }
   ]
 };
