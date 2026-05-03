@@ -1,11 +1,5 @@
-import {
-  Grid,
-  CircularProgress,
-  Typography,
-  Fade,
-  Box,
-  Button,
-} from '@mui/material';
+import { Box, Button, CircularProgress, Fade, Grid, Typography } from '@mui/material';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import IntegrationCard from 'components/IntegrationCard';
 import { integrationService } from 'service/integration.service';
@@ -27,54 +21,77 @@ const Integrations = () => {
 
   if (isLoading) {
     return (
-      <Grid container justifyContent="center" alignItems="center" height="60vh">
-        <CircularProgress />
-      </Grid>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
+        <CircularProgress sx={{ color: '#25D366' }} />
+      </Box>
     );
   }
 
   if (isError) {
     return (
-      <Typography color="error" textAlign="center" mt={4}>
-        {(error as Error).message}
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
+        <Typography color="error">{(error as Error).message}</Typography>
+      </Box>
     );
   }
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Integrations</Typography>
+    <Box sx={{ px: 3, py: 3 }}>
 
-        <Button variant="contained" size="large">
-          + Add Integration
+      {/* ── PAGE HEADER ── */}
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 4 }}>
+        <Box>
+          <Typography sx={{ fontSize: 22, fontWeight: 800, color: '#111827', letterSpacing: -0.4, mb: 0.5 }}>
+            Integrations
+          </Typography>
+          <Typography sx={{ fontSize: 13.5, color: '#6b7280' }}>
+            Connect third-party services to automate your workflows
+          </Typography>
+        </Box>
+
+        <Button
+          variant="contained"
+          startIcon={<AddCircleOutlineIcon sx={{ fontSize: 18 }} />}
+          sx={{
+            bgcolor: '#25D366',
+            color: '#fff',
+            fontWeight: 700,
+            fontSize: 13,
+            borderRadius: '10px',
+            px: 2.5,
+            py: 1,
+            textTransform: 'none',
+            boxShadow: '0 2px 10px rgba(37,211,102,0.35)',
+            '&:hover': { bgcolor: '#1db954', boxShadow: '0 4px 14px rgba(37,211,102,0.45)' },
+          }}
+        >
+          Add Integration
         </Button>
       </Box>
 
-      {data?.length === 0 && (
-        <Typography color="text.secondary" textAlign="center" mt={8}>
-          No integrations connected yet.
-        </Typography>
+      {/* ── CARDS ── */}
+      {data?.length === 0 ? (
+        <Box sx={{ textAlign: 'center', py: 10 }}>
+          <Typography fontSize={48} lineHeight={1} mb={2}>🔌</Typography>
+          <Typography fontSize={16} fontWeight={700} color="#374151" mb={0.75}>No integrations yet</Typography>
+          <Typography fontSize={13} color="#9ca3af">Connect a service to automate your workflows</Typography>
+        </Box>
+      ) : (
+        <Grid container spacing={2.5}>
+          {data?.map((integration: IntegrationT, index: number) => (
+            <Grid item xs={12} sm={6} lg={4} key={integration._id}>
+              <Fade in timeout={350} style={{ transitionDelay: `${index * 80}ms` }}>
+                <Box>
+                  <IntegrationCard
+                    integration={integration}
+                    onDisconnect={(id) => disconnectMutation.mutate(id)}
+                  />
+                </Box>
+              </Fade>
+            </Grid>
+          ))}
+        </Grid>
       )}
-
-      <Grid container spacing={3}>
-        {data?.map((integration: IntegrationT, index: number) => (
-          <Grid item xs={12} sm={6} lg={4} key={integration._id}>
-            <Fade
-              in={true}
-              timeout={400}
-              style={{ transitionDelay: `${index * 200}ms` }}
-            >
-              <Box>
-                <IntegrationCard
-                  integration={integration}
-                  onDisconnect={(id) => disconnectMutation.mutate(id)}
-                />
-              </Box>
-            </Fade>
-          </Grid>
-        ))}
-      </Grid>
     </Box>
   );
 };
