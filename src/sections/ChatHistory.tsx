@@ -61,9 +61,10 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
 
   const getStatusUI = (history: any) => {
     const status = history.status;
+    if (status === 'PENDING') return <Typography sx={{ fontSize: 10, color: '#9ca3af', lineHeight: 1 }}>🕐</Typography>;
     if (status === 'SENT') return <Typography sx={{ fontSize: 11, color: '#9ca3af', lineHeight: 1 }}>✓</Typography>;
     if (status === 'DELIVERED') return <Typography sx={{ fontSize: 11, color: '#9ca3af', lineHeight: 1 }}>✓✓</Typography>;
-    if (status === 'READ') return <Typography sx={{ fontSize: 11, color: '#4fc3f7', lineHeight: 1 }}>✓✓</Typography>;
+    if (status === 'READ') return <Typography sx={{ fontSize: 11, color: '#53bdeb', lineHeight: 1 }}>✓✓</Typography>;
     if (status === 'FAILED') {
       const errorText = history.error?.message || 'Message failed';
       return (

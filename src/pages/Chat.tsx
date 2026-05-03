@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CircularProgress } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
@@ -79,6 +79,8 @@ const Chat = () => {
   const textInput = useRef(null);
 
   const [data, setData] = useState<HistoryProps[]>([]);
+  const [botTyping, setBotTyping] = useState(false);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const chatState = useSelector((state: any) => state?.chat || {});
 
   const handleUserChange = () => setEmailDetails((prev) => !prev);
@@ -218,6 +220,8 @@ const Chat = () => {
     if (!user?._id) return;
     setData([]);
     setCursor(null);
+    setBotTyping(false);
+    clearTimeout(typingTimerRef.current);
   }, [user?._id]);
 
   useEffect(() => {
@@ -241,7 +245,7 @@ const Chat = () => {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [data]);
+  }, [data, botTyping]);
 
   useEffect(() => {
     return () => { selectedFiles.forEach((file) => URL.revokeObjectURL(file as any)); };
@@ -249,14 +253,26 @@ const Chat = () => {
 
   const { subscribe } = useWebSocketChat();
 
+  const showTyping = useCallback(() => {
+    setBotTyping(true);
+    clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => setBotTyping(false), 10000);
+  }, []);
+
+  const hideTyping = useCallback(() => {
+    setBotTyping(false);
+    clearTimeout(typingTimerRef.current);
+  }, []);
+
   // Live incoming messages + status updates via WebSocket
   useEffect(() => {
     if (!user?._id) return;
     const unsubscribe = subscribe((msg) => {
       if (msg.type === 'new_message' && msg.contact_id?.toString() === user._id?.toString()) {
         setData((prev) => [...prev, msg.message]);
-        // User is viewing this chat — auto-clear unread badge
         contactService.markAsRead(user._id as string).catch(() => {});
+        if (msg.message?.direction === 'IN') showTyping();
+        if (msg.message?.direction === 'OUT') hideTyping();
       }
       if (msg.type === 'message_status' && (msg as any).contact_id?.toString() === user._id?.toString()) {
         setData((prev) =>
@@ -265,9 +281,22 @@ const Chat = () => {
           )
         );
       }
+      if (msg.type === 'typing_indicator' && (msg as any).contact_id?.toString() === user._id?.toString()) {
+        if ((msg as any).is_typing) showTyping(); else hideTyping();
+      }
+      // Update wa_message_id + status on the message in state (PENDING → SENT / FAILED)
+      if (msg.type === 'message_update') {
+        setData((prev) =>
+          prev.map((m: any) =>
+            m._id?.toString() === (msg as any)._id
+              ? { ...m, wa_message_id: (msg as any).wa_message_id ?? m.wa_message_id, status: (msg as any).status }
+              : m
+          )
+        );
+      }
     });
     return unsubscribe;
-  }, [user?._id, subscribe]);
+  }, [user?._id, subscribe, showTyping, hideTyping]);
 
   const name = user?.name || user?.phone || '';
   const initials = name.slice(0, 2).toUpperCase();
@@ -363,6 +392,35 @@ const Chat = () => {
                     </Box>
                   )}
                   <ChatHistory theme={theme} user={user ?? {}} data={data} />
+                  {botTyping && (
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-start', px: 2, mb: 1 }}>
+                      <Box sx={{
+                        bgcolor: '#fff',
+                        borderRadius: '0 12px 12px 12px',
+                        px: 1.5,
+                        py: 1,
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                        display: 'flex',
+                        gap: '5px',
+                        alignItems: 'center',
+                      }}>
+                        {[0, 1, 2].map((i) => (
+                          <Box key={i} sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            bgcolor: '#9ca3af',
+                            animation: 'typingBounce 1.2s ease-in-out infinite',
+                            animationDelay: `${i * 0.18}s`,
+                            '@keyframes typingBounce': {
+                              '0%, 60%, 100%': { transform: 'translateY(0)' },
+                              '30%': { transform: 'translateY(-5px)' },
+                            },
+                          }} />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
                   <div ref={bottomRef} />
                 </Box>
               </SimpleBar>
