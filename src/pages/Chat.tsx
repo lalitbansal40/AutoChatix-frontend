@@ -37,9 +37,11 @@ import SendIcon from '@mui/icons-material/Send';
 import { History as HistoryProps } from 'types/chat';
 import { UserProfile } from 'types/user-profile';
 import { messageService } from 'service/message.service';
+import { contactService } from 'service/contact.service';
 import { CreateContactModal } from 'components/chat/CreateContactModel';
 import heic2any from 'heic2any';
 import SendTemplateModal from 'components/chat/SendTemplateModal';
+import { useWebSocketChat } from 'contexts/WebSocketContext';
 
 const AVATAR_COLORS = ['#25D366', '#128C7E', '#34B7F1', '#9B59B6', '#E67E22', '#E74C3C', '#1ABC9C', '#3498DB'];
 const getAvatarColor = (name: string) => {
@@ -244,6 +246,28 @@ const Chat = () => {
   useEffect(() => {
     return () => { selectedFiles.forEach((file) => URL.revokeObjectURL(file as any)); };
   }, [selectedFiles]);
+
+  const { subscribe } = useWebSocketChat();
+
+  // Live incoming messages + status updates via WebSocket
+  useEffect(() => {
+    if (!user?._id) return;
+    const unsubscribe = subscribe((msg) => {
+      if (msg.type === 'new_message' && msg.contact_id?.toString() === user._id?.toString()) {
+        setData((prev) => [...prev, msg.message]);
+        // User is viewing this chat — auto-clear unread badge
+        contactService.markAsRead(user._id as string).catch(() => {});
+      }
+      if (msg.type === 'message_status' && (msg as any).contact_id?.toString() === user._id?.toString()) {
+        setData((prev) =>
+          prev.map((m: any) =>
+            m.wa_message_id === (msg as any).wa_message_id ? { ...m, status: (msg as any).status } : m
+          )
+        );
+      }
+    });
+    return unsubscribe;
+  }, [user?._id, subscribe]);
 
   const name = user?.name || user?.phone || '';
   const initials = name.slice(0, 2).toUpperCase();

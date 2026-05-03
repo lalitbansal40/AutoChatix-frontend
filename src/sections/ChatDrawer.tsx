@@ -20,6 +20,7 @@ import UserList from './UserList';
 import { UserProfile } from 'types/user-profile';
 import { CreateContactModal } from 'components/chat/CreateContactModel';
 import { contactService } from 'service/contact.service';
+import { useWebSocketChat } from 'contexts/WebSocketContext';
 
 interface ChatDrawerProps {
   setUser: (u: UserProfile) => void;
@@ -31,6 +32,7 @@ function ChatDrawer({ setUser, selectedUserId }: ChatDrawerProps) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [channelId, setChannelId] = useState<string>('');
+  const { subscribe } = useWebSocketChat();
 
   const { data } = useQuery({
     queryKey: ['channels'],
@@ -79,6 +81,16 @@ function ChatDrawer({ setUser, selectedUserId }: ChatDrawerProps) {
     if (selected) setUser(selected);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUserId, contactData]);
+
+  // Refresh contact list when a new message arrives (to update last message & ordering)
+  useEffect(() => {
+    const unsubscribe = subscribe((msg) => {
+      if (msg.type === 'new_message') {
+        contactRefetch();
+      }
+    });
+    return unsubscribe;
+  }, [subscribe, contactRefetch]);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#fff' }}>
