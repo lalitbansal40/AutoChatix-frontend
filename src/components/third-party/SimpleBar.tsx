@@ -49,7 +49,7 @@ export default function SimpleBarScroll({ children, sx, ...other }: MUIStyledCom
         </SimpleBarStyle>
       </RootStyle>
       <MobileView>
-        <Box sx={{ overflowX: 'auto', ...sx }} {...other}>
+        <Box sx={{ overflow: 'auto', WebkitOverflowScrolling: 'touch', ...sx }} {...other}>
           {children as ReactNode}
         </Box>
       </MobileView>
