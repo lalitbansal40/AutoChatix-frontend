@@ -138,11 +138,31 @@ const Chat = () => {
 
   const handleSendAll = async () => {
     if (!user?._id || !user?.channel_id) return;
+
     if (selectedFiles.length === 0 && message.trim()) {
-      await messageService.sendMessage({ channelId: user.channel_id, contactId: user._id, text: message });
+      const trimmed = message.trim();
+      const tempMsg: any = {
+        _id: `temp-${Date.now()}`,
+        direction: 'OUT',
+        type: 'text',
+        text: trimmed,
+        status: 'PENDING',
+        createdAt: new Date().toISOString(),
+        isTemp: true,
+      };
+      setData((prev) => [...prev, tempMsg]);
       setMessage('');
+      try {
+        await messageService.sendMessage({ channelId: user.channel_id, contactId: user._id, text: trimmed });
+      } catch (err) {
+        setData((prev) => prev.filter((m: any) => m._id !== tempMsg._id));
+        console.error(err);
+      }
       return;
     }
+
+    if (selectedFiles.length === 0) return;
+
     try {
       const formData = new FormData();
       selectedFiles.forEach((file) => formData.append('files', file));
@@ -150,17 +170,31 @@ const Chat = () => {
       formData.append('channelId', user.channel_id);
       if (message.trim()) formData.append('caption', message);
 
-      const tempMessage = {
+      const tempMessage: any = {
         _id: `temp-${Date.now()}`,
         direction: 'OUT',
         type: 'media_group',
-        payload: { files: selectedFiles.map((file) => ({ url: URL.createObjectURL(file), type: file.type })), caption: message },
+        isTemp: true,
+        status: 'PENDING',
+        payload: {
+          files: selectedFiles.map((file) => ({ url: URL.createObjectURL(file), type: file.type, name: file.name })),
+          caption: message,
+        },
         createdAt: new Date().toISOString(),
       };
-      setData((prev) => [...prev, tempMessage as any]);
-      await messageService.sendMedia(formData);
+      setData((prev) => [...prev, tempMessage]);
       setSelectedFiles([]);
       setMessage('');
+      const mediaResult = await messageService.sendMedia(formData);
+      // Replace the temp message with the real messages (status: SENT) from the API response
+      if (mediaResult?.data?.length) {
+        setData((prev) => {
+          const withoutTemp = prev.filter((m: any) => m._id !== tempMessage._id);
+          const existingIds = new Set(withoutTemp.map((m: any) => m._id?.toString()));
+          const fresh = (mediaResult.data as any[]).filter((m) => !existingIds.has(m._id?.toString()));
+          return [...withoutTemp, ...fresh];
+        });
+      }
     } catch (err) {
       console.error(err);
     }
@@ -269,7 +303,27 @@ const Chat = () => {
     if (!user?._id) return;
     const unsubscribe = subscribe((msg) => {
       if (msg.type === 'new_message' && msg.contact_id?.toString() === user._id?.toString()) {
-        setData((prev) => [...prev, msg.message]);
+        setData((prev) => {
+          const existingIdx = prev.findIndex((m: any) => m._id?.toString() === msg.message?._id?.toString());
+          if (existingIdx !== -1) {
+            // Already in list (added via API response) — only upgrade status, never downgrade to PENDING
+            const existing = prev[existingIdx] as any;
+            const statusOrder: Record<string, number> = { PENDING: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 4 };
+            const incomingRank = statusOrder[msg.message?.status] ?? 0;
+            const currentRank = statusOrder[existing.status] ?? 0;
+            if (incomingRank <= currentRank) return prev;
+            return prev.map((m: any, i: number) => i === existingIdx ? { ...m, status: msg.message?.status } : m);
+          }
+          // Replace the oldest optimistic temp message with the real one (OUT only)
+          if (msg.message?.direction === 'OUT') {
+            const tempIdx = prev.findIndex((m: any) => m.isTemp === true);
+            if (tempIdx !== -1) {
+              const updated = prev.filter((_, i) => i !== tempIdx);
+              return [...updated, msg.message];
+            }
+          }
+          return [...prev, msg.message];
+        });
         contactService.markAsRead(user._id as string).catch(() => {});
         if (msg.message?.direction === 'IN') showTyping();
         if (msg.message?.direction === 'OUT') hideTyping();
@@ -294,6 +348,29 @@ const Chat = () => {
           )
         );
       }
+      // Handle bulk media send confirmation (backend pushes "new_messages" plural for media)
+      if (msg.type === 'new_messages' && (msg as any).contact_id?.toString() === user._id?.toString()) {
+        const incoming: any[] = (msg as any).messages || [];
+        setData((prev) => {
+          let updated = prev;
+          incoming.forEach((realMsg: any) => {
+            const existingIdx = updated.findIndex((m: any) => m._id?.toString() === realMsg._id?.toString());
+            if (existingIdx !== -1) {
+              // Already in list (added via API response) — just update status/wa_message_id
+              updated = updated.map((m: any, i: number) =>
+                i === existingIdx ? { ...m, status: realMsg.status, wa_message_id: realMsg.wa_message_id ?? m.wa_message_id } : m
+              );
+            } else {
+              // Not in list yet — remove first temp and add real
+              const tempIdx = updated.findIndex((m: any) => m.isTemp === true);
+              updated = tempIdx !== -1
+                ? [...updated.filter((_, i) => i !== tempIdx), realMsg]
+                : [...updated, realMsg];
+            }
+          });
+          return updated;
+        });
+      }
     });
     return unsubscribe;
   }, [user?._id, subscribe, showTyping, hideTyping]);
@@ -303,11 +380,11 @@ const Chat = () => {
   const avatarColor = getAvatarColor(name);
 
   return (
-    <Box sx={{ display: 'flex', height: 'calc(100vh - 88px)', minHeight: 500, overflow: 'hidden', border: '1px solid #e5e7eb', borderRadius: '12px', bgcolor: '#f0f2f5' }}>
+    <Box sx={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden', bgcolor: '#f0f2f5' }}>
 
       {/* ── LEFT: CONTACTS PANEL ── */}
       <Box sx={{
-        width: { xs: '100%', md: 360 },
+        width: { xs: '100%', md: 300 },
         flexShrink: 0,
         display: { xs: user ? 'none' : 'flex', md: 'flex' },
         flexDirection: 'column',
@@ -429,34 +506,34 @@ const Chat = () => {
 
           {/* ── INPUT AREA ── */}
           {user && (
-            <Box sx={{ flexShrink: 0, bgcolor: '#f0f2f5', px: 1.5, py: 1.25 }}>
+            <Box sx={{ flexShrink: 0, bgcolor: '#f0f2f5', borderTop: '1px solid rgba(0,0,0,0.06)', px: 1.5, py: 1 }}>
 
               {/* File previews */}
               {selectedFiles.length > 0 && (
-                <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap', p: 1, bgcolor: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+                <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap', p: 1.25, bgcolor: '#fff', borderRadius: '14px', border: '1px solid #e5e7eb', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                   {selectedFiles.map((file, index) => {
                     const fileUrl = URL.createObjectURL(file);
                     if (file.type.startsWith('image')) {
                       return (
                         <Box key={index} sx={{ position: 'relative' }}>
-                          <img alt="" src={fileUrl} style={{ width: 72, height: 72, borderRadius: 8, objectFit: 'cover' }} />
-                          <Box onClick={() => removeFile(index)} sx={{ position: 'absolute', top: -4, right: -4, width: 18, height: 18, bgcolor: '#374151', color: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, cursor: 'pointer' }}>×</Box>
+                          <img alt="" src={fileUrl} style={{ width: 76, height: 76, borderRadius: 10, objectFit: 'cover' }} />
+                          <Box onClick={() => removeFile(index)} sx={{ position: 'absolute', top: -5, right: -5, width: 20, height: 20, bgcolor: '#1f2937', color: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>×</Box>
                         </Box>
                       );
                     }
                     if (file.type.startsWith('video')) {
                       return (
                         <Box key={index} sx={{ position: 'relative' }}>
-                          <video src={fileUrl} style={{ width: 72, height: 72, borderRadius: 8, objectFit: 'cover' }} />
-                          <Box onClick={() => removeFile(index)} sx={{ position: 'absolute', top: -4, right: -4, width: 18, height: 18, bgcolor: '#374151', color: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, cursor: 'pointer' }}>×</Box>
+                          <video src={fileUrl} style={{ width: 76, height: 76, borderRadius: 10, objectFit: 'cover' }} />
+                          <Box onClick={() => removeFile(index)} sx={{ position: 'absolute', top: -5, right: -5, width: 20, height: 20, bgcolor: '#1f2937', color: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, cursor: 'pointer', boxShadow: '0  1px 3px rgba(0,0,0,0.3)' }}>×</Box>
                         </Box>
                       );
                     }
                     return (
-                      <Box key={index} sx={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 0.5, px: 1.25, py: 0.75, bgcolor: '#f3f4f6', borderRadius: 2 }}>
+                      <Box key={index} sx={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 0.75, px: 1.25, py: 0.75, bgcolor: '#f3f4f6', borderRadius: '10px', border: '1px solid #e5e7eb' }}>
                         <Typography fontSize={20}>📄</Typography>
-                        <Typography fontSize={11} color="#374151" noWrap sx={{ maxWidth: 80 }}>{file.name}</Typography>
-                        <Box onClick={() => removeFile(index)} sx={{ width: 16, height: 16, bgcolor: '#374151', color: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, cursor: 'pointer', ml: 0.5 }}>×</Box>
+                        <Typography fontSize={11} fontWeight={500} color="#374151" noWrap sx={{ maxWidth: 80 }}>{file.name}</Typography>
+                        <Box onClick={() => removeFile(index)} sx={{ width: 17, height: 17, bgcolor: '#6b7280', color: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, cursor: 'pointer', ml: 0.5, flexShrink: 0 }}>×</Box>
                       </Box>
                     );
                   })}
@@ -465,26 +542,26 @@ const Chat = () => {
 
               {/* Recording indicator */}
               {recording && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.75, mb: 0.75, bgcolor: '#fef2f2', borderRadius: '8px' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.75, mb: 0.75, bgcolor: '#fef2f2', borderRadius: '10px', border: '1px solid #fecaca' }}>
                   <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#ef4444', animation: 'pulse 1s infinite', '@keyframes pulse': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.4 } } }} />
-                  <Typography fontSize={12} color="error">Recording...</Typography>
+                  <Typography fontSize={12} fontWeight={500} color="error">Recording...</Typography>
                 </Box>
               )}
 
               {/* Input row */}
-              <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 0.75 }}>
 
                 {/* Action buttons */}
-                <Box sx={{ display: 'flex', gap: 0.25, alignItems: 'center', pb: 0.25 }}>
+                <Box sx={{ display: 'flex', gap: 0.25, alignItems: 'center', pb: 0.25, bgcolor: 'rgba(255,255,255,0.6)', borderRadius: '14px', px: 0.5 }}>
                   <>
                     <IconButton
                       ref={anchorElEmoji}
                       aria-describedby={emojiId}
                       onClick={handleOnEmojiButtonClick}
-                      sx={{ color: '#6b7280', '&:hover': { color: '#374151' } }}
-                      size="medium"
+                      sx={{ color: '#6b7280', '&:hover': { color: '#25D366', bgcolor: 'transparent' }, p: 0.875 }}
+                      size="small"
                     >
-                      <SmileOutlined />
+                      <SmileOutlined style={{ fontSize: 20 }} />
                     </IconButton>
                     <Popper
                       id={emojiId}
@@ -501,8 +578,8 @@ const Chat = () => {
                       </ClickAwayListener>
                     </Popper>
                   </>
-                  <IconButton sx={{ color: '#6b7280', '&:hover': { color: '#374151' } }} size="medium" onClick={handlePlusClick}>
-                    <PlusOutlined />
+                  <IconButton sx={{ color: '#6b7280', '&:hover': { color: '#25D366', bgcolor: 'transparent' }, p: 0.875 }} size="small" onClick={handlePlusClick}>
+                    <PlusOutlined style={{ fontSize: 18 }} />
                   </IconButton>
                   <Menu
                     anchorEl={anchorElPlus}
@@ -510,15 +587,16 @@ const Chat = () => {
                     onClose={handlePlusClose}
                     anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
                     transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                    PaperProps={{ sx: { borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', mt: -1 } }}
                   >
-                    <MenuItem onClick={() => { handlePlusClose(); setTemplateModalOpen(true); }}>📩 Send Template</MenuItem>
-                    <MenuItem disabled>📊 Campaign (Coming soon)</MenuItem>
+                    <MenuItem onClick={() => { handlePlusClose(); setTemplateModalOpen(true); }} sx={{ fontSize: 13, gap: 1 }}>📩 Send Template</MenuItem>
+                    <MenuItem disabled sx={{ fontSize: 13, gap: 1 }}>📊 Campaign (Coming soon)</MenuItem>
                   </Menu>
-                  <IconButton sx={{ color: '#6b7280', '&:hover': { color: '#374151' } }} size="medium" onClick={() => fileInputRef.current.click()}>
-                    <PaperClipOutlined />
+                  <IconButton sx={{ color: '#6b7280', '&:hover': { color: '#25D366', bgcolor: 'transparent' }, p: 0.875 }} size="small" onClick={() => fileInputRef.current.click()}>
+                    <PaperClipOutlined style={{ fontSize: 18 }} />
                   </IconButton>
-                  <IconButton sx={{ color: '#6b7280', '&:hover': { color: '#374151' } }} size="medium" onClick={() => setRecordModalOpen(true)}>
-                    <SoundOutlined />
+                  <IconButton sx={{ color: '#6b7280', '&:hover': { color: '#25D366', bgcolor: 'transparent' }, p: 0.875 }} size="small" onClick={() => setRecordModalOpen(true)}>
+                    <SoundOutlined style={{ fontSize: 18 }} />
                   </IconButton>
                 </Box>
 
@@ -538,33 +616,36 @@ const Chat = () => {
                     }
                   }}
                   sx={{
-                    borderRadius: '20px',
+                    borderRadius: '22px',
                     bgcolor: '#fff',
                     fontSize: 14,
                     '& fieldset': { border: 'none' },
-                    '& .MuiOutlinedInput-input': { py: 1 },
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                    '& .MuiOutlinedInput-input': { py: 1.1, px: 1.75 },
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+                    transition: 'box-shadow 0.2s',
+                    '&:hover': { boxShadow: '0 2px 8px rgba(0,0,0,0.1)' },
+                    '&.Mui-focused': { boxShadow: '0 0 0 2px rgba(37,211,102,0.2)' },
                   }}
                 />
 
                 {/* Send button */}
-                <Box sx={{ pb: 0.25 }}>
-                  <IconButton
-                    onClick={handleSendAll}
-                    disabled={!message.trim() && selectedFiles.length === 0}
-                    sx={{
-                      bgcolor: '#25D366',
-                      color: '#fff',
-                      width: 40,
-                      height: 40,
-                      '&:hover': { bgcolor: '#1db954' },
-                      '&.Mui-disabled': { bgcolor: '#d1d5db', color: '#9ca3af' },
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    <SendIcon sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </Box>
+                <IconButton
+                  onClick={handleSendAll}
+                  disabled={!message.trim() && selectedFiles.length === 0}
+                  sx={{
+                    bgcolor: '#25D366',
+                    color: '#fff',
+                    width: 42,
+                    height: 42,
+                    flexShrink: 0,
+                    '&:hover': { bgcolor: '#1db954', transform: 'scale(1.05)' },
+                    '&.Mui-disabled': { bgcolor: '#d1d5db', color: '#9ca3af', boxShadow: 'none' },
+                    transition: 'all 0.15s',
+                    boxShadow: '0 2px 8px rgba(37,211,102,0.35)',
+                  }}
+                >
+                  <SendIcon sx={{ fontSize: 18 }} />
+                </IconButton>
               </Box>
             </Box>
           )}

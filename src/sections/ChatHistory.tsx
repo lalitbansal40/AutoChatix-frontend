@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/alt-text */
 /* eslint-disable jsx-a11y/iframe-has-title */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Dialog, Stack, Theme, Typography, Tooltip } from '@mui/material';
 import { Box } from '@mui/system';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -352,9 +352,32 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
       );
     }
 
+    if (type === 'media_group') {
+      const files: any[] = payload?.files || [];
+      return (
+        <Stack spacing={0.5}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {files.map((file: any, i: number) => {
+              if (file.type?.startsWith('image'))
+                return <img key={i} src={file.url} style={{ width: 140, height: 140, borderRadius: 8, objectFit: 'cover' }} />;
+              if (file.type?.startsWith('video'))
+                return <video key={i} src={file.url} controls style={{ width: 140, height: 140, borderRadius: 8, objectFit: 'cover' }} />;
+              return (
+                <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.5, bgcolor: 'rgba(0,0,0,0.06)', borderRadius: 1 }}>
+                  <Typography>📄</Typography>
+                  <Typography fontSize={12}>{file.name || 'File'}</Typography>
+                </Box>
+              );
+            })}
+          </Box>
+          {payload?.caption && <Typography fontSize={13} sx={{ pt: 0.25, whiteSpace: 'pre-wrap' }}>{payload.caption}</Typography>}
+        </Stack>
+      );
+    }
+
     return (
       <Typography fontSize={14} sx={{ wordBreak: 'break-word' }}>
-        {payload?.bodyText || payload?.text?.body || payload?.text || text || 'Message'}
+        {payload?.bodyText || payload?.text?.body || payload?.text || text || ''}
       </Typography>
     );
   };
@@ -381,38 +404,63 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
     </Box>
   );
 
+  const formatDateLabel = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return 'Today';
+    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return date.toLocaleDateString('en', { day: 'numeric', month: 'short', year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined });
+  };
+
+  let lastDateStr = '';
+
   return (
     <Box ref={wrapper} sx={{ py: 1 }}>
       {groupedMessages.map((group: any, index: number) => {
+        const groupTs = group.items ? group.items[0]?.createdAt : group.createdAt;
+        const dateStr = groupTs ? new Date(groupTs).toDateString() : '';
+        const showDateSep = dateStr && dateStr !== lastDateStr;
+        if (showDateSep) lastDateStr = dateStr;
 
         // ── MEDIA GROUP ──
         if (group.items) {
           const first = group.items[0];
           const isOut = group.direction !== 'IN';
           return (
-            <Box key={index} sx={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start', px: 2, mb: 1 }}>
-              <Box sx={{
-                maxWidth: '75%',
-                bgcolor: isOut ? '#d9fdd3' : '#fff',
-                borderRadius: isOut ? '12px 12px 0 12px' : '0 12px 12px 12px',
-                overflow: 'hidden',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                p: 0.5,
-              }}>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                  {group.items.map((item: any, i: number) => {
-                    const itemUrl = item.payload?.url;
-                    if (item.type === 'image') return <img key={i} src={itemUrl} onError={(e: any) => { e.target.src = '/image-error.png'; }} style={{ width: 140, height: 140, borderRadius: 6, objectFit: 'cover' }} />;
-                    if (item.type === 'video') return <video key={i} src={itemUrl} controls style={{ width: 140, height: 140, borderRadius: 6 }} />;
-                    return null;
-                  })}
+            <Fragment key={index}>
+              {showDateSep && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', my: 1.5 }}>
+                  <Typography sx={{ fontSize: 11.5, color: '#6b7280', bgcolor: 'rgba(255,255,255,0.8)', px: 1.75, py: 0.4, borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', fontWeight: 500 }}>
+                    {formatDateLabel(groupTs)}
+                  </Typography>
                 </Box>
-                {first.payload?.caption && <Typography sx={{ px: 0.5, pt: 0.5, fontSize: 13 }}>{first.payload.caption}</Typography>}
-                <Box sx={{ px: 0.5 }}>
-                  <BubbleMeta ts={first.createdAt} isOut={isOut} />
+              )}
+              <Box sx={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start', px: 2, mb: 1 }}>
+                <Box sx={{
+                  maxWidth: '75%',
+                  bgcolor: isOut ? '#d9fdd3' : '#fff',
+                  borderRadius: isOut ? '12px 12px 0 12px' : '0 12px 12px 12px',
+                  overflow: 'hidden',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  p: 0.5,
+                }}>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {group.items.map((item: any, i: number) => {
+                      const itemUrl = item.payload?.url;
+                      if (item.type === 'image') return <img key={i} src={itemUrl} onError={(e: any) => { e.target.src = '/image-error.png'; }} style={{ width: 140, height: 140, borderRadius: 6, objectFit: 'cover' }} />;
+                      if (item.type === 'video') return <video key={i} src={itemUrl} controls style={{ width: 140, height: 140, borderRadius: 6 }} />;
+                      return null;
+                    })}
+                  </Box>
+                  {first.payload?.caption && <Typography sx={{ px: 0.5, pt: 0.5, fontSize: 13 }}>{first.payload.caption}</Typography>}
+                  <Box sx={{ px: 0.5 }}>
+                    <BubbleMeta ts={first.createdAt} isOut={isOut} />
+                  </Box>
                 </Box>
               </Box>
-            </Box>
+            </Fragment>
           );
         }
 
@@ -421,19 +469,30 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
         const isOut = history.direction !== 'IN';
 
         return (
-          <Box key={index} sx={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start', px: 2, mb: 1 }}>
-            <Box sx={{
-              maxWidth: '72%',
-              bgcolor: isOut ? '#d9fdd3' : '#fff',
-              borderRadius: isOut ? '12px 12px 0 12px' : '0 12px 12px 12px',
-              px: 1.5, py: 0.875,
-              boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
-            }}>
-              <ReplyPreview message={history.reply_message} />
-              <RenderMessage history={history} />
-              <BubbleMeta ts={history.createdAt} isOut={isOut} history={history} />
+          <Fragment key={index}>
+            {showDateSep && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', my: 1.5 }}>
+                <Typography sx={{ fontSize: 11.5, color: '#6b7280', bgcolor: 'rgba(255,255,255,0.8)', px: 1.75, py: 0.4, borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', fontWeight: 500 }}>
+                  {formatDateLabel(groupTs)}
+                </Typography>
+              </Box>
+            )}
+            <Box sx={{ display: 'flex', justifyContent: isOut ? 'flex-end' : 'flex-start', px: 2, mb: 1 }}>
+              <Box sx={{
+                maxWidth: '72%',
+                bgcolor: isOut ? '#d9fdd3' : '#fff',
+                borderRadius: isOut ? '12px 12px 0 12px' : '0 12px 12px 12px',
+                px: 1.5, py: 0.875,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                opacity: history.isTemp ? 0.72 : 1,
+                transition: 'opacity 0.25s',
+              }}>
+                <ReplyPreview message={history.reply_message} />
+                <RenderMessage history={history} />
+                <BubbleMeta ts={history.createdAt} isOut={isOut} history={history} />
+              </Box>
             </Box>
-          </Box>
+          </Fragment>
         );
       })}
 

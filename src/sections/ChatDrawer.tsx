@@ -93,7 +93,7 @@ function ChatDrawer({ setUser, selectedUserId }: ChatDrawerProps) {
   }, [subscribe, contactRefetch]);
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#fff' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', bgcolor: '#fff' }}>
 
       {/* ── HEADER ── */}
       <Box sx={{ px: 2, pt: 2, pb: 1.5 }}>
@@ -190,7 +190,7 @@ function ChatDrawer({ setUser, selectedUserId }: ChatDrawerProps) {
 
       {/* ── CONTACTS LIST ── */}
       <Box
-        sx={{ flex: 1, overflowY: 'auto', borderTop: '1px solid #f3f4f6' }}
+        sx={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: '1px solid #f3f4f6' }}
         onScroll={(e: any) => {
           const t = e.target;
           if (t.scrollTop + t.clientHeight >= t.scrollHeight - 50 && hasNextPage && !isFetchingNextPage) {

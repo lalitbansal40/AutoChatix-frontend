@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom';
 
 // material-ui
 import { useTheme } from '@mui/material/styles';
-import { useMediaQuery, Box, Container, Toolbar } from '@mui/material';
+import { useMediaQuery, Box, Toolbar } from '@mui/material';
 
 // project import
 import Drawer from './Drawer';
@@ -27,7 +27,7 @@ const MainLayout = () => {
   const matchDownXL = useMediaQuery(theme.breakpoints.down('xl'));
   const downLG = useMediaQuery(theme.breakpoints.down('lg'));
 
-  const { container, miniDrawer, menuOrientation } = useConfig();
+  const { miniDrawer, menuOrientation } = useConfig();
 
   const isHorizontal = menuOrientation === MenuOrientation.HORIZONTAL && !downLG;
 
@@ -44,22 +44,11 @@ const MainLayout = () => {
       <Header />
       {!isHorizontal ? <Drawer /> : <HorizontalBar />}
 
-      <Box component="main" sx={{ width: 'calc(100% - 100px)', flexGrow: 1, p: 0 }}>
-        <Toolbar sx={{ mt: isHorizontal ? 0 : 'inherit' }} />
-        <Container
-          maxWidth={container ? 'xl' : false}
-          sx={{
-            ...(container && { px: { xs: 0, sm: 0 } }),
-            position: 'relative',
-            minHeight: 'calc(100vh - 110px)',
-            display: 'flex',
-            flexDirection: 'column'
-          }}
-        >
-          {/* <Breadcrumbs navigation={navigation} title titleBottom card={false} divider={false} /> */}
+      <Box component="main" sx={{ width: 'calc(100% - 100px)', flexGrow: 1, p: 0, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+        <Toolbar sx={{ mt: isHorizontal ? 0 : 'inherit', flexShrink: 0 }} />
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', pb: '8px', minHeight: 0 }}>
           <Outlet />
-          {/* <Footer /> */}
-        </Container>
+        </Box>
       </Box>
     </Box>
   );
