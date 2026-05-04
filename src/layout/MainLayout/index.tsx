@@ -46,7 +46,7 @@ const MainLayout = () => {
 
       <Box component="main" sx={{ width: 'calc(100% - 100px)', flexGrow: 1, p: 0, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
         <Toolbar sx={{ mt: isHorizontal ? 0 : 'inherit', flexShrink: 0 }} />
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', pb: '8px', minHeight: 0 }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', pb: '8px', minHeight: 0, overflowY: 'auto' }}>
           <Outlet />
         </Box>
       </Box>

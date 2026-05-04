@@ -29,6 +29,7 @@ const NODE_STYLE: Record<string, { color: string; bg: string; icon: string; labe
   razorpay_payment:      { color: "#2563eb", bg: "#eff6ff", icon: "💳", label: "Razorpay" },
   borzo_delivery:        { color: "#dc2626", bg: "#fef2f2", icon: "🚚", label: "Borzo" },
   distance_check:        { color: "#6366f1", bg: "#eef2ff", icon: "📏", label: "Distance" },
+  integration_action:    { color: "#0891b2", bg: "#ecfeff", icon: "🔌", label: "Integration" },
 };
 const DEFAULT_STYLE = { color: "#6b7280", bg: "#f9fafb", icon: "⚙️", label: "Node" };
 
@@ -394,7 +395,7 @@ const WAPreview = ({ data }: { data: any }) => {
 /* ══════════════════════════════════════════════
    MAIN NodeOpenPopup
 ══════════════════════════════════════════════ */
-const NodeOpenPopup = ({ selectedNode, updateNodeData, onClose, allNodes }: any) => {
+const NodeOpenPopup = ({ selectedNode, updateNodeData, onClose, allNodes, channelId }: any) => {
   if (!selectedNode) return null;
 
   const EditorComponent = NODE_EDITORS[selectedNode.data.type] || null;
@@ -487,6 +488,7 @@ const NodeOpenPopup = ({ selectedNode, updateNodeData, onClose, allNodes }: any)
                 node={selectedNode}
                 updateNodeData={updateNodeData}
                 allNodes={allNodes}
+                channelId={channelId}
               />
             ) : (
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>

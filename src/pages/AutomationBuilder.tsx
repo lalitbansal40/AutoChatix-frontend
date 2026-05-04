@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -27,11 +27,13 @@ import automationService from "service/automation.service";
 import * as dagre from "dagre";
 import NodeOpenPopup from "components/NodeOpenPopup";
 import { MarkerType } from "reactflow";
-import { Dialog, DialogContent, TextField } from "@mui/material";
+import { Dialog, DialogContent, TextField, MenuItem as MuiMenuItem, Avatar, Divider } from "@mui/material";
 import CustomEdge from "components/customedge";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import CloseIcon from "@mui/icons-material/Close";
 import { IconButton, Menu, MenuItem } from "@mui/material";
+import { useIntegrationCatalog } from "hooks/useIntegrationCatalog";
+import { IntegrationDefinition } from "types/integration";
 
 
 type CustomNodeData = {
@@ -154,6 +156,7 @@ const NODE_STYLE: Record<string, { color: string; bg: string; icon: string; labe
   razorpay_payment: { color: "#2563eb", bg: "#eff6ff", icon: "💳", label: "Razorpay" },
   borzo_delivery: { color: "#dc2626", bg: "#fef2f2", icon: "🚚", label: "Borzo" },
   distance_check: { color: "#6366f1", bg: "#eef2ff", icon: "📏", label: "Distance" },
+  integration_action: { color: "#0891b2", bg: "#ecfeff", icon: "🔌", label: "Integration" },
 };
 const DEFAULT_STYLE = { color: "#6b7280", bg: "#f9fafb", icon: "⚙️", label: "Node" };
 
@@ -245,6 +248,23 @@ const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
                 {k || "?"} = {Array.isArray(data.attribute_value) ? data.attribute_value[i] : data.attribute_value || "?"}
               </Typography>
             ))}
+          </Box>
+        )}
+
+        {/* INTEGRATION ACTION */}
+        {data.type === "integration_action" && (
+          <Box sx={{ bgcolor: "#ecfeff", border: "1px solid #a5f3fc", borderRadius: 1.5, px: 1, py: 0.75 }}>
+            <Typography fontSize={10.5} color="#0e7490" fontWeight={700} sx={{ textTransform: "uppercase", letterSpacing: 0.4 }}>
+              {data.integration_slug || "?"}
+            </Typography>
+            <Typography fontSize={11} color="#155e75" sx={{ mt: 0.25 }}>
+              {data.action_label || data.action_key || "Pick action"}
+            </Typography>
+            {data.config?.save_to && (
+              <Typography fontSize={10} color="#6b7280" sx={{ fontFamily: "monospace", mt: 0.25 }}>
+                → {`{{${data.config.save_to}}}`}
+              </Typography>
+            )}
           </Box>
         )}
 
@@ -404,19 +424,47 @@ const AutomationBuilder = () => {
       new_message_received: "Incoming Message",
       outgoing_message: "Outgoing Message",
       webhook_received: "Webhook",
-      call_completed: "Call Completed",   // 🔥 ADD
-      call_missed: "Call Missed",         // 🔥 ADD
+      call_completed: "Call Completed",
+      call_missed: "Call Missed",
+      integration_trigger: "Integration",
     };
 
     return map[trigger] || trigger;
   };
 
+  // 🔥 Resolve the connected app + trigger meta for integration_trigger
+  const integrationTriggerInfo = useMemo(() => {
+    if (automation?.trigger !== "integration_trigger") return null;
+    const slug = automation?.trigger_config?.slug;
+    const triggerKey = automation?.trigger_config?.trigger_key;
+    if (!slug || !triggerKey) return null;
+    const app = catalog.find((a) => a.slug === slug);
+    const trg = app?.triggers.find((t) => t.key === triggerKey);
+    return app && trg ? { app, trg } : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [automation?.trigger, automation?.trigger_config?.slug, automation?.trigger_config?.trigger_key, catalog]);
+
+  const apiBase: string =
+    (typeof window !== "undefined" && (window as any).__API_BASE__) ||
+    process.env.REACT_APP_API_URL ||
+    "";
+
+  const integrationWebhookUrl = useMemo(() => {
+    if (!integrationTriggerInfo) return "";
+    const slug = integrationTriggerInfo.app.slug;
+    const accountId = automation?.account_id;
+    const ch = channelId;
+    const base = apiBase || `${window.location.protocol}//${window.location.host}`;
+    return `${base.replace(/\/+$/, "")}/api/integrations/webhook/${slug}?account_id=${accountId}&channel_id=${ch}`;
+  }, [integrationTriggerInfo, automation?.account_id, channelId, apiBase]);
+
 
 
   /* =========================
      CREATE NODE
+     `extras` lets the palette inject integration_action defaults.
   ========================= */
-  const createNode = (type: string) => {
+  const createNode = (type: string, extras: Record<string, any> = {}) => {
     if (!type || !createNodePos) return;
 
     const config = NODE_CONFIG[type] || {};
@@ -434,6 +482,7 @@ const AutomationBuilder = () => {
         type,
         label: type,
         ...config,
+        ...extras, // 🔥 integration_slug + action_key + initial config
 
         messageType:
           config.messageType || (type === "auto_reply" ? "text" : ""),
@@ -661,6 +710,17 @@ const AutomationBuilder = () => {
   });
 
   const automation = data?.data || data;
+
+  // ── channel id (handles populated object or string) ──
+  const channelId: string | undefined =
+    typeof automation?.channel_id === "object"
+      ? automation?.channel_id?._id
+      : automation?.channel_id;
+
+  // ── integration catalog (palette source) ──
+  const { data: catalogResp } = useIntegrationCatalog(channelId);
+  const catalog = catalogResp?.catalog || [];
+  const connectedApps: IntegrationDefinition[] = catalog.filter((a) => a.connected);
 
   /* =========================
      LOAD FLOW
@@ -1079,43 +1139,130 @@ const AutomationBuilder = () => {
             boxShadow: "0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)",
             p: 1.5,
             zIndex: 2000,
-            minWidth: 280,
+            minWidth: 320,
+            maxHeight: 480,
+            overflowY: "auto",
             border: "1px solid #e5e7eb",
           }}
         >
+          {/* ─── BUILT-IN ─── */}
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", px: 0.5, pb: 1, letterSpacing: 0.5, textTransform: "uppercase" }}>
-            Add Node
+            Built-in Nodes
           </Typography>
           <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
-            {Object.keys(NODE_CONFIG).map((type) => {
-              const ns = NODE_STYLE[type] || DEFAULT_STYLE;
-              return (
-                <Box
-                  key={type}
-                  onClick={() => { createNode(type); setCreateNodePos(null); }}
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                    px: 1.25,
-                    py: 1,
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    border: "1px solid #f3f4f6",
-                    transition: "all 0.15s",
-                    "&:hover": { bgcolor: ns.bg, borderColor: ns.color, "& .node-label": { color: ns.color } },
-                  }}
-                >
-                  <Box sx={{ width: 28, height: 28, borderRadius: "7px", bgcolor: ns.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>
-                    {ns.icon}
+            {Object.keys(NODE_CONFIG)
+              .filter((type) => type !== "trigger")
+              .map((type) => {
+                const ns = NODE_STYLE[type] || DEFAULT_STYLE;
+                return (
+                  <Box
+                    key={type}
+                    onClick={() => { createNode(type); setCreateNodePos(null); }}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1,
+                      px: 1.25,
+                      py: 1,
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      border: "1px solid #f3f4f6",
+                      transition: "all 0.15s",
+                      "&:hover": { bgcolor: ns.bg, borderColor: ns.color, "& .node-label": { color: ns.color } },
+                    }}
+                  >
+                    <Box sx={{ width: 28, height: 28, borderRadius: "7px", bgcolor: ns.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>
+                      {ns.icon}
+                    </Box>
+                    <Typography className="node-label" sx={{ fontSize: 12, fontWeight: 600, color: "#374151", lineHeight: 1.2 }}>
+                      {ns.label}
+                    </Typography>
                   </Box>
-                  <Typography className="node-label" sx={{ fontSize: 12, fontWeight: 600, color: "#374151", lineHeight: 1.2 }}>
-                    {ns.label}
-                  </Typography>
-                </Box>
-              );
-            })}
+                );
+              })}
           </Box>
+
+          {/* ─── INTEGRATIONS ─── */}
+          <Divider sx={{ my: 1.5, borderColor: "#f3f4f6" }} />
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 0.5, pb: 1 }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 0.5, textTransform: "uppercase" }}>
+              Integrations
+            </Typography>
+            {connectedApps.length === 0 && (
+              <Typography
+                component="a"
+                href="/integrations"
+                target="_blank"
+                sx={{ fontSize: 10.5, color: "#0891b2", fontWeight: 600, textDecoration: "none", "&:hover": { textDecoration: "underline" } }}
+              >
+                + Connect apps
+              </Typography>
+            )}
+          </Box>
+
+          {connectedApps.length === 0 ? (
+            <Typography sx={{ fontSize: 11.5, color: "#9ca3af", px: 0.5, py: 1, fontStyle: "italic" }}>
+              No connected integrations on this channel yet.
+            </Typography>
+          ) : (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {connectedApps.map((app) => (
+                <Box key={app.slug}>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 0.5, mb: 0.5 }}>
+                    <Avatar sx={{ width: 20, height: 20, bgcolor: app.bgColor, color: app.color, fontSize: 11, fontWeight: 800 }}>
+                      {app.icon || app.name[0]}
+                    </Avatar>
+                    <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#374151" }}>{app.name}</Typography>
+                  </Stack>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 0.5, pl: 0.25 }}>
+                    {app.actions.map((act) => (
+                      <Box
+                        key={`${app.slug}_${act.key}`}
+                        onClick={() => {
+                          // Initialise node with default config from action schema
+                          const initialConfig: Record<string, any> = {};
+                          for (const f of act.configSchema || []) {
+                            if (f.defaultValue !== undefined) initialConfig[f.key] = f.defaultValue;
+                          }
+                          createNode("integration_action", {
+                            integration_slug: app.slug,
+                            action_key: act.key,
+                            action_label: act.label,
+                            label: `${app.name}: ${act.label}`,
+                            config: initialConfig,
+                          });
+                          setCreateNodePos(null);
+                        }}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.75,
+                          px: 1.25,
+                          py: 0.75,
+                          borderRadius: "8px",
+                          cursor: "pointer",
+                          border: "1px solid #f3f4f6",
+                          "&:hover": { bgcolor: app.bgColor, borderColor: app.color },
+                        }}
+                      >
+                        <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: app.color, flexShrink: 0 }} />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#1f2937", lineHeight: 1.25 }} noWrap>
+                            {act.label}
+                          </Typography>
+                          {act.description && (
+                            <Typography sx={{ fontSize: 10.5, color: "#6b7280", lineHeight: 1.3 }} noWrap>
+                              {act.description}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          )}
         </Box>
       )}
 
@@ -1126,6 +1273,7 @@ const AutomationBuilder = () => {
           onClose={() => setSelectedNode(null)}
           updateNodeData={updateNodeData}
           allNodes={nodes}
+          channelId={channelId}
         />
       )}
 
@@ -1270,6 +1418,58 @@ const AutomationBuilder = () => {
               <Typography fontSize={13} color="#991b1b">
                 📵 This automation fires when a call is missed.
               </Typography>
+            </Box>
+          )}
+
+          {automation?.trigger === "integration_trigger" && integrationTriggerInfo && (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              <Box sx={{ p: 2, borderRadius: "10px", bgcolor: integrationTriggerInfo.app.bgColor, border: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 1.25 }}>
+                <Box sx={{ width: 32, height: 32, borderRadius: "8px", bgcolor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: integrationTriggerInfo.app.color }}>
+                  {integrationTriggerInfo.app.icon || integrationTriggerInfo.app.name[0]}
+                </Box>
+                <Box>
+                  <Typography fontSize={13} fontWeight={700} color={integrationTriggerInfo.app.color}>
+                    {integrationTriggerInfo.app.name} → {integrationTriggerInfo.trg.label}
+                  </Typography>
+                  <Typography fontSize={11.5} color="text.secondary">
+                    {integrationTriggerInfo.trg.description}
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.6, mb: 0.75 }}>
+                  Webhook URL
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#6b7280", mb: 0.75 }}>
+                  Paste this URL into your <strong>{integrationTriggerInfo.app.name}</strong> dashboard to subscribe to events.
+                </Typography>
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  <TextField
+                    fullWidth size="small" value={integrationWebhookUrl} InputProps={{ readOnly: true }}
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontFamily: "monospace", fontSize: 11.5 } }}
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => navigator.clipboard.writeText(integrationWebhookUrl)}
+                    sx={{ borderRadius: "8px", flexShrink: 0, fontWeight: 600 }}
+                  >
+                    Copy
+                  </Button>
+                </Box>
+              </Box>
+
+              {integrationTriggerInfo.trg.webhookEvent && (
+                <Box sx={{ p: 1.25, borderRadius: "8px", bgcolor: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                  <Typography fontSize={11} color="#6b7280">
+                    Webhook event:{" "}
+                    <Box component="span" sx={{ fontFamily: "monospace", fontWeight: 700, color: "#374151" }}>
+                      {integrationTriggerInfo.trg.webhookEvent}
+                    </Box>
+                  </Typography>
+                </Box>
+              )}
             </Box>
           )}
         </DialogContent>

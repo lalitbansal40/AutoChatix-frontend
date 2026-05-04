@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": false
+  },
+  "include": [
+    "src/components/integrations/DynamicFieldRenderer.tsx",
+    "src/components/node-editors/IntegrationActionEditor.tsx",
+    "src/components/node-editors/index.ts",
+    "src/hooks/useIntegrationCatalog.ts",
+    "src/types/integration.ts",
+    "src/service/integration.service.ts",
+    "src/service/automation.service.ts",
+    "src/components/CreateAutomationModal.tsx",
+    "src/pages/AutomationBuilder.tsx",
+    "src/components/NodeOpenPopup.tsx"
+  ],
+  "exclude": ["node_modules"]
+}

@@ -26,9 +26,17 @@ export interface EdgeData {
   condition?: string;
 }
 
+export interface TriggerConfig {
+  slug?: string;
+  trigger_key?: string;
+  filters?: Record<string, any>;
+  [key: string]: any;
+}
+
 export interface AutomationPayload {
   name: string;
   trigger: string;
+  trigger_config?: TriggerConfig;
   nodes?: NodeData[];
   edges?: EdgeData[]; // ✅ IMPORTANT ADD
   channel_id?: string;

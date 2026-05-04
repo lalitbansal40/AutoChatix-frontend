@@ -2,6 +2,7 @@ import AskInputEditor from "components/AskInputEditor";
 import AutoReplyEditor from "./AutoReplyEditor";
 import SetContactAttributeEditor from "components/SetContactAttributeNode";
 import GoogleSheetEditor from "./GoogleSheetEditor";
+import IntegrationActionEditor from "./IntegrationActionEditor";
 
 export const NODE_EDITORS: any = {
   auto_reply: AutoReplyEditor,
@@ -10,4 +11,5 @@ export const NODE_EDITORS: any = {
   ask_input: AskInputEditor,
   set_contact_attribute: SetContactAttributeEditor,
   google_sheet: GoogleSheetEditor,
+  integration_action: IntegrationActionEditor,
 };

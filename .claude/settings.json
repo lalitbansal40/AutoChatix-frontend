@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(xargs ls *)",
+      "Read(//Users/lalitbansal/Documents/autochatix/**)"
+    ],
+    "additionalDirectories": [
+      "/Users/lalitbansal/Documents/autochatix/AutoChatix-backend/src/config",
+      "/Users/lalitbansal/Documents/autochatix/AutoChatix-backend/src/models",
+      "/Users/lalitbansal/Documents/autochatix/AutoChatix-backend/src/controllers",
+      "/Users/lalitbansal/Documents/autochatix/AutoChatix-backend/src/routes",
+      "/Users/lalitbansal/Documents/autochatix/AutoChatix-backend/src/database",
+      "/Users/lalitbansal/Documents/autochatix/AutoChatix-backend/src"
     ]
   }
 }

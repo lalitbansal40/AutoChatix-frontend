@@ -20,13 +20,15 @@ const LogoMain = ({ reverse, ...others }: { reverse?: boolean }) => {
       <img
         src="https://autochatix-assets.s3.ap-south-1.amazonaws.com/AutoChatix_Full_Logo.png"
         alt="logo"
-        width={250}
-        height={80}
         style={{
+          width: '100%',
+          maxWidth: 160,
+          height: 'auto',
           objectFit: 'contain',
+          display: 'block',
           filter:
             theme.palette.mode === ThemeMode.DARK || reverse
-              ? 'brightness(0) invert(1)' // 👈 dark mode me white logo
+              ? 'brightness(0) invert(1)'
               : 'none'
         }}
         {...others}
