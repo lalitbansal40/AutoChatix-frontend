@@ -140,7 +140,7 @@ const Automations = () => {
         onClose={() => setOpenCreate(false)}
         onSuccess={(newAutomation: any) => {
           setOpenCreate(false);
-          navigate(`/automation-builder/${newAutomation._id}`);
+          navigate(`/automations/${newAutomation._id}`);
         }}
       />
     </Box>

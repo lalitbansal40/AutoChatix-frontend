@@ -97,10 +97,10 @@ const GoogleSheetEditor = ({ node, updateNodeData, allNodes }: any) => {
           <Grid item xs={12}>
             <TextField
               fullWidth
-              label="Spreadsheet ID"
-              placeholder="1Goh9PPS7Yv62yxzrlpJNkqoJtynOypwCSeUcZWCXAwA"
+              label="Spreadsheet URL or ID"
+              placeholder="Paste full URL or just the ID"
               value={data.spreadsheet_id || ""}
-              helperText="Copy from the Google Sheets URL between /d/ and /edit"
+              helperText="Paste the full sheet URL (e.g. https://docs.google.com/spreadsheets/d/…/edit) or only the ID — both work."
               onChange={(e) => updateNodeData(node.id, { spreadsheet_id: e.target.value })}
             />
           </Grid>

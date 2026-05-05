@@ -93,7 +93,7 @@ const CreateAutomationModal = ({ open, onClose, onSuccess }: any) => {
       setChannel("");
       setSelected({ kind: "builtin", value: "new_message_received" });
 
-      navigate(`/automation-builder/${newAutomation._id}`);
+      navigate(`/automations/${newAutomation._id}`);
     } catch (err) {
       console.error(err);
     } finally {

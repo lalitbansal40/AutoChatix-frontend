@@ -10,6 +10,7 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import { useEffect, useRef, useState } from "react";
 import { FieldDef } from "types/integration";
 
 /* ─────────────────────────────────────────────────────────
@@ -56,7 +57,40 @@ const SectionLabel = ({
 
 /* ─────────────────────────────────────────────────────────
    key_value editor — { col: "value template" } pairs.
+
+   IMPORTANT: state is held as an ORDERED ARRAY of rows
+   internally so that:
+     • two rows with the same (or empty) key never collapse
+     • typing into one row never reorders/loses another row
+     • rows preserve identity across re-renders (stable React keys)
+
+   We sync the external object → array only when the parent
+   value object changes by KEY SET (i.e. real edits from
+   outside), not on every render.
 ───────────────────────────────────────────────────────── */
+type KvRow = { id: string; k: string; v: string };
+
+const objectToRows = (obj: Record<string, any> | undefined): KvRow[] =>
+  Object.entries(obj || {}).map(([k, v], i) => ({
+    id: `${i}-${k}`,
+    k,
+    v: v === null || v === undefined ? "" : String(v),
+  }));
+
+const rowsToObject = (rows: KvRow[]): Record<string, string> => {
+  // Last write wins on duplicate keys; empty keys are dropped.
+  const out: Record<string, string> = {};
+  for (const r of rows) {
+    const key = (r.k || "").trim();
+    if (!key) continue;
+    out[key] = r.v ?? "";
+  }
+  return out;
+};
+
+let __kvRowSeq = 0;
+const newRow = (): KvRow => ({ id: `kv_${++__kvRowSeq}_${Date.now()}`, k: "", v: "" });
+
 const KeyValueEditor = ({
   value = {},
   onChange,
@@ -68,50 +102,83 @@ const KeyValueEditor = ({
   placeholder?: string;
   fixedKeys?: string[];
 }) => {
-  const rows: { k: string; v: string }[] = Object.entries(value || {}).map(
-    ([k, v]) => ({ k, v: String(v ?? "") })
-  );
+  const [rows, setRows] = useState<KvRow[]>(() => objectToRows(value));
 
-  const setRow = (i: number, partial: Partial<{ k: string; v: string }>) => {
-    const next = rows.map((r, idx) => (idx === i ? { ...r, ...partial } : r));
-    onChange(Object.fromEntries(next.map((r) => [r.k, r.v])));
+  // Sync from parent ONLY when the external key set changes (e.g. user
+  // loaded a different node). This prevents wiping local typed-but-empty
+  // rows on every parent re-render.
+  const externalKeysRef = useRef<string>("");
+  useEffect(() => {
+    const externalKeys = Object.keys(value || {})
+      .sort()
+      .join("|");
+    if (externalKeys !== externalKeysRef.current) {
+      externalKeysRef.current = externalKeys;
+      // Merge: keep our local order/rows, but pick up any new keys we
+      // don't have. (Only run on truly external changes — e.g. node load.)
+      setRows((prev) => {
+        const localObj = rowsToObject(prev);
+        const same =
+          Object.keys(localObj).length === Object.keys(value || {}).length &&
+          Object.keys(localObj).every((k) => (value || {})[k] === localObj[k]);
+        if (same) return prev;
+        return objectToRows(value);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const commit = (next: KvRow[]) => {
+    setRows(next);
+    onChange(rowsToObject(next));
   };
 
-  const addRow = () => {
-    const next = [...rows, { k: "", v: "" }];
-    onChange(Object.fromEntries(next.map((r) => [r.k, r.v])));
+  const setRow = (id: string, partial: Partial<KvRow>) => {
+    commit(rows.map((r) => (r.id === id ? { ...r, ...partial } : r)));
   };
 
-  const delRow = (i: number) => {
-    const next = rows.filter((_, idx) => idx !== i);
-    onChange(Object.fromEntries(next.map((r) => [r.k, r.v])));
-  };
+  const addRow = () => commit([...rows, newRow()]);
+  const delRow = (id: string) => commit(rows.filter((r) => r.id !== id));
 
   return (
-    <Stack spacing={0.75}>
-      {rows.map((r, i) => (
-        <Stack key={i} direction="row" spacing={0.75} alignItems="center">
+    <Stack spacing={0.5}>
+      {rows.length > 0 && (
+        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ pl: 0.25 }}>
+          <Typography sx={{ flex: 1, fontSize: 10.5, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.4 }}>
+            Sheet column
+          </Typography>
+          <Box sx={{ width: 18 }} />
+          <Typography sx={{ flex: 2, fontSize: 10.5, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.4 }}>
+            Value or {`{{variable}}`}
+          </Typography>
+          <Box sx={{ width: 28 }} />
+        </Stack>
+      )}
+
+      {rows.map((r) => (
+        <Stack key={r.id} direction="row" spacing={0.75} alignItems="center">
           <TextField
             size="small"
-            placeholder="column"
+            placeholder="e.g. Phone"
             value={r.k}
-            onChange={(e) => setRow(i, { k: e.target.value })}
+            onChange={(e) => setRow(r.id, { k: e.target.value })}
             disabled={!!fixedKeys}
             sx={{ flex: 1, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}
           />
           <Typography sx={{ color: "#9ca3af", fontSize: 14 }}>=</Typography>
           <TextField
             size="small"
-            placeholder={placeholder || "{{value}}"}
+            placeholder={placeholder || "Lalit Bansal or {{contact.name}}"}
             value={r.v}
-            onChange={(e) => setRow(i, { v: e.target.value })}
+            onChange={(e) => setRow(r.id, { v: e.target.value })}
             sx={{ flex: 2, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}
           />
-          <IconButton size="small" onClick={() => delRow(i)} sx={{ color: "#ef4444" }}>
+          <IconButton size="small" onClick={() => delRow(r.id)} sx={{ color: "#ef4444" }}>
             <DeleteOutlineIcon fontSize="small" />
           </IconButton>
         </Stack>
       ))}
+
       <Button
         size="small"
         startIcon={<AddIcon />}
@@ -121,6 +188,7 @@ const KeyValueEditor = ({
           textTransform: "none",
           fontSize: 12,
           color: "#16a34a",
+          mt: 0.25,
           "&:hover": { bgcolor: "#f0fdf4" },
         }}
       >

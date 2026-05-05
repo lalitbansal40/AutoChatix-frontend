@@ -27,7 +27,7 @@ import automationService from "service/automation.service";
 import * as dagre from "dagre";
 import NodeOpenPopup from "components/NodeOpenPopup";
 import { MarkerType } from "reactflow";
-import { Dialog, DialogContent, TextField, MenuItem as MuiMenuItem, Avatar, Divider } from "@mui/material";
+import { Dialog, DialogContent, TextField, Avatar, Divider } from "@mui/material";
 import CustomEdge from "components/customedge";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import CloseIcon from "@mui/icons-material/Close";
@@ -220,6 +220,18 @@ const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
 
       {/* ── BODY ── */}
       <Box sx={{ px: 1.5, py: 1 }}>
+
+        {/* TRIGGER META (integration trigger) */}
+        {data.type === "trigger" && data.trigger_meta?.slug && (
+          <Box sx={{ bgcolor: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 1.5, px: 1, py: 0.5 }}>
+            <Typography fontSize={10.5} color="#c2410c" fontWeight={700} sx={{ textTransform: "uppercase", letterSpacing: 0.4 }}>
+              {data.trigger_meta.slug}
+            </Typography>
+            <Typography fontSize={11} color="#9a3412" sx={{ mt: 0.25 }}>
+              {data.trigger_meta.trigger_key}
+            </Typography>
+          </Box>
+        )}
 
         {/* MESSAGE PREVIEW */}
         {data.message && (
@@ -431,34 +443,6 @@ const AutomationBuilder = () => {
 
     return map[trigger] || trigger;
   };
-
-  // 🔥 Resolve the connected app + trigger meta for integration_trigger
-  const integrationTriggerInfo = useMemo(() => {
-    if (automation?.trigger !== "integration_trigger") return null;
-    const slug = automation?.trigger_config?.slug;
-    const triggerKey = automation?.trigger_config?.trigger_key;
-    if (!slug || !triggerKey) return null;
-    const app = catalog.find((a) => a.slug === slug);
-    const trg = app?.triggers.find((t) => t.key === triggerKey);
-    return app && trg ? { app, trg } : null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [automation?.trigger, automation?.trigger_config?.slug, automation?.trigger_config?.trigger_key, catalog]);
-
-  const apiBase: string =
-    (typeof window !== "undefined" && (window as any).__API_BASE__) ||
-    process.env.REACT_APP_API_URL ||
-    "";
-
-  const integrationWebhookUrl = useMemo(() => {
-    if (!integrationTriggerInfo) return "";
-    const slug = integrationTriggerInfo.app.slug;
-    const accountId = automation?.account_id;
-    const ch = channelId;
-    const base = apiBase || `${window.location.protocol}//${window.location.host}`;
-    return `${base.replace(/\/+$/, "")}/api/integrations/webhook/${slug}?account_id=${accountId}&channel_id=${ch}`;
-  }, [integrationTriggerInfo, automation?.account_id, channelId, apiBase]);
-
-
 
   /* =========================
      CREATE NODE
@@ -719,8 +703,44 @@ const AutomationBuilder = () => {
 
   // ── integration catalog (palette source) ──
   const { data: catalogResp } = useIntegrationCatalog(channelId);
-  const catalog = catalogResp?.catalog || [];
-  const connectedApps: IntegrationDefinition[] = catalog.filter((a) => a.connected);
+  const catalog: IntegrationDefinition[] = useMemo(
+    () => catalogResp?.catalog || [],
+    [catalogResp]
+  );
+  const connectedApps: IntegrationDefinition[] = useMemo(
+    () => catalog.filter((a) => a.connected),
+    [catalog]
+  );
+
+  // 🔥 Resolve the connected app + trigger meta for integration_trigger
+  const integrationTriggerInfo = useMemo(() => {
+    if (automation?.trigger !== "integration_trigger") return null;
+    const slug = automation?.trigger_config?.slug;
+    const triggerKey = automation?.trigger_config?.trigger_key;
+    if (!slug || !triggerKey) return null;
+    const app = catalog.find((a) => a.slug === slug);
+    const trg = app?.triggers.find((t) => t.key === triggerKey);
+    return app && trg ? { app, trg } : null;
+  }, [
+    automation?.trigger,
+    automation?.trigger_config?.slug,
+    automation?.trigger_config?.trigger_key,
+    catalog,
+  ]);
+
+  const apiBase: string =
+    (typeof window !== "undefined" && (window as any).__API_BASE__) ||
+    process.env.REACT_APP_API_URL ||
+    "";
+
+  const integrationWebhookUrl = useMemo(() => {
+    if (!integrationTriggerInfo) return "";
+    const slug = integrationTriggerInfo.app.slug;
+    const accountId = automation?.account_id;
+    const ch = channelId;
+    const base = apiBase || `${window.location.protocol}//${window.location.host}`;
+    return `${base.replace(/\/+$/, "")}/api/integrations/webhook/${slug}?account_id=${accountId}&channel_id=${ch}`;
+  }, [integrationTriggerInfo, automation?.account_id, channelId, apiBase]);
 
   /* =========================
      LOAD FLOW
@@ -743,6 +763,17 @@ const AutomationBuilder = () => {
         );
       }
 
+      // For integration_trigger automations, decorate the start trigger
+      // node with the source app/trigger meta so the canvas shows it.
+      const isTriggerNode = node.type === "trigger";
+      const triggerMeta =
+        isTriggerNode && data.trigger === "integration_trigger" && data.trigger_config
+          ? {
+              slug: data.trigger_config.slug,
+              trigger_key: data.trigger_config.trigger_key,
+            }
+          : undefined;
+
       return {
         id: node.id,
         type: "custom",
@@ -754,6 +785,7 @@ const AutomationBuilder = () => {
           // 🔥 ADD THIS
           attribute_name: node.config?.key || "",
           attribute_value: node.config?.value || "",
+          ...(triggerMeta && { trigger_meta: triggerMeta }),
           disconnectRow,
           setMenuAnchor: (el: HTMLElement) => {
             setSelectedNode({
@@ -1417,6 +1449,48 @@ const AutomationBuilder = () => {
             <Box sx={{ p: 2, borderRadius: "10px", bgcolor: "#fef2f2", border: "1px solid #fecaca" }}>
               <Typography fontSize={13} color="#991b1b">
                 📵 This automation fires when a call is missed.
+              </Typography>
+            </Box>
+          )}
+
+          {automation?.trigger === "outgoing_message" && (
+            <Box sx={{ p: 2, borderRadius: "10px", bgcolor: "#eff6ff", border: "1px solid #bfdbfe" }}>
+              <Typography fontSize={13} color="#1e40af">
+                📤 This automation fires whenever an agent sends a message on this channel.
+              </Typography>
+            </Box>
+          )}
+
+          {automation?.trigger === "webhook_received" && (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              <Box sx={{ p: 2, borderRadius: "10px", bgcolor: "#f5f3ff", border: "1px solid #ddd6fe" }}>
+                <Typography fontSize={13} color="#5b21b6">
+                  🔗 This automation fires when a custom webhook is invoked.
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.6, mb: 0.75 }}>
+                  Webhook URL
+                </Typography>
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  <TextField
+                    fullWidth size="small" InputProps={{ readOnly: true }}
+                    value={`${(apiBase || `${typeof window !== "undefined" ? window.location.origin : ""}`).replace(/\/+$/, "")}/webhook/custom?automation_id=${automation?._id}`}
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontFamily: "monospace", fontSize: 11.5 } }}
+                  />
+                </Box>
+              </Box>
+            </Box>
+          )}
+
+          {automation?.trigger === "integration_trigger" && !integrationTriggerInfo && (
+            <Box sx={{ p: 2, borderRadius: "10px", bgcolor: "#fef3c7", border: "1px solid #fde68a" }}>
+              <Typography fontSize={13} color="#92400e" fontWeight={600}>
+                ⚠️ Integration not connected
+              </Typography>
+              <Typography fontSize={12} color="#78350f" sx={{ mt: 0.5 }}>
+                The integration <strong>{automation?.trigger_config?.slug || "(unknown)"}</strong> isn't connected on this channel anymore.
+                Reconnect it from the Integrations page or create a new automation.
               </Typography>
             </Box>
           )}
