@@ -16,11 +16,14 @@ interface ChatHistoryProps {
 const getMessageText = (history: any) => {
   const payload = history?.payload || {};
   if (history?.type === 'list') return payload?.body || '';
+  if (history?.type === 'carousel') return payload?.body || 'Carousel message';
   return (
     history?.text ||
     payload?.text?.body ||
     payload?.bodyText ||
     payload?.caption ||
+    payload?.button?.text ||
+    payload?.button?.payload ||
     payload?.interactive?.button_reply?.title ||
     payload?.interactive?.list_reply?.title ||
     payload?.interactive?.nfm_reply?.response_json ||
@@ -47,6 +50,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
     if (!msg) return '';
     const payload = msg.payload || {};
     if (msg.type === 'list') return payload?.body || 'List message';
+    if (msg.type === 'carousel') return payload?.body || 'Carousel message';
     return (
       msg?.text ||
       payload?.bodyText ||
@@ -76,10 +80,81 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
     return null;
   };
 
-  const ReplyPreview = ({ message }: any) => {
+  const ReplyPreview = ({ message, selectedBy }: any) => {
     if (!message) return null;
     const payload = message.payload || {};
     const type = message.type;
+
+    if (type === 'carousel') {
+      const items = payload?.items || [];
+      const selectedId =
+        selectedBy?.payload?.button?.payload ||
+        selectedBy?.payload?.interactive?.button_reply?.id ||
+        selectedBy?.payload?.interactive?.list_reply?.id ||
+        '';
+      const selectedTitle =
+        selectedBy?.payload?.button?.text ||
+        selectedBy?.payload?.interactive?.button_reply?.title ||
+        selectedBy?.payload?.interactive?.list_reply?.title ||
+        selectedBy?.text ||
+        '';
+      const selectedMatch = String(selectedId).match(/^cr_(\d+)_(\d+)$/);
+      const selectedItem = selectedMatch
+        ? items[Number(selectedMatch[1])]
+        : items.find((item: any) =>
+            item?.id === selectedId ||
+            (item?.buttons || []).some((btn: any) => btn?.id === selectedId)
+          );
+      const selectedButton = selectedItem
+        ? (selectedItem.buttons || [])[selectedMatch ? Number(selectedMatch[2]) : 0]
+        : null;
+
+      return (
+        <Stack sx={{ borderLeft: '3px solid #25D366', pl: 1, mb: 1, background: 'rgba(0,0,0,0.06)', borderRadius: 1, maxWidth: 300, py: 0.75, pr: 1 }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block' }}>
+            {payload?.body || 'Carousel'}
+          </Typography>
+          {selectedItem ? (
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+              {selectedItem.image && (
+                <img src={selectedItem.image} style={{ width: 42, height: 42, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
+              )}
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="caption" sx={{ color: '#667085', display: 'block', lineHeight: 1.25 }}>
+                  Selected card
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {selectedItem.title || 'Card'}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#00a884', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  Button: {selectedButton?.title || selectedTitle || 'Selected'}
+                </Typography>
+              </Box>
+            </Stack>
+          ) : items.length > 0 ? (
+            <Stack direction="row" spacing={0.75} sx={{ overflow: 'hidden' }}>
+              {items.slice(0, 2).map((item: any, index: number) => (
+                <Stack key={item.id || index} direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
+                  {item.image && (
+                    <img src={item.image} style={{ width: 34, height: 34, borderRadius: 5, objectFit: 'cover', flexShrink: 0 }} />
+                  )}
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.title || 'Card'}
+                    </Typography>
+                    {item.description && (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {item.description}
+                      </Typography>
+                    )}
+                  </Box>
+                </Stack>
+              ))}
+            </Stack>
+          ) : null}
+        </Stack>
+      );
+    }
 
     if (type === 'interactive_media') {
       return (
@@ -158,9 +233,123 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
     }
 
     if (type === 'interactive') {
-      const title = payload?.interactive?.button_reply?.title || payload?.interactive?.list_reply?.title;
+      const title =
+        payload?.interactive?.button_reply?.title ||
+        payload?.interactive?.list_reply?.title;
+      const description = payload?.interactive?.list_reply?.description;
+      const replyId =
+        payload?.interactive?.button_reply?.id ||
+        payload?.interactive?.list_reply?.id ||
+        '';
+
       if (title && !payload?.interactive?.nfm_reply) {
-        return <Typography sx={{ fontSize: 14 }}>{title}</Typography>;
+        // 🔥 If this reply is to a carousel/list message, surface the card
+        // (or list-row) the user actually picked so the agent can see what
+        // was selected. The replied-to message is provided by the backend
+        // as history.reply_message.
+        const replied = history?.reply_message;
+        const repliedPayload = replied?.payload || {};
+        let cardLabel = '';
+        let cardImage = '';
+        if (replied?.type === 'carousel') {
+          const items = repliedPayload?.items || [];
+          // Carousel synthetic IDs look like "cr_<cardIdx>_<btnIdx>"
+          const m = String(replyId).match(/^cr_(\d+)_(\d+)$/);
+          let pickedItem: any = null;
+          if (m) {
+            pickedItem = items[Number(m[1])];
+          } else if (replyId) {
+            pickedItem = items.find((it: any) =>
+              (it?.buttons || []).some((b: any) => b?.id === replyId),
+            );
+          }
+          if (!pickedItem && title) {
+            // last-ditch: match by button title
+            pickedItem = items.find((it: any) =>
+              (it?.buttons || []).some(
+                (b: any) => (b?.title || '').toLowerCase() === title.toLowerCase(),
+              ),
+            );
+          }
+          if (pickedItem) {
+            cardLabel = pickedItem.title || pickedItem.description || '';
+            cardImage = pickedItem.image || '';
+          }
+        }
+
+        return (
+          <Stack spacing={0.5} sx={{ maxWidth: 260 }}>
+            {(cardLabel || cardImage) && (
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                sx={{
+                  borderLeft: '3px solid #25D366',
+                  pl: 1,
+                  py: 0.5,
+                  bgcolor: 'rgba(0,0,0,0.04)',
+                  borderRadius: 1,
+                }}
+              >
+                {cardImage && (
+                  <img
+                    src={cardImage}
+                    alt=""
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 4,
+                      objectFit: 'cover',
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
+                <Typography
+                  sx={{
+                    fontSize: 11.5,
+                    color: '#075e54',
+                    fontWeight: 600,
+                    lineHeight: 1.2,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                  }}
+                >
+                  {cardLabel || 'Carousel option'}
+                </Typography>
+              </Stack>
+            )}
+            <Stack direction="row" spacing={0.75} alignItems="center">
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: 10,
+                  bgcolor: '#e8f5e9',
+                  color: '#1b5e20',
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                }}
+              >
+                ▶ Tapped
+              </Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 500 }}>
+                {title}
+              </Typography>
+            </Stack>
+            {description && (
+              <Typography sx={{ fontSize: 12, color: '#6b7280' }}>
+                {description}
+              </Typography>
+            )}
+          </Stack>
+        );
       }
     }
 
@@ -179,6 +368,45 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
               ))}
             </Stack>
           )}
+        </Stack>
+      );
+    }
+
+    if (type === 'carousel') {
+      const items = payload?.items || [];
+      return (
+        <Stack spacing={1} sx={{ maxWidth: 320 }}>
+          {payload?.body && <Typography sx={{ whiteSpace: 'pre-line', fontSize: 14 }}>{payload.body}</Typography>}
+          <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5, maxWidth: 320 }}>
+            {items.map((item: any, i: number) => (
+              <Stack
+                key={item.id || i}
+                sx={{
+                  width: 190,
+                  flexShrink: 0,
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  bgcolor: '#fff'
+                }}
+              >
+                {item.image && <img src={item.image} style={{ width: '100%', height: 110, objectFit: 'cover' }} />}
+                <Stack sx={{ p: 1 }} spacing={0.5}>
+                  <Typography fontSize={13} fontWeight={600} sx={{ whiteSpace: 'pre-line' }}>{item.title}</Typography>
+                  {item.description && <Typography fontSize={12} color="text.secondary">{item.description}</Typography>}
+                </Stack>
+                {item.buttons?.length > 0 && (
+                  <Stack sx={{ borderTop: '1px solid rgba(0,0,0,0.08)' }}>
+                    {item.buttons.map((btn: any, bi: number) => (
+                      <Box key={btn.id || bi} sx={{ textAlign: 'center', py: 0.8, fontSize: 13, color: '#00a884', fontWeight: 500, borderTop: bi > 0 ? '1px solid rgba(0,0,0,0.08)' : 'none' }}>
+                        {btn.title || 'Button'}
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
+              </Stack>
+            ))}
+          </Box>
         </Stack>
       );
     }
@@ -487,7 +715,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
                 opacity: history.isTemp ? 0.72 : 1,
                 transition: 'opacity 0.25s',
               }}>
-                <ReplyPreview message={history.reply_message} />
+                <ReplyPreview message={history.reply_message} selectedBy={history} />
                 <RenderMessage history={history} />
                 <BubbleMeta ts={history.createdAt} isOut={isOut} history={history} />
               </Box>

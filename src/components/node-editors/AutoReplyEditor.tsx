@@ -36,6 +36,9 @@ const SectionLabel = ({ children, mb = 1 }: { children: any; mb?: number }) => (
   </Typography>
 );
 
+const createQuickReplyId = () =>
+  `b${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.slice(0, 20);
+
 const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
   const [messageType, setMessageType] = useState(
     node.data.type === "list" ? "list" : node.data.messageType || "text"
@@ -61,7 +64,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
 
   const handleAddButton = () => {
     updateNodeData(node.id, {
-      buttons: [...buttons, { id: `BTN_${Date.now()}_${Math.random()}`, title: "New Button", type: "quick_reply" }],
+      buttons: [...buttons, { id: createQuickReplyId(), title: "New Button", type: "quick_reply" }],
     });
   };
 
@@ -502,7 +505,21 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
 
       {/* ═══════════════ CAROUSEL ═══════════════ */}
       {messageType === "carousel" && (
-        <Box>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <Box>
+            <SectionLabel>Main Message</SectionLabel>
+            <TextField
+              fullWidth multiline rows={3}
+              placeholder={"Type the text shown above the carousel…\nExample: Choose your workspace type"}
+              value={data.body || ""}
+              onChange={(e) => updateNodeData(node.id, { body: e.target.value })}
+              helperText={`${(data.body || "").length}/1024 chars`}
+              inputProps={{ maxLength: 1024 }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", fontSize: 13 } }}
+            />
+          </Box>
+
+          <Box>
           <SectionLabel mb={1.5}>Cards ({(data.cards || []).length}/10)</SectionLabel>
           <Stack spacing={1.5}>
             {(data.cards || []).map((card: any, ci: number) => (
@@ -635,7 +652,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                       const updated = JSON.parse(JSON.stringify(data.cards));
                       updated[ci].buttons = [
                         ...(updated[ci].buttons || []),
-                        { id: `btn_${Date.now()}_${Math.random()}`, title: "Button", type: "quick_reply", nextNode: "" },
+                        { id: createQuickReplyId(), title: "Button", type: "quick_reply", nextNode: "" },
                       ];
                       updateNodeData(node.id, { cards: updated });
                     }}
@@ -661,6 +678,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
               Add Card
             </Button>
           )}
+          </Box>
         </Box>
       )}
 

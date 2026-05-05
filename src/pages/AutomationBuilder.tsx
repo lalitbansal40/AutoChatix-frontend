@@ -49,6 +49,22 @@ const edgeTypes = {
   custom: CustomEdge,
 };
 
+const getCarouselButtonHandles = (data: any) => {
+  if (data?.type !== "carousel" || !Array.isArray(data.cards)) return [];
+
+  return data.cards.flatMap((card: any, cardIndex: number) =>
+    (Array.isArray(card.buttons) ? card.buttons : [])
+      .filter((button: any) => button?.id && button?.title)
+      .map((button: any, buttonIndex: number) => ({
+        ...button,
+        cardId: card.id,
+        cardIndex,
+        buttonIndex,
+        cardBody: card.body,
+      })),
+  );
+};
+
 /* =========================
    NODE CONFIG
 ========================= */
@@ -163,6 +179,7 @@ const DEFAULT_STYLE = { color: "#6b7280", bg: "#f9fafb", icon: "⚙️", label: 
 const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
   const { disconnectRow } = data;
   const ns = NODE_STYLE[data.type] || DEFAULT_STYLE;
+  const carouselButtons = getCarouselButtonHandles(data);
 
   return (
     <Box
@@ -326,6 +343,51 @@ const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
           })
         )}
 
+        {/* CAROUSEL BUTTONS */}
+        {carouselButtons.length > 0 && (
+          <Box sx={{ mt: 0.75 }}>
+            <Typography fontSize={10} color="#6b7280" sx={{ mb: 0.5 }}>
+              Carousel Buttons
+            </Typography>
+            {carouselButtons.map((btn: any) => {
+              const buttonId = btn.id;
+              return (
+                <Box
+                  onClick={(e) => { e.stopPropagation(); disconnectRow?.(id, buttonId); }}
+                  key={`${btn.cardId}_${buttonId}`}
+                  sx={{
+                    mt: 0.75,
+                    px: 1.25,
+                    py: 0.75,
+                    borderRadius: "8px",
+                    background: "#f8fffe",
+                    border: "1px solid #d1fae5",
+                    position: "relative",
+                    cursor: "pointer",
+                    "&:hover": { background: "#ecfdf5" },
+                  }}
+                >
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#25D366", flexShrink: 0 }} />
+                    <Typography fontSize={11} color="#065f46" fontWeight={600} noWrap sx={{ flex: 1 }}>
+                      {btn.title || "Button"}
+                    </Typography>
+                  </Stack>
+                  <Typography fontSize={9.5} color="#6b7280" noWrap sx={{ pl: 1.75, mt: 0.1 }}>
+                    Card {btn.cardIndex + 1}{btn.cardBody ? ` · ${btn.cardBody}` : ""}
+                  </Typography>
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={buttonId}
+                    style={{ width: 10, height: 10, background: "#25D366", borderRadius: "50%", position: "absolute", right: -6, top: "50%", transform: "translateY(-50%)" }}
+                  />
+                </Box>
+              );
+            })}
+          </Box>
+        )}
+
         {/* LIST ITEMS */}
         {Array.isArray(data.list) && data.list.length > 0 &&
           data.list.map((item: any, index: number) => {
@@ -377,7 +439,8 @@ const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
       )}
       {data.type !== "trigger" &&
         (!Array.isArray(data.buttons) || data.buttons.length === 0) &&
-        (!Array.isArray(data.list) || data.list.length === 0) && (
+        (!Array.isArray(data.list) || data.list.length === 0) &&
+        carouselButtons.length === 0 && (
           <Handle type="source" position={Position.Right}
             style={{
               width: 10, height: 10,
