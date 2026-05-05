@@ -11,6 +11,7 @@ import Profile from './Profile';
 // import Notification from './Notification';
 import MobileSection from './MobileSection';
 // import MegaMenuSection from './MegaMenuSection';
+import WalletBalanceBadge from 'components/WalletBalanceBadge';
 
 import useConfig from 'hooks/useConfig';
 import DrawerHeader from 'layout/MainLayout/Drawer/DrawerHeader';
@@ -36,6 +37,7 @@ const HeaderContent = () => {
 
       {/* <Notification /> */}
       {/* <Message /> */}
+      {!downLG && <WalletBalanceBadge />}
       {!downLG && <Profile />}
       {downLG && <MobileSection />}
     </>

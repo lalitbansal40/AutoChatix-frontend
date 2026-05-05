@@ -10,12 +10,14 @@ import {
     Typography,
     Stack,
     Box,
+    Alert,
 } from "@mui/material";
 import { useState, useMemo } from "react";
 import { templateService } from "service/template.service";
 import { useMutation } from "@tanstack/react-query";
 import { useSnackbar } from "notistack";
 import { useQuery } from "@tanstack/react-query";
+import { walletService } from "service/wallet.service";
 interface Props {
     open: boolean;
     onClose: () => void;
@@ -27,6 +29,22 @@ const SendTemplateModal = ({ open, onClose, user, channelId }: Props) => {
     const { enqueueSnackbar } = useSnackbar();
     const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
     const [bodyValues, setBodyValues] = useState<string[]>([]);
+
+    const formatMoney = (amount: number, currency = "INR") => {
+        const value = Number(amount || 0) / 100;
+        return new Intl.NumberFormat("en-IN", {
+            style: "currency",
+            currency,
+            maximumFractionDigits: 2,
+        }).format(value);
+    };
+
+    const { data: walletData } = useQuery({
+        queryKey: ["wallet"],
+        queryFn: () => walletService.getWallet(),
+        enabled: open,
+        staleTime: 30_000,
+    });
 
     //   FETCH TEMPLATES
     const { data, isLoading } = useQuery({
@@ -54,7 +72,8 @@ const SendTemplateModal = ({ open, onClose, user, channelId }: Props) => {
         },
 
         onError: (err: any) => {
-            enqueueSnackbar(err?.response?.data?.message || "Failed to send ❌", {
+            const message = err?.response?.data?.message || "Failed to send ❌";
+            enqueueSnackbar(message, {
                 variant: "error",
             });
         },
@@ -99,6 +118,12 @@ const SendTemplateModal = ({ open, onClose, user, channelId }: Props) => {
         (c: any) => c.type === "BUTTONS"
     );
 
+    const wallet = walletData?.wallet;
+    const availableBalance = Number(walletData?.available_balance || 0);
+    const remainingCredit = Number(walletData?.remaining_credit || 0);
+    const holdBalance = Number(wallet?.hold_balance || 0);
+    const walletCurrency = wallet?.currency || "INR";
+
 
 
 
@@ -111,6 +136,15 @@ const SendTemplateModal = ({ open, onClose, user, channelId }: Props) => {
                 <Stack direction="row" spacing={3}>
                     {/* 🔥 LEFT SIDE (FORM) */}
                     <Stack spacing={2} flex={1}>
+                        <Alert
+                            severity={availableBalance < 0 ? "error" : "info"}
+                            sx={{ borderRadius: 2 }}
+                        >
+                            Wallet balance: <strong>{formatMoney(availableBalance, walletCurrency)}</strong>
+                            {holdBalance > 0 && <> | Hold: <strong>{formatMoney(holdBalance, walletCurrency)}</strong></>}
+                            <> | Credit left: <strong>{formatMoney(remainingCredit, walletCurrency)}</strong></>
+                        </Alert>
+
                         {/* TEMPLATE SELECT */}
                         <Autocomplete
                             options={templatesList}
