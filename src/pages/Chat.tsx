@@ -338,12 +338,17 @@ const Chat = () => {
       if (msg.type === 'typing_indicator' && (msg as any).contact_id?.toString() === user._id?.toString()) {
         if ((msg as any).is_typing) showTyping(); else hideTyping();
       }
-      // Update wa_message_id + status on the message in state (PENDING → SENT / FAILED)
+      // Update wa_message_id + status + error on the message in state (PENDING → SENT / FAILED)
       if (msg.type === 'message_update') {
         setData((prev) =>
           prev.map((m: any) =>
             m._id?.toString() === (msg as any)._id
-              ? { ...m, wa_message_id: (msg as any).wa_message_id ?? m.wa_message_id, status: (msg as any).status }
+              ? {
+                  ...m,
+                  wa_message_id: (msg as any).wa_message_id ?? m.wa_message_id,
+                  status: (msg as any).status,
+                  error: (msg as any).error ?? m.error,
+                }
               : m
           )
         );

@@ -13,6 +13,64 @@ interface ChatHistoryProps {
   user: UserProfile;
 }
 
+/**
+ * Robustly extract a human-readable error string from anything backend may
+ * have stored in `message.error`. Handles:
+ *   - plain strings ("Please add amount in wallet...")
+ *   - objects with `.message`
+ *   - Meta API error objects: { error: { message, code, type, ... } }
+ *   - JSON-stringified versions of the above (whatsapp.client.ts uses JSON.stringify)
+ *   - axios response.data shapes
+ */
+const getErrorText = (raw: any, depth = 0): string => {
+  if (raw == null) return '';
+  if (depth > 4) return '';
+
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    // If it looks like JSON, try to parse and recurse.
+    if (
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))
+    ) {
+      try {
+        return getErrorText(JSON.parse(trimmed), depth + 1);
+      } catch {
+        return trimmed;
+      }
+    }
+    return trimmed;
+  }
+
+  if (typeof raw === 'object') {
+    // Meta-style: { error: { message, code, type, error_data: { details } } }
+    const nestedDetails =
+      raw?.error?.error_data?.details ||
+      raw?.error_data?.details;
+    if (typeof nestedDetails === 'string' && nestedDetails) return nestedDetails;
+
+    const nestedMessage =
+      raw?.error?.message ||
+      raw?.message ||
+      raw?.error_user_msg ||
+      raw?.error?.error_user_msg;
+    if (typeof nestedMessage === 'string' && nestedMessage) return nestedMessage;
+
+    // Recurse on nested error object if no string found yet.
+    if (raw?.error && typeof raw.error === 'object') {
+      const inner = getErrorText(raw.error, depth + 1);
+      if (inner) return inner;
+    }
+    if (raw?.data) {
+      const inner = getErrorText(raw.data, depth + 1);
+      if (inner) return inner;
+    }
+  }
+
+  return '';
+};
+
 const getMessageText = (history: any) => {
   const payload = history?.payload || {};
   if (history?.type === 'list') return payload?.body || '';
@@ -70,7 +128,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
     if (status === 'DELIVERED') return <Typography sx={{ fontSize: 11, color: '#9ca3af', lineHeight: 1 }}>✓✓</Typography>;
     if (status === 'READ') return <Typography sx={{ fontSize: 11, color: '#53bdeb', lineHeight: 1 }}>✓✓</Typography>;
     if (status === 'FAILED') {
-      const errorText = history.error?.message || 'Message failed';
+      const errorText = getErrorText(history?.error) || 'Message failed';
       return (
         <Tooltip title={<Typography sx={{ fontSize: 12 }}>⚠️ {errorText}</Typography>} arrow placement="top">
           <InfoOutlinedIcon sx={{ fontSize: 14, color: '#ef4444', cursor: 'pointer' }} />
