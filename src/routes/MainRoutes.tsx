@@ -16,6 +16,7 @@ import CallLogs from 'pages/CallLogs';
 import ECommerce from 'pages/ECommerce';
 import SuperAdmin from 'pages/SuperAdmin';
 import UsersPage from 'pages/Users';
+import Payments from 'pages/Payments';
 
 // pages routing
 const MaintenanceError = Loadable(lazy(() => import('pages/maintenance/404')));
@@ -78,6 +79,10 @@ const MainRoutes = {
         {
           path: 'users',
           element: <UsersPage />
+        },
+        {
+          path: 'payments',
+          element: <Payments />
         },
         {
           path: 'superadmin',

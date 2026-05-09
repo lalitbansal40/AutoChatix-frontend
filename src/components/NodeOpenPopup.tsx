@@ -27,6 +27,7 @@ const NODE_STYLE: Record<string, { color: string; bg: string; icon: string; labe
   set_contact_attribute: { color: "#f59e0b", bg: "#fffbeb", icon: "🏷️", label: "Set Attribute" },
   google_sheet:          { color: "#16a34a", bg: "#f0fdf4", icon: "📊", label: "Google Sheets" },
   razorpay_payment:      { color: "#2563eb", bg: "#eff6ff", icon: "💳", label: "Razorpay" },
+  whatsapp_payment:      { color: "#25D366", bg: "#f0fdf4", icon: "💰", label: "WhatsApp Payment" },
   borzo_delivery:        { color: "#dc2626", bg: "#fef2f2", icon: "🚚", label: "Borzo" },
   distance_check:        { color: "#6366f1", bg: "#eef2ff", icon: "📏", label: "Distance" },
   api_request:           { color: "#7c3aed", bg: "#f5f3ff", icon: "🌐", label: "API Request" },

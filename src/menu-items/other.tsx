@@ -2,7 +2,7 @@
 import { FormattedMessage } from 'react-intl';
 
 // assets
-import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined } from '@ant-design/icons';
+import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined, WalletOutlined } from '@ant-design/icons';
 
 // type
 import { NavItemType } from 'types/menu';
@@ -18,6 +18,7 @@ const icons = {
   TagsOutlined,
   PhoneOutlined,
   ShoppingOutlined,
+  WalletOutlined,
 };
 
 // ==============================|| MENU ITEMS - SUPPORT ||============================== //
@@ -75,6 +76,13 @@ const other: NavItemType = {
       type: 'item',
       url: '/contact-fields',
       icon: icons.TagsOutlined
+    },
+    {
+      id: 'Payments',
+      title: <FormattedMessage id="Payments" />,
+      type: 'item',
+      url: '/payments',
+      icon: icons.WalletOutlined
     }
   ]
 };

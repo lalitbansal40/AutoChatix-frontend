@@ -278,11 +278,6 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
       }),
 
       // ── Settings ──
-      f.text("currency", "Currency", {
-        defaultValue: "INR",
-        supportsInterpolation: false,
-        helperText: "ISO currency code, e.g. INR",
-      }),
       f.select("payment_type", "Order Type", ["digital-goods", "physical-goods", "appointment"], {
         defaultValue: "digital-goods",
         supportsInterpolation: false,
@@ -290,35 +285,6 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
       f.text("reference_id", "Reference ID", {
         placeholder: "{{contact.phone}}-{{timestamp}}",
         helperText: "Unique ID for this payment. Supports {{variables}}. Auto-generated if blank.",
-      }),
-
-      // ── Payment Method ──
-      f.select("payment_method", "Payment Method", ["razorpay", "upi_vpa"], {
-        defaultValue: "razorpay",
-        supportsInterpolation: false,
-        helperText: "Choose how the customer pays. Both must be configured in Meta Business Manager.",
-      }),
-      f.text("razorpay_config_name", "Razorpay Config Name", {
-        placeholder: "Name set in Meta Business Manager",
-        helperText: "Razorpay configuration name registered under your WABA in Meta.",
-        supportsInterpolation: false,
-        visibleWhen: { field: "payment_method", equals: "razorpay" },
-      }),
-      f.text("razorpay_receipt", "Razorpay Receipt ID", {
-        placeholder: "{{contact.phone}} or order_{{session.order_id}}",
-        helperText: "Unique receipt ID sent to Razorpay. Supports {{variables}}.",
-        visibleWhen: { field: "payment_method", equals: "razorpay" },
-      }),
-      f.text("upi_config_name", "UPI Config Name", {
-        placeholder: "Name set in Meta Business Manager",
-        helperText: "UPI configuration name registered under your WABA in Meta.",
-        supportsInterpolation: false,
-        visibleWhen: { field: "payment_method", equals: "upi_vpa" },
-      }),
-      f.text("upi_vpa", "Merchant UPI VPA", {
-        placeholder: "yourstore@okhdfc",
-        helperText: "Your UPI address (VPA). Customer will pay to this address.",
-        visibleWhen: { field: "payment_method", equals: "upi_vpa" },
       }),
 
       // ── Message ──
