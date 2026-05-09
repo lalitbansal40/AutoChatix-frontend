@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react';
+import { useState } from 'react';
 
 // material-ui
 import { useTheme } from '@mui/material/styles';
@@ -6,7 +6,7 @@ import { Box, Typography, useMediaQuery } from '@mui/material';
 
 // project import
 import NavGroup from './NavGroup';
-import menuItem from 'menu-items';
+import { useMenuItems } from 'menu-items';
 
 import { useSelector } from 'store';
 import useConfig from 'hooks/useConfig';
@@ -27,12 +27,7 @@ const Navigation = () => {
   const { drawerOpen } = useSelector((state) => state.menu);
   const [selectedItems, setSelectedItems] = useState<string | undefined>('');
   const [selectedLevel, setSelectedLevel] = useState<number>(0);
-  const [menuItems, setMenuItems] = useState<{ items: NavItemType[] }>({ items: [] });
-
-  useLayoutEffect(() => {
-    setMenuItems(menuItem);
-    // eslint-disable-next-line
-  }, [menuItem]);
+  const menuItems = useMenuItems();
 
   const isHorizontal = menuOrientation === MenuOrientation.HORIZONTAL && !downLG;
 

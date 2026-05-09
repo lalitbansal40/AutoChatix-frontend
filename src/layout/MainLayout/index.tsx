@@ -8,11 +8,8 @@ import { useMediaQuery, Box, Toolbar } from '@mui/material';
 // project import
 import Drawer from './Drawer';
 import Header from './Header';
-// import Footer from './Footer';
 import HorizontalBar from './Drawer/HorizontalBar';
-// import Breadcrumbs from 'components/@extended/Breadcrumbs';
 
-// import navigation from 'menu-items';
 import useConfig from 'hooks/useConfig';
 import { dispatch } from 'store';
 import { openDrawer } from 'store/reducers/menu';
@@ -31,7 +28,6 @@ const MainLayout = () => {
 
   const isHorizontal = menuOrientation === MenuOrientation.HORIZONTAL && !downLG;
 
-  // set media wise responsive drawer
   useEffect(() => {
     if (!miniDrawer) {
       dispatch(openDrawer(!matchDownXL));

@@ -5,6 +5,7 @@ import MainLayout from 'layout/MainLayout';
 import CommonLayout from 'layout/CommonLayout';
 import Loadable from 'components/Loadable';
 import AuthGuard from 'utils/route-guard/AuthGuard';
+import SuperAdminGuard from 'utils/route-guard/SuperAdminGuard';
 import Channels from 'pages/Channels';
 import ChannelManage from 'pages/ChannelMangae';
 import Automations from 'pages/Automation';
@@ -13,6 +14,8 @@ import Integrations from 'pages/Integrations';
 import ContactFields from 'pages/ContactFields';
 import CallLogs from 'pages/CallLogs';
 import ECommerce from 'pages/ECommerce';
+import SuperAdmin from 'pages/SuperAdmin';
+import UsersPage from 'pages/Users';
 
 // pages routing
 const MaintenanceError = Loadable(lazy(() => import('pages/maintenance/404')));
@@ -71,6 +74,18 @@ const MainRoutes = {
         {
           path: 'ecommerce',
           element: <ECommerce />
+        },
+        {
+          path: 'users',
+          element: <UsersPage />
+        },
+        {
+          path: 'superadmin',
+          element: (
+            <SuperAdminGuard>
+              <SuperAdmin />
+            </SuperAdminGuard>
+          )
         }
       ]
     },

@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Fade, Grid, Snackbar, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Fade, Grid, Snackbar, Tooltip, Typography } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ChannelCard from 'components/ChannelCard';
 import { channelService } from 'service/channel.service';
 import { ChannelT } from 'types/channels';
+import axios from 'utils/axios';
+
+const fetchAccountLimits = () => axios.get('/team/limits').then((r) => r.data);
 
 declare global {
   interface Window {
@@ -38,6 +41,16 @@ const Channels = () => {
     queryFn: () => channelService.getChannels(),
     select: (response) => response.data,
   });
+
+  const { data: limits } = useQuery({ queryKey: ['account-limits'], queryFn: fetchAccountLimits });
+
+  const channelLimit = limits?.limits?.channels ?? null;
+  const channelUsage = limits?.usage?.channels ?? (data?.length ?? 0);
+  const channelLimitReached = channelLimit !== null && channelLimit !== -1 && channelUsage >= channelLimit;
+  const connectDisabled = connecting || channelLimitReached;
+  const connectTooltip = channelLimitReached
+    ? `Channel limit reached (${channelLimit}). Upgrade your plan to add more.`
+    : '';
 
   // Load Meta Facebook JS SDK dynamically once
   useEffect(() => {
@@ -160,27 +173,31 @@ const Channels = () => {
           </Typography>
         </Box>
 
-        <Button
-          variant="contained"
-          startIcon={connecting ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <AddCircleOutlineIcon sx={{ fontSize: 18 }} />}
-          onClick={launchWhatsAppSignup}
-          disabled={connecting}
-          sx={{
-            bgcolor: '#25D366',
-            color: '#fff',
-            fontWeight: 700,
-            fontSize: 13,
-            borderRadius: '10px',
-            px: 2.5,
-            py: 1,
-            textTransform: 'none',
-            boxShadow: '0 2px 10px rgba(37,211,102,0.35)',
-            '&:hover': { bgcolor: '#1db954', boxShadow: '0 4px 14px rgba(37,211,102,0.45)' },
-            '&:disabled': { bgcolor: '#86efac', color: '#fff' },
-          }}
-        >
-          {connecting ? 'Connecting...' : 'Connect WhatsApp'}
-        </Button>
+        <Tooltip title={connectTooltip} arrow>
+          <span>
+            <Button
+              variant="contained"
+              startIcon={connecting ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <AddCircleOutlineIcon sx={{ fontSize: 18 }} />}
+              onClick={launchWhatsAppSignup}
+              disabled={connectDisabled}
+              sx={{
+                bgcolor: '#25D366',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: 13,
+                borderRadius: '10px',
+                px: 2.5,
+                py: 1,
+                textTransform: 'none',
+                boxShadow: '0 2px 10px rgba(37,211,102,0.35)',
+                '&:hover': { bgcolor: '#1db954', boxShadow: '0 4px 14px rgba(37,211,102,0.45)' },
+                '&:disabled': { bgcolor: '#86efac', color: '#fff' },
+              }}
+            >
+              {connecting ? 'Connecting...' : 'Connect WhatsApp'}
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
 
       {/* ── CHANNEL CARDS ── */}

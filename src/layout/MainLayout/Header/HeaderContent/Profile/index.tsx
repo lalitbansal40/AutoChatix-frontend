@@ -3,11 +3,9 @@ import { useNavigate } from 'react-router';
 
 // material-ui
 import { useTheme } from '@mui/material/styles';
-import { Box, ButtonBase, CardContent, ClickAwayListener, Grid, Paper, Popper, Stack, Tooltip, Typography } from '@mui/material';
+import { Box, ButtonBase, CardContent, Chip, ClickAwayListener, Divider, Grid, Paper, Popper, Stack, Tooltip, Typography } from '@mui/material';
 
 // project import
-// import ProfileTab from './ProfileTab';
-// import SettingTab from './SettingTab';
 import Avatar from 'components/@extended/Avatar';
 import MainCard from 'components/MainCard';
 import Transitions from 'components/@extended/Transitions';
@@ -16,7 +14,7 @@ import useAuth from 'hooks/useAuth';
 
 // assets
 import avatar1 from 'assets/images/users/avatar-1.png';
-import { LogoutOutlined } from '@ant-design/icons';
+import { LogoutOutlined, RollbackOutlined } from '@ant-design/icons';
 
 // types
 import { ThemeMode } from 'types/config';
@@ -52,7 +50,7 @@ const Profile = () => {
   const theme = useTheme();
   const navigate = useNavigate();
 
-  const { logout, user } = useAuth();
+  const { logout, user, isImpersonating, exitImpersonation } = useAuth() as any;
   const handleLogout = async () => {
     try {
       await logout();
@@ -152,10 +150,8 @@ const Profile = () => {
                           <Stack>
                             <Typography variant="h5">{user?.account_name}</Typography>
                             <Typography variant="h6">{user?.name}</Typography>
-                            <Typography variant="body2" color="textSecondary">
-                              {user?.role}
-                            </Typography>
-                            <Typography variant="body2" color="textSecondary">
+                            <Chip label={user?.role} size="small" color={user?.role === 'superadmin' ? 'error' : user?.role === 'owner' || user?.role === 'admin' ? 'primary' : 'default'} sx={{ height: 18, fontSize: 10, mt: 0.25 }} />
+                            <Typography variant="body2" color="textSecondary" mt={0.25}>
                               {user?.email}
                             </Typography>
                           </Stack>
@@ -169,6 +165,32 @@ const Profile = () => {
                         </Tooltip>
                       </Grid>
                     </Grid>
+
+                    {isImpersonating && (
+                      <>
+                        <Divider sx={{ my: 1.5 }} />
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          spacing={1}
+                          onClick={() => { exitImpersonation(); setOpen(false); }}
+                          sx={{
+                            cursor: 'pointer',
+                            p: 1,
+                            borderRadius: 1,
+                            bgcolor: 'warning.lighter',
+                            border: '1px solid',
+                            borderColor: 'warning.light',
+                            '&:hover': { bgcolor: 'warning.light' },
+                          }}
+                        >
+                          <RollbackOutlined style={{ color: '#b45309' }} />
+                          <Typography variant="body2" fontWeight={600} color="warning.dark">
+                            Return to Super Admin
+                          </Typography>
+                        </Stack>
+                      </>
+                    )}
                   </CardContent>
 
                   {/* <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>

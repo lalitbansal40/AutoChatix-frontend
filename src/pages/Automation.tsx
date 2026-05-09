@@ -4,6 +4,7 @@ import {
   CircularProgress,
   Fade,
   Grid,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -14,6 +15,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import automationService from "service/automation.service";
 import { AutomationT } from "types/automation";
+import axios from "utils/axios";
+
+const fetchAccountLimits = () => axios.get('/team/limits').then((r) => r.data);
 
 const Automations = () => {
   const navigate = useNavigate();
@@ -24,6 +28,15 @@ const Automations = () => {
     queryFn: () => automationService.getAutomations(),
     select: (data: any) => data || [],
   });
+
+  const { data: limits } = useQuery({ queryKey: ['account-limits'], queryFn: fetchAccountLimits });
+
+  const autoLimit = limits?.limits?.automations ?? null;
+  const autoUsage = limits?.usage?.automations ?? (data?.length ?? 0);
+  const autoLimitReached = autoLimit !== null && autoLimit !== -1 && autoUsage >= autoLimit;
+  const createTooltip = autoLimitReached
+    ? `Automation limit reached (${autoLimit}). Upgrade your plan to create more.`
+    : '';
 
   if (isLoading) {
     return (
@@ -69,23 +82,28 @@ const Automations = () => {
           </Typography>
         </Box>
 
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setOpenCreate(true)}
-          sx={{
-            borderRadius: "10px",
-            px: 2.5,
-            py: 1,
-            fontWeight: 700,
-            fontSize: 13,
-            bgcolor: "#25D366",
-            "&:hover": { bgcolor: "#1db954" },
-            boxShadow: "0 2px 8px rgba(37,211,102,0.35)",
-          }}
-        >
-          Create Automation
-        </Button>
+        <Tooltip title={createTooltip} arrow>
+          <span>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setOpenCreate(true)}
+              disabled={autoLimitReached}
+              sx={{
+                borderRadius: "10px",
+                px: 2.5,
+                py: 1,
+                fontWeight: 700,
+                fontSize: 13,
+                bgcolor: "#25D366",
+                "&:hover": { bgcolor: "#1db954" },
+                boxShadow: "0 2px 8px rgba(37,211,102,0.35)",
+              }}
+            >
+              Create Automation
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
 
       {/* ── EMPTY STATE ── */}
@@ -105,18 +123,23 @@ const Automations = () => {
               Create your first automation to start sending automated WhatsApp messages
             </Typography>
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setOpenCreate(true)}
-            sx={{
-              borderRadius: "10px", px: 3, py: 1, fontWeight: 700, fontSize: 13,
-              bgcolor: "#25D366", "&:hover": { bgcolor: "#1db954" },
-              boxShadow: "0 2px 8px rgba(37,211,102,0.35)", mt: 0.5,
-            }}
-          >
-            Create Automation
-          </Button>
+          <Tooltip title={createTooltip} arrow>
+            <span>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setOpenCreate(true)}
+                disabled={autoLimitReached}
+                sx={{
+                  borderRadius: "10px", px: 3, py: 1, fontWeight: 700, fontSize: 13,
+                  bgcolor: "#25D366", "&:hover": { bgcolor: "#1db954" },
+                  boxShadow: "0 2px 8px rgba(37,211,102,0.35)", mt: 0.5,
+                }}
+              >
+                Create Automation
+              </Button>
+            </span>
+          </Tooltip>
         </Box>
       )}
 
