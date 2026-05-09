@@ -168,7 +168,7 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
     root: "data",
     fields: [
       f.text("catalog_id", "Catalog ID", { required: true, supportsInterpolation: false }),
-      f.text("header", "Header", { placeholder: "Optional" }),
+      f.text("header", "Header", { defaultValue: "Our Products", helperText: "Required by WhatsApp — cannot be empty." }),
       f.textarea("body", "Body Message", {
         required: true,
         defaultValue: "Browse our products 👇",
