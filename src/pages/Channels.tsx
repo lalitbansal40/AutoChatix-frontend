@@ -1,21 +1,130 @@
-import { Box, Button, CircularProgress, Fade, Grid, Typography } from '@mui/material';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Box, Button, CircularProgress, Fade, Grid, Snackbar, Typography } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ChannelCard from 'components/ChannelCard';
 import { channelService } from 'service/channel.service';
 import { ChannelT } from 'types/channels';
 
-const connectWhatsApp = () => {
-  window.location.href =
-    'https://business.facebook.com/messaging/whatsapp/onboard/?app_id=1577064810024190&config_id=1496415178861183&extras=%7B%22sessionInfoVersion%22%3A%223%22%2C%22version%22%3A%22v4%22%7D';
-};
+declare global {
+  interface Window {
+    FB: any;
+    fbAsyncInit: () => void;
+  }
+}
+
+const META_APP_ID = '955625287255039';
+const META_CONFIG_ID = '1917533792228152';
 
 const Channels = () => {
+  const queryClient = useQueryClient();
+
+  // Stores phone_number_id + waba_id received from Meta iframe message event
+  const sessionInfoRef = useRef<{
+    phone_number_id?: string;
+    waba_id?: string;
+    display_phone_number?: string;
+  }>({});
+
+  const [connecting, setConnecting] = useState(false);
+  const [toast, setToast] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({ open: false, message: '', severity: 'success' });
+
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['channels'],
     queryFn: () => channelService.getChannels(),
     select: (response) => response.data,
   });
+
+  // Load Meta Facebook JS SDK dynamically once
+  useEffect(() => {
+    if (document.getElementById('facebook-jssdk')) return;
+
+    window.fbAsyncInit = () => {
+      window.FB.init({
+        appId: META_APP_ID,
+        autoLogAppEvents: true,
+        xfbml: true,
+        version: 'v21.0',
+      });
+    };
+
+    const script = document.createElement('script');
+    script.id = 'facebook-jssdk';
+    script.src = 'https://connect.facebook.net/en_US/sdk.js';
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+  }, []);
+
+  // Listen for WA_EMBEDDED_SIGNUP message from Meta iframe popup
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== 'https://www.facebook.com') return;
+      try {
+        const parsed = JSON.parse(event.data);
+        if (parsed.type === 'WA_EMBEDDED_SIGNUP' && parsed.event === 'FINISH') {
+          sessionInfoRef.current = {
+            phone_number_id: parsed.data?.phone_number_id,
+            waba_id: parsed.data?.waba_id,
+            display_phone_number: parsed.data?.display_phone_number,
+          };
+        }
+      } catch {
+        // non-JSON messages from facebook — safe to ignore
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const launchWhatsAppSignup = () => {
+    if (!window.FB) {
+      setToast({ open: true, message: 'Facebook SDK not loaded yet. Please wait a moment and try again.', severity: 'error' });
+      return;
+    }
+
+    // Reset any previous session info
+    sessionInfoRef.current = {};
+
+    window.FB.login(
+      async (response: any) => {
+        if (!response.authResponse?.code) {
+          setToast({ open: true, message: 'Connection cancelled or failed. Please try again.', severity: 'error' });
+          return;
+        }
+
+        setConnecting(true);
+        try {
+          await channelService.connectViaEmbeddedSignup({
+            code: response.authResponse.code,
+            waba_id: sessionInfoRef.current.waba_id,
+            phone_number_id: sessionInfoRef.current.phone_number_id,
+            display_phone_number: sessionInfoRef.current.display_phone_number,
+          });
+          // Refresh the channels list
+          queryClient.invalidateQueries({ queryKey: ['channels'] });
+          setToast({ open: true, message: 'WhatsApp channel connected successfully!', severity: 'success' });
+        } catch (err: any) {
+          const msg = err?.message || err?.response?.data?.message || 'Failed to connect channel. Please try again.';
+          setToast({ open: true, message: msg, severity: 'error' });
+        } finally {
+          setConnecting(false);
+        }
+      },
+      {
+        config_id: META_CONFIG_ID,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: {
+          sessionInfoVersion: 3,
+        },
+      }
+    );
+  };
 
   if (isLoading) {
     return (
@@ -49,8 +158,9 @@ const Channels = () => {
 
         <Button
           variant="contained"
-          startIcon={<AddCircleOutlineIcon sx={{ fontSize: 18 }} />}
-          onClick={connectWhatsApp}
+          startIcon={connecting ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <AddCircleOutlineIcon sx={{ fontSize: 18 }} />}
+          onClick={launchWhatsAppSignup}
+          disabled={connecting}
           sx={{
             bgcolor: '#25D366',
             color: '#fff',
@@ -62,9 +172,10 @@ const Channels = () => {
             textTransform: 'none',
             boxShadow: '0 2px 10px rgba(37,211,102,0.35)',
             '&:hover': { bgcolor: '#1db954', boxShadow: '0 4px 14px rgba(37,211,102,0.45)' },
+            '&:disabled': { bgcolor: '#86efac', color: '#fff' },
           }}
         >
-          Connect WhatsApp
+          {connecting ? 'Connecting...' : 'Connect WhatsApp'}
         </Button>
       </Box>
 
@@ -88,6 +199,23 @@ const Channels = () => {
           ))}
         </Grid>
       )}
+
+      {/* ── TOAST NOTIFICATIONS ── */}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={5000}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setToast((t) => ({ ...t, open: false }))}
+          severity={toast.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
