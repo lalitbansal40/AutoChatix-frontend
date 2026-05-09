@@ -51,6 +51,10 @@ class ContactService {
     return response.data;
   }
 
+  async deleteContact(contactId: string) {
+    return axiosServices.delete(`contact/${contactId}`);
+  }
+
   async markAsRead(contactId: string) {
     return axiosServices.put(`/message/read/${contactId}`);
   }

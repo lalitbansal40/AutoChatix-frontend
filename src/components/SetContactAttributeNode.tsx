@@ -1,20 +1,22 @@
 import {
   Box,
-  TextField,
   IconButton,
   Typography,
   Stack,
   Divider,
   Button,
-  Paper
+  Paper,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  Alert,
 } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
-
-const COMMON_VARS = [
-  "{{contact.name}}",
-  "{{contact.phone}}",
-];
+import { useQuery } from "@tanstack/react-query";
+import { contactAttributeService, ContactAttribute } from "service/contactAttribute.service";
+import VariablePicker from "components/VariablePicker";
 
 const SetContactAttributeEditor = ({ node, updateNodeData }: any) => {
   const data = node.data || {};
@@ -26,6 +28,15 @@ const SetContactAttributeEditor = ({ node, updateNodeData }: any) => {
   const values: string[] = Array.isArray(data.attribute_value)
     ? data.attribute_value
     : [data.attribute_value || ""];
+
+  const { data: attributes = [] } = useQuery<ContactAttribute[]>({
+    queryKey: ["contact-attributes"],
+    queryFn: async () => {
+      const res = await contactAttributeService.getAttributes();
+      return res.data || [];
+    },
+    staleTime: 60_000,
+  });
 
   const updatePair = (index: number, key: "name" | "value", val: string) => {
     const newNames = [...names];
@@ -65,12 +76,18 @@ const SetContactAttributeEditor = ({ node, updateNodeData }: any) => {
 
       <Divider />
 
+      {attributes.length === 0 && (
+        <Alert severity="info" sx={{ borderRadius: "10px" }}>
+          No contact fields defined yet. Go to <strong>Contact Fields</strong> in the sidebar to create them.
+        </Alert>
+      )}
+
       {/* ─ Pairs ─ */}
       <Box>
         {/* Column labels */}
         <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 36px", gap: 1, mb: 1, px: 0.5 }}>
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>
-            Attribute Key
+            Contact Field
           </Typography>
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>
             Value
@@ -85,23 +102,35 @@ const SetContactAttributeEditor = ({ node, updateNodeData }: any) => {
               variant="outlined"
               sx={{ borderRadius: "10px", p: 1.5, borderColor: "#e5e7eb", bgcolor: index % 2 === 0 ? "#fff" : "#fafafa" }}
             >
-              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 36px", gap: 1, alignItems: "center" }}>
-                {/* Key */}
-                <TextField
-                  size="small"
-                  placeholder="e.g. cabin_size"
-                  value={name}
-                  onChange={(e) => updatePair(index, "name", e.target.value)}
-                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontFamily: "monospace", fontSize: 12 } }}
-                />
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 36px", gap: 1, alignItems: "flex-start" }}>
+                {/* Field Key — dropdown from defined contact fields */}
+                <FormControl size="small" fullWidth>
+                  <InputLabel sx={{ fontSize: 12 }}>Select Field</InputLabel>
+                  <Select
+                    value={name}
+                    label="Select Field"
+                    onChange={(e) => updatePair(index, "name", e.target.value)}
+                    sx={{ borderRadius: "8px", fontSize: 12, fontFamily: "monospace" }}
+                  >
+                    {attributes.map((attr) => (
+                      <MenuItem key={attr.id} value={attr.id} sx={{ fontSize: 12, fontFamily: "monospace" }}>
+                        <Stack>
+                          <Typography fontSize={12} fontWeight={600}>{attr.name}</Typography>
+                          <Typography fontSize={10} color="text.secondary">{attr.id}</Typography>
+                        </Stack>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
 
-                {/* Value */}
-                <TextField
-                  size="small"
-                  placeholder="value or {{variable}}"
+                {/* Value — VariablePicker */}
+                <VariablePicker
                   value={values[index] || ""}
-                  onChange={(e) => updatePair(index, "value", e.target.value)}
-                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontFamily: "monospace", fontSize: 12 } }}
+                  onChange={(val) => updatePair(index, "value", val)}
+                  placeholder="value or {{variable}}"
+                  multiline={false}
+                  rows={1}
+                  size="small"
                 />
 
                 {/* Delete */}
@@ -109,29 +138,11 @@ const SetContactAttributeEditor = ({ node, updateNodeData }: any) => {
                   size="small"
                   onClick={() => removeField(index)}
                   disabled={names.length === 1}
-                  sx={{ color: "#ef4444", "&:hover": { bgcolor: "#fef2f2" }, "&.Mui-disabled": { color: "#d1d5db" } }}
+                  sx={{ color: "#ef4444", "&:hover": { bgcolor: "#fef2f2" }, "&.Mui-disabled": { color: "#d1d5db" }, mt: 0.5 }}
                 >
                   <DeleteOutlineIcon fontSize="small" />
                 </IconButton>
               </Box>
-
-              {/* Quick-insert variable chips */}
-              <Stack direction="row" spacing={0.75} mt={1} flexWrap="wrap" useFlexGap>
-                {COMMON_VARS.map((v) => (
-                  <Box
-                    key={v}
-                    onClick={() => updatePair(index, "value", v)}
-                    sx={{
-                      px: 1, py: 0.25, borderRadius: "20px", fontSize: 10,
-                      bgcolor: "#f5f3ff", color: "#6d28d9", fontFamily: "monospace",
-                      border: "1px solid #ede9fe", cursor: "pointer",
-                      "&:hover": { bgcolor: "#ede9fe" },
-                    }}
-                  >
-                    {v}
-                  </Box>
-                ))}
-              </Stack>
             </Paper>
           ))}
         </Stack>
@@ -144,7 +155,7 @@ const SetContactAttributeEditor = ({ node, updateNodeData }: any) => {
         onClick={addField}
         sx={{ alignSelf: "flex-start", borderRadius: "8px", borderColor: "#e5e7eb", color: "#374151", fontSize: 12, fontWeight: 600, "&:hover": { borderColor: "#f59e0b", color: "#d97706", bgcolor: "#fffbeb" } }}
       >
-        Add Attribute
+        Add Field
       </Button>
 
       <Divider />
@@ -157,10 +168,11 @@ const SetContactAttributeEditor = ({ node, updateNodeData }: any) => {
           <Box component="code" sx={{ bgcolor: "#fef3c7", px: "4px", borderRadius: "4px", fontSize: 11 }}>
             {"{{attributes.key_name}}"}
           </Box>
-          , e.g.{" "}
+          . Manage fields from the{" "}
           <Box component="code" sx={{ bgcolor: "#fef3c7", px: "4px", borderRadius: "4px", fontSize: 11 }}>
-            {"{{attributes.cabin_size}}"}
-          </Box>
+            Contact Fields
+          </Box>{" "}
+          page in the sidebar.
         </Typography>
       </Box>
 

@@ -6,6 +6,9 @@ import {
   Button,
   ClickAwayListener,
   Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Menu,
   MenuItem,
   OutlinedInput,
@@ -14,6 +17,7 @@ import {
   Typography,
   useMediaQuery,
 } from '@mui/material';
+import { useQueryClient } from '@tanstack/react-query';
 import EmojiPicker, { SkinTones, EmojiClickData } from 'emoji-picker-react';
 import { useSearchParams } from 'react-router-dom';
 import ChatDrawer from 'sections/ChatDrawer';
@@ -26,6 +30,7 @@ import { PopupTransition } from 'components/@extended/Transitions';
 import { dispatch, useSelector } from 'store';
 import { getUserChats } from 'store/reducers/chat';
 import {
+  DeleteOutlined,
   EditOutlined,
   PaperClipOutlined,
   SmileOutlined,
@@ -53,6 +58,7 @@ const getAvatarColor = (name: string) => {
 const Chat = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const queryClient = useQueryClient();
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const bottomRef = useRef<any>(null);
@@ -72,6 +78,8 @@ const Chat = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [anchorElPlus, setAnchorElPlus] = useState<null | HTMLElement>(null);
   const openPlusMenu = Boolean(anchorElPlus);
   const [anchorElEmoji, setAnchorElEmoji] = useState<any>();
@@ -86,6 +94,21 @@ const Chat = () => {
   const handleUserChange = () => setEmailDetails((prev) => !prev);
   const handleEditOpen = () => setEditModalOpen(true);
   const handleEditClose = () => setEditModalOpen(false);
+
+  const handleDeleteContact = async () => {
+    if (!user?._id) return;
+    setDeleting(true);
+    try {
+      await contactService.deleteContact(user._id);
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      setDeleteDialogOpen(false);
+      setUser(null as any);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDeleting(false);
+    }
+  };
   const handleOnEmojiButtonClick = (event: React.MouseEvent<HTMLButtonElement> | undefined) => {
     setAnchorElEmoji(anchorElEmoji ? null : event?.currentTarget);
   };
@@ -457,6 +480,15 @@ const Chat = () => {
               >
                 <EditOutlined style={{ fontSize: 16 }} />
               </IconButton>
+
+              {/* Delete button */}
+              <IconButton
+                size="small"
+                onClick={() => setDeleteDialogOpen(true)}
+                sx={{ color: '#9ca3af', '&:hover': { color: '#ef4444', bgcolor: '#fef2f2' }, borderRadius: '8px' }}
+              >
+                <DeleteOutlined style={{ fontSize: 16 }} />
+              </IconButton>
             </Box>
           )}
 
@@ -775,6 +807,35 @@ const Chat = () => {
           user={user}
         />
       )}
+
+      {/* Delete Contact Confirm Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: '16px' } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Delete Contact?</DialogTitle>
+        <DialogContent>
+          <Typography fontSize={14} color="text.secondary">
+            Are you sure you want to delete <strong>{user?.name || user?.phone}</strong>?
+            This will permanently remove the contact and all associated data.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button onClick={() => setDeleteDialogOpen(false)} sx={{ borderRadius: '8px' }}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={deleting}
+            onClick={handleDeleteContact}
+            sx={{ borderRadius: '8px', fontWeight: 600, boxShadow: 'none' }}
+          >
+            {deleting ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

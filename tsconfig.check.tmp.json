@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": false,
+    "types": []
+  },
+  "include": [
+    "src/components/WhatsappFlowTab.tsx",
+    "src/components/TemplatesTab.tsx",
+    "src/components/FlowPreviewModal.tsx",
+    "src/service/whatsappFlow.service.ts",
+    "src/components/TemplatePopup.tsx",
+    "src/components/BulkFlowModal.tsx",
+    "src/types/**/*.ts"
+  ]
+}

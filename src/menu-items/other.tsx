@@ -2,7 +2,7 @@
 import { FormattedMessage } from 'react-intl';
 
 // assets
-import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined } from '@ant-design/icons';
+import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined } from '@ant-design/icons';
 
 // type
 import { NavItemType } from 'types/menu';
@@ -15,6 +15,7 @@ const icons = {
   MessageOutlined,
   RobotOutlined,
   ApiOutlined,
+  TagsOutlined,
 };
 
 // ==============================|| MENU ITEMS - SUPPORT ||============================== //
@@ -51,6 +52,13 @@ const other: NavItemType = {
       type: 'item',
       url: '/integrations',
       icon: icons.ApiOutlined
+    },
+    {
+      id: 'ContactFields',
+      title: <FormattedMessage id="Contact Fields" />,
+      type: 'item',
+      url: '/contact-fields',
+      icon: icons.TagsOutlined
     }
   ]
 };

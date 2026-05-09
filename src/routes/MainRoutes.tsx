@@ -10,6 +10,7 @@ import ChannelManage from 'pages/ChannelMangae';
 import Automations from 'pages/Automation';
 import AutomationBuilder from 'pages/AutomationBuilder';
 import Integrations from 'pages/Integrations';
+import ContactFields from 'pages/ContactFields';
 
 // pages routing
 const MaintenanceError = Loadable(lazy(() => import('pages/maintenance/404')));
@@ -56,6 +57,10 @@ const MainRoutes = {
         {
           path: 'integrations',
           element: <Integrations />
+        },
+        {
+          path: 'contact-fields',
+          element: <ContactFields />
         }
       ]
     },

@@ -14,6 +14,7 @@ import AddIcon from "@mui/icons-material/Add";
 import { useEffect, useState } from "react";
 import mediaService from "service/media.service";
 import { templateService } from "service/template.service";
+import VariablePicker from "components/VariablePicker";
 
 const MSG_TYPES = [
   { value: "text",     icon: "💬", label: "Text" },
@@ -189,13 +190,12 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
       {messageType === "text" && (
         <Box>
           <SectionLabel>Message Body</SectionLabel>
-          <TextField
-            fullWidth multiline rows={5}
-            placeholder={"Type your message…\nUse {{contact.name}} for variables"}
+          <VariablePicker
             value={data.message || ""}
-            onChange={(e) => updateNodeData(node.id, { message: e.target.value })}
+            onChange={(val) => updateNodeData(node.id, { message: val })}
+            placeholder={"Type your message…\nUse {{contact.name}} for variables"}
+            rows={5}
             helperText={`${(data.message || "").length} chars`}
-            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", fontSize: 13 } }}
           />
         </Box>
       )}
@@ -205,13 +205,12 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
           <Box>
             <SectionLabel>Message Body</SectionLabel>
-            <TextField
-              fullWidth multiline rows={4}
-              placeholder={"Type your message…\nUse {{contact.name}} for variables"}
+            <VariablePicker
               value={data.message || ""}
-              onChange={(e) => updateNodeData(node.id, { message: e.target.value })}
+              onChange={(val) => updateNodeData(node.id, { message: val })}
+              placeholder={"Type your message…\nUse {{contact.name}} for variables"}
+              rows={4}
               helperText={`${(data.message || "").length} chars`}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", fontSize: 13 } }}
             />
           </Box>
 
@@ -316,13 +315,12 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
           <Box>
             <SectionLabel>Message Body</SectionLabel>
-            <TextField
-              fullWidth multiline rows={3}
-              placeholder="e.g. Please select an option below"
+            <VariablePicker
               value={data.message || ""}
-              onChange={(e) => updateNodeData(node.id, { message: e.target.value })}
+              onChange={(val) => updateNodeData(node.id, { message: val })}
+              placeholder="e.g. Please select an option below"
+              rows={3}
               helperText={`${(data.message || "").length} chars`}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", fontSize: 13 } }}
             />
           </Box>
 
@@ -467,13 +465,12 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
       {messageType === "address" && (
         <Box>
           <SectionLabel>Message</SectionLabel>
-          <TextField
-            fullWidth multiline rows={3}
-            placeholder="e.g. Please share your delivery address 🏠"
+          <VariablePicker
             value={data.message || ""}
-            onChange={(e) => updateNodeData(node.id, { message: e.target.value })}
+            onChange={(val) => updateNodeData(node.id, { message: val })}
+            placeholder="e.g. Please share your delivery address 🏠"
+            rows={3}
             helperText={`${(data.message || "").length} chars`}
-            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", fontSize: 13 } }}
           />
           <Box sx={{ mt: 1.5, p: 1.5, borderRadius: "10px", bgcolor: "#eff6ff", border: "1px solid #bfdbfe" }}>
             <Typography sx={{ fontSize: 11, color: "#1e40af", lineHeight: 1.6 }}>
@@ -487,13 +484,12 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
       {messageType === "location" && (
         <Box>
           <SectionLabel>Message</SectionLabel>
-          <TextField
-            fullWidth multiline rows={3}
-            placeholder="e.g. Please share your current location 📍"
+          <VariablePicker
             value={data.message || ""}
-            onChange={(e) => updateNodeData(node.id, { message: e.target.value })}
+            onChange={(val) => updateNodeData(node.id, { message: val })}
+            placeholder="e.g. Please share your current location 📍"
+            rows={3}
             helperText={`${(data.message || "").length} chars`}
-            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", fontSize: 13 } }}
           />
           <Box sx={{ mt: 1.5, p: 1.5, borderRadius: "10px", bgcolor: "#eff6ff", border: "1px solid #bfdbfe" }}>
             <Typography sx={{ fontSize: 11, color: "#1e40af", lineHeight: 1.6 }}>
@@ -508,14 +504,12 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <Box>
             <SectionLabel>Main Message</SectionLabel>
-            <TextField
-              fullWidth multiline rows={3}
-              placeholder={"Type the text shown above the carousel…\nExample: Choose your workspace type"}
+            <VariablePicker
               value={data.body || ""}
-              onChange={(e) => updateNodeData(node.id, { body: e.target.value })}
+              onChange={(val) => updateNodeData(node.id, { body: val })}
+              placeholder={"Type the text shown above the carousel…\nExample: Choose your workspace type"}
+              rows={3}
               helperText={`${(data.body || "").length}/1024 chars`}
-              inputProps={{ maxLength: 1024 }}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", fontSize: 13 } }}
             />
           </Box>
 
