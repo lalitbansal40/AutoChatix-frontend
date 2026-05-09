@@ -87,6 +87,14 @@ const getCarouselButtonHandles = (data: any) => {
   );
 };
 
+const getPaymentStatusHandles = (data: any) => {
+  if (data?.type !== "whatsapp_payment") return [];
+  return [
+    { id: "PAYMENT_SUCCESS", title: "Paid", color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0" },
+    { id: "PAYMENT_FAILED", title: "Failed", color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
+  ];
+};
+
 /* =========================
    NODE CONFIG
 ========================= */
@@ -260,6 +268,7 @@ const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
   const { disconnectRow } = data;
   const ns = NODE_STYLE[data.type] || DEFAULT_STYLE;
   const carouselButtons = getCarouselButtonHandles(data);
+  const paymentStatusHandles = getPaymentStatusHandles(data);
 
   return (
     <Box
@@ -468,6 +477,45 @@ const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
           </Box>
         )}
 
+        {/* PAYMENT STATUS BRANCHES */}
+        {paymentStatusHandles.length > 0 && (
+          <Box sx={{ mt: 0.75 }}>
+            <Typography fontSize={10} color="#6b7280" sx={{ mb: 0.5 }}>
+              Payment Result
+            </Typography>
+            {paymentStatusHandles.map((handle) => (
+              <Box
+                onClick={(e) => { e.stopPropagation(); disconnectRow?.(id, handle.id); }}
+                key={handle.id}
+                sx={{
+                  mt: 0.75,
+                  px: 1.25,
+                  py: 0.75,
+                  borderRadius: "8px",
+                  background: handle.bg,
+                  border: `1px solid ${handle.border}`,
+                  position: "relative",
+                  cursor: "pointer",
+                  "&:hover": { filter: "brightness(0.98)" },
+                }}
+              >
+                <Stack direction="row" spacing={0.75} alignItems="center">
+                  <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: handle.color, flexShrink: 0 }} />
+                  <Typography fontSize={11} color={handle.color} fontWeight={600} noWrap sx={{ flex: 1 }}>
+                    {handle.title}
+                  </Typography>
+                </Stack>
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={handle.id}
+                  style={{ width: 10, height: 10, background: handle.color, borderRadius: "50%", position: "absolute", right: -6, top: "50%", transform: "translateY(-50%)" }}
+                />
+              </Box>
+            ))}
+          </Box>
+        )}
+
         {/* LIST ITEMS */}
         {Array.isArray(data.list) && data.list.length > 0 &&
           data.list.map((item: any, index: number) => {
@@ -520,6 +568,7 @@ const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
       {data.type !== "trigger" &&
         (!Array.isArray(data.buttons) || data.buttons.length === 0) &&
         (!Array.isArray(data.list) || data.list.length === 0) &&
+        paymentStatusHandles.length === 0 &&
         carouselButtons.length === 0 && (
           <Handle type="source" position={Position.Right}
             style={{
