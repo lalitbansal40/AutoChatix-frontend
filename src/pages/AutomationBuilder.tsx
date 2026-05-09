@@ -160,6 +160,27 @@ const NODE_CONFIG: any = {
     },
   },
 
+  whatsapp_payment: {
+    config: {
+      use_last_order: false,
+      manual_items: [{ name: "Item", qty: "1", price: "" }],
+      additional_rows: [],
+      currency: "INR",
+      payment_type: "digital-goods",
+      payment_method: "razorpay",
+      razorpay_config_name: "",
+      razorpay_receipt: "",
+      tax_amount: "",
+      tax_description: "Tax",
+      discount_amount: "",
+      discount_description: "Discount",
+      reference_id: "",
+      body: "Here is your order summary. Tap to review and pay. 💳",
+      footer: "",
+      save_to: "wa_payment",
+    },
+  },
+
   borzo_delivery: {
     borzo_action: "calculate",
     pickup: {},
@@ -221,6 +242,7 @@ const NODE_STYLE: Record<string, { color: string; bg: string; icon: string; labe
   set_contact_attribute: { color: "#f59e0b", bg: "#fffbeb", icon: "🏷️", label: "Set Attribute" },
   google_sheet: { color: "#16a34a", bg: "#f0fdf4", icon: "📊", label: "Google Sheets" },
   razorpay_payment: { color: "#2563eb", bg: "#eff6ff", icon: "💳", label: "Razorpay" },
+  whatsapp_payment: { color: "#25D366", bg: "#f0fdf4", icon: "💰", label: "WA Payment" },
   borzo_delivery: { color: "#dc2626", bg: "#fef2f2", icon: "🚚", label: "Borzo" },
   distance_check: { color: "#6366f1", bg: "#eef2ff", icon: "📏", label: "Distance" },
   integration_action: { color: "#0891b2", bg: "#ecfeff", icon: "🔌", label: "Integration" },

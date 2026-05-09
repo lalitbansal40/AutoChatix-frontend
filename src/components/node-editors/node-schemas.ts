@@ -240,6 +240,7 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
   whatsapp_payment: {
     root: "config",
     fields: [
+      // ── Items ──
       f.boolean("use_last_order", "Use Last Order Items", {
         defaultValue: false,
         helperText: "When on, items come from the contact's latest WhatsApp catalog order.",
@@ -250,11 +251,33 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
         helperText: "Used only when Use Last Order is off.",
         visibleWhen: { field: "use_last_order", equals: false },
       }),
-      f.lineItems("additional_rows", "Extra Charges", {
+      f.lineItems("additional_rows", "Extra Charges / Delivery Fee", {
         defaultValue: [],
-        placeholder: "Delivery Fee / Tax / Packing",
-        helperText: "Added on top of order items (treated as shipping).",
+        placeholder: "Delivery Fee / Packing Charges",
+        helperText: "Always added on top. Counts as shipping in WhatsApp order summary.",
       }),
+
+      // ── Tax & Discount ──
+      f.number("tax_amount", "Tax Amount (₹)", {
+        defaultValue: 0,
+        helperText: "e.g. 18 for ₹18 GST. Use {{variables}} or a fixed number.",
+      }),
+      f.text("tax_description", "Tax Label", {
+        defaultValue: "Tax",
+        placeholder: "e.g. GST 18%",
+        helperText: "Label shown on the tax line in the order.",
+      }),
+      f.number("discount_amount", "Discount Amount (₹)", {
+        defaultValue: 0,
+        helperText: "Deducted from total. e.g. 50 for ₹50 off.",
+      }),
+      f.text("discount_description", "Discount Label", {
+        defaultValue: "Discount",
+        placeholder: "e.g. Promo Code: SAVE50",
+        helperText: "Label shown on the discount line.",
+      }),
+
+      // ── Settings ──
       f.text("currency", "Currency", {
         defaultValue: "INR",
         supportsInterpolation: false,
@@ -264,19 +287,44 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
         defaultValue: "digital-goods",
         supportsInterpolation: false,
       }),
+      f.text("reference_id", "Reference ID", {
+        placeholder: "{{contact.phone}}-{{timestamp}}",
+        helperText: "Unique ID for this payment. Supports {{variables}}. Auto-generated if blank.",
+      }),
+
+      // ── Payment Method ──
+      f.select("payment_method", "Payment Method", ["razorpay", "upi_vpa"], {
+        defaultValue: "razorpay",
+        supportsInterpolation: false,
+        helperText: "Choose how the customer pays. Both must be configured in Meta Business Manager.",
+      }),
       f.text("razorpay_config_name", "Razorpay Config Name", {
         placeholder: "Name set in Meta Business Manager",
-        helperText: "The Razorpay payment configuration registered under your WABA in Meta.",
+        helperText: "Razorpay configuration name registered under your WABA in Meta.",
         supportsInterpolation: false,
+        visibleWhen: { field: "payment_method", equals: "razorpay" },
       }),
-      f.text("razorpay_receipt", "Receipt / Reference ID", {
-        placeholder: "{{contact.phone}} or order_{{order_id}}",
-        helperText: "Unique receipt ID sent to Razorpay (supports {{variables}}).",
-        defaultValue: "",
+      f.text("razorpay_receipt", "Razorpay Receipt ID", {
+        placeholder: "{{contact.phone}} or order_{{session.order_id}}",
+        helperText: "Unique receipt ID sent to Razorpay. Supports {{variables}}.",
+        visibleWhen: { field: "payment_method", equals: "razorpay" },
       }),
+      f.text("upi_config_name", "UPI Config Name", {
+        placeholder: "Name set in Meta Business Manager",
+        helperText: "UPI configuration name registered under your WABA in Meta.",
+        supportsInterpolation: false,
+        visibleWhen: { field: "payment_method", equals: "upi_vpa" },
+      }),
+      f.text("upi_vpa", "Merchant UPI VPA", {
+        placeholder: "yourstore@okhdfc",
+        helperText: "Your UPI address (VPA). Customer will pay to this address.",
+        visibleWhen: { field: "payment_method", equals: "upi_vpa" },
+      }),
+
+      // ── Message ──
       f.textarea("body", "Message Body", {
         defaultValue: "Here is your order summary. Tap to review and pay. 💳",
-        helperText: "Message shown above the order items.",
+        helperText: "Message shown above the order details.",
       }),
       f.text("footer", "Footer", {
         placeholder: "e.g. Thank you for shopping with us",
@@ -285,7 +333,7 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
       f.text("save_to", "Save Payment Result As", {
         defaultValue: "wa_payment",
         supportsInterpolation: false,
-        helperText: "After payment, result is in {{wa_payment.status}}, {{wa_payment.transaction_id}}, etc.",
+        helperText: "Use {{wa_payment.status}}, {{wa_payment.transaction_id}}, {{wa_payment.amount}} downstream.",
       }),
     ],
   },
