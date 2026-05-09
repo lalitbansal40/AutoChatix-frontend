@@ -14,6 +14,7 @@ const NODE_META: Record<string, { color: string; bg: string; icon: string; label
   send_flow:       { color: "#0d9488", bg: "#f0fdfa", icon: "🌊", label: "Send Flow",       desc: "Trigger a WhatsApp Flow." },
   razorpay_payment:{ color: "#2563eb", bg: "#eff6ff", icon: "💳", label: "Razorpay Payment",desc: "Generate a Razorpay payment link." },
   whatsapp_payment:{ color: "#25D366", bg: "#f0fdf4", icon: "💰", label: "WhatsApp Payment", desc: "Send native WhatsApp Order Details with Pay button." },
+  update_order:    { color: "#0f766e", bg: "#f0fdfa", icon: "📦", label: "Update Order", desc: "Update status, payment and delivery details for the current order." },
   payment_summary: { color: "#2563eb", bg: "#eff6ff", icon: "🧾", label: "Payment Summary", desc: "Show order summary + Pay button." },
   borzo_delivery:  { color: "#dc2626", bg: "#fef2f2", icon: "🚚", label: "Borzo Delivery",  desc: "Calculate, create or track a Borzo order." },
   send_template:   { color: "#16a34a", bg: "#f0fdf4", icon: "📨", label: "Send Template",   desc: "Send an approved WhatsApp template." },

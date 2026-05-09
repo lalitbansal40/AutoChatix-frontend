@@ -304,6 +304,109 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
     ],
   },
 
+  /* ─── update_order ─── */
+  update_order: {
+    root: "config",
+    fields: [
+      f.text("order_id", "Order ID / WA Message ID", {
+        placeholder: "{{last_order.wa_message_id}}",
+        helperText: "Leave blank to update the current/latest order for this contact.",
+      }),
+      f.select("order_status", "Order Status", [
+        "",
+        "new",
+        "confirmed",
+        "packed",
+        "shipped",
+        "out_for_delivery",
+        "delivered",
+        "returned",
+        "cancelled",
+      ], {
+        defaultValue: "",
+        supportsInterpolation: false,
+        helperText: "Blank means do not change this field.",
+      }),
+      f.select("payment_status", "Payment Status", [
+        "",
+        "unpaid",
+        "paid",
+        "partial",
+        "refunded",
+      ], {
+        defaultValue: "",
+        supportsInterpolation: false,
+        helperText: "Blank means do not change this field.",
+      }),
+      f.select("payment_type", "Payment Type", [
+        "",
+        "whatsapp_payment",
+        "razorpay",
+        "online",
+        "cod",
+        "manual",
+      ], {
+        defaultValue: "",
+        supportsInterpolation: false,
+      }),
+      f.text("payment_reference", "Payment Reference", {
+        placeholder: "{{last_payment.transaction_id}}",
+      }),
+      f.text("delivery_name", "Delivery Name", {
+        placeholder: "{{contact.name}}",
+      }),
+      f.text("delivery_phone", "Delivery Phone", {
+        placeholder: "{{contact.phone}}",
+      }),
+      f.text("address_line1", "Address Line 1", {
+        placeholder: "{{address.fullAddress}}",
+      }),
+      f.text("address_line2", "Address Line 2"),
+      f.text("city", "City", {
+        placeholder: "{{address.city}}",
+      }),
+      f.text("state", "State", {
+        placeholder: "{{address.state}}",
+      }),
+      f.text("pincode", "Pincode", {
+        placeholder: "{{address.pincode}}",
+      }),
+      f.text("country", "Country", {
+        placeholder: "India",
+        helperText: "Blank means do not change this field.",
+      }),
+      f.select("shipping_method", "Shipping Method", [
+        "",
+        "standard",
+        "express",
+        "same_day",
+        "pickup",
+        "courier",
+        "manual",
+      ], {
+        defaultValue: "",
+        supportsInterpolation: false,
+        helperText: "Blank means do not change this field.",
+      }),
+      f.text("shipping_fee", "Shipping Fee", {
+        placeholder: "{{wa_payment.shipping}}",
+      }),
+      f.text("courier_name", "Courier Name", {
+        placeholder: "{{borzo.order.courier.name}}",
+      }),
+      f.text("tracking_id", "Tracking ID", {
+        placeholder: "{{borzo.order.id}}",
+      }),
+      f.textarea("customer_note", "Customer Note"),
+      f.textarea("internal_note", "Internal Note"),
+      f.text("save_to", "Save Updated Order As", {
+        defaultValue: "updated_order",
+        supportsInterpolation: false,
+        helperText: "Updated order object is saved here for downstream nodes.",
+      }),
+    ],
+  },
+
   /* ─── payment_summary (legacy — config.title/rows[]/button_text) ─── */
   payment_summary: {
     root: "config",

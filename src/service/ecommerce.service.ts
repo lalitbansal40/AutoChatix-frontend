@@ -6,6 +6,11 @@ class ECommerceService {
     return res.data;
   }
 
+  async updateOrder(orderId: string, data: Record<string, any>) {
+    const res = await axiosServices.put(`/message/orders/${orderId}`, data);
+    return res.data;
+  }
+
   async getCatalogs(channelId: string) {
     const res = await axiosServices.get(`/catalog/${channelId}`);
     return res.data;

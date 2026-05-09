@@ -37,7 +37,7 @@ import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import SyncIcon from "@mui/icons-material/Sync";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { channelService } from "service/channel.service";
 import { ecommerceService } from "service/ecommerce.service";
 import { useNavigate } from "react-router-dom";
@@ -60,6 +60,72 @@ function calcOrderTotal(order: any) {
   const currency = items[0]?.currency || "INR";
   return { total, currency, itemCount: items.reduce((s: number, i: any) => s + Number(i.quantity || 1), 0), items };
 }
+
+const ORDER_STATUS_OPTIONS = [
+  { value: "new", label: "New" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "packed", label: "Packed" },
+  { value: "shipped", label: "Shipped" },
+  { value: "out_for_delivery", label: "Out for Delivery" },
+  { value: "delivered", label: "Delivered" },
+  { value: "returned", label: "Returned" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+const PAYMENT_STATUS_OPTIONS = [
+  { value: "unpaid", label: "Unpaid" },
+  { value: "paid", label: "Paid" },
+  { value: "partial", label: "Partial" },
+  { value: "refunded", label: "Refunded" },
+];
+
+const PAYMENT_TYPE_OPTIONS = [
+  { value: "whatsapp_payment", label: "WhatsApp Payment" },
+  { value: "razorpay", label: "Razorpay" },
+  { value: "online", label: "Online" },
+  { value: "cod", label: "COD" },
+  { value: "manual", label: "Manual" },
+];
+
+const SHIPPING_METHOD_OPTIONS = [
+  { value: "standard", label: "Standard" },
+  { value: "express", label: "Express" },
+  { value: "same_day", label: "Same Day" },
+  { value: "pickup", label: "Pickup" },
+  { value: "courier", label: "Courier" },
+  { value: "manual", label: "Manual" },
+];
+
+const statusLabel = (options: { value: string; label: string }[], value?: string) =>
+  options.find((o) => o.value === value)?.label || value || "";
+
+const getOrderMeta = (order: any) => order?.payload?.order_meta || {};
+
+const getDefaultOrderForm = (order: any) => {
+  const meta = getOrderMeta(order);
+  return {
+    payment_status: meta.payment_status || "unpaid",
+    payment_type: meta.payment_type || "whatsapp_payment",
+    order_status: meta.order_status || "new",
+    payment_reference: meta.payment_reference || "",
+    shipping_method: meta.shipping_method || "standard",
+    shipping_fee: meta.shipping_fee || "",
+    tracking_id: meta.tracking_id || "",
+    courier_name: meta.courier_name || "",
+    customer_note: meta.customer_note || order?.payload?.order?.text || "",
+    internal_note: meta.internal_note || "",
+    delivery_address: {
+      name: meta.delivery_address?.name || order?.contact_id?.name || "",
+      phone: meta.delivery_address?.phone || order?.contact_id?.phone || "",
+      line1: meta.delivery_address?.line1 || "",
+      line2: meta.delivery_address?.line2 || "",
+      city: meta.delivery_address?.city || "",
+      state: meta.delivery_address?.state || "",
+      pincode: meta.delivery_address?.pincode || "",
+      country: meta.delivery_address?.country || "India",
+    },
+  };
+};
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD", "BDT", "PKR"];
 const AVAILABILITY_OPTIONS = ["in stock", "out of stock", "preorder", "available for order", "discontinued"];
@@ -782,10 +848,143 @@ const ProductsTab = () => {
   );
 };
 
+const OrderEditDialog = ({ order, open, onClose, onSaved }: any) => {
+  const [form, setForm] = useState<any>(() => getDefaultOrderForm(order));
+  const { total, currency, itemCount, items } = calcOrderTotal(order);
+  const contact = order?.contact_id;
+
+  useEffect(() => {
+    setForm(getDefaultOrderForm(order));
+  }, [order]);
+
+  const update = (field: string) => (e: any) => {
+    setForm((prev: any) => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const updateAddress = (field: string) => (e: any) => {
+    setForm((prev: any) => ({
+      ...prev,
+      delivery_address: {
+        ...prev.delivery_address,
+        [field]: e.target.value,
+      },
+    }));
+  };
+
+  const mutation = useMutation({
+    mutationFn: () => ecommerceService.updateOrder(order._id, form),
+    onSuccess: () => {
+      onSaved();
+      onClose();
+    },
+  });
+
+  if (!order) return null;
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>
+        Order Details
+        <IconButton onClick={onClose} sx={{ position: "absolute", right: 8, top: 8, color: "#6b7280" }}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent dividers sx={{ bgcolor: "#f8fafc" }}>
+        <Grid container spacing={2.5}>
+          <Grid item xs={12} md={7}>
+            <Box sx={{ bgcolor: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", p: 2 }}>
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2} mb={1.5}>
+                <Box>
+                  <Typography fontSize={15} fontWeight={800}>{contact?.name || "Customer"}</Typography>
+                  <Typography fontSize={12.5} color="#6b7280">{contact?.phone || form.delivery_address.phone}</Typography>
+                </Box>
+                <Box textAlign="right">
+                  <Typography fontSize={17} fontWeight={900} color="#065f46">{currency} {total.toFixed(2)}</Typography>
+                  <Typography fontSize={11.5} color="#6b7280">{itemCount} item{itemCount !== 1 ? "s" : ""}</Typography>
+                </Box>
+              </Stack>
+
+              <Stack spacing={1}>
+                {items.map((item: any, index: number) => (
+                  <Box key={`${item.product_retailer_id}-${index}`} sx={{ display: "flex", justifyContent: "space-between", gap: 2, py: 1, borderTop: index ? "1px solid #f3f4f6" : 0 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography fontSize={12.5} fontWeight={700} color="#111827" noWrap>
+                        {item.name || item.product_name || item.product_retailer_id}
+                      </Typography>
+                      <Typography fontSize={11.5} color="#6b7280">Qty {item.quantity || 1} · {item.product_retailer_id}</Typography>
+                    </Box>
+                    <Typography fontSize={12.5} fontWeight={800} color="#111827" flexShrink={0}>
+                      {currency} {(Number(item.item_price) * Number(item.quantity || 1)).toFixed(2)}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+
+            <Box sx={{ bgcolor: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", p: 2, mt: 2 }}>
+              <Typography fontSize={13} fontWeight={800} mb={1.5}>Delivery Address</Typography>
+              <Grid container spacing={1.5}>
+                <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Name" value={form.delivery_address.name} onChange={updateAddress("name")} /></Grid>
+                <Grid item xs={12} sm={6}><TextField fullWidth size="small" label="Phone" value={form.delivery_address.phone} onChange={updateAddress("phone")} /></Grid>
+                <Grid item xs={12}><TextField fullWidth size="small" label="Address Line 1" value={form.delivery_address.line1} onChange={updateAddress("line1")} /></Grid>
+                <Grid item xs={12}><TextField fullWidth size="small" label="Address Line 2" value={form.delivery_address.line2} onChange={updateAddress("line2")} /></Grid>
+                <Grid item xs={12} sm={4}><TextField fullWidth size="small" label="City" value={form.delivery_address.city} onChange={updateAddress("city")} /></Grid>
+                <Grid item xs={12} sm={4}><TextField fullWidth size="small" label="State" value={form.delivery_address.state} onChange={updateAddress("state")} /></Grid>
+                <Grid item xs={12} sm={4}><TextField fullWidth size="small" label="Pincode" value={form.delivery_address.pincode} onChange={updateAddress("pincode")} /></Grid>
+              </Grid>
+            </Box>
+          </Grid>
+
+          <Grid item xs={12} md={5}>
+            <Box sx={{ bgcolor: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", p: 2 }}>
+              <Typography fontSize={13} fontWeight={800} mb={1.5}>Status & Payment</Typography>
+              <Stack spacing={1.5}>
+                <TextField select fullWidth size="small" label="Order Status" value={form.order_status} onChange={update("order_status")}>
+                  {ORDER_STATUS_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+                </TextField>
+                <TextField select fullWidth size="small" label="Payment Status" value={form.payment_status} onChange={update("payment_status")}>
+                  {PAYMENT_STATUS_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+                </TextField>
+                <TextField select fullWidth size="small" label="Payment Type" value={form.payment_type} onChange={update("payment_type")}>
+                  {PAYMENT_TYPE_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+                </TextField>
+                <TextField fullWidth size="small" label="Payment Reference" value={form.payment_reference} onChange={update("payment_reference")} />
+                <TextField select fullWidth size="small" label="Shipping Method" value={form.shipping_method} onChange={update("shipping_method")}>
+                  {SHIPPING_METHOD_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+                </TextField>
+                <TextField fullWidth size="small" label="Shipping Fee" value={form.shipping_fee} onChange={update("shipping_fee")} />
+                <TextField fullWidth size="small" label="Courier Name" value={form.courier_name} onChange={update("courier_name")} />
+                <TextField fullWidth size="small" label="Tracking ID" value={form.tracking_id} onChange={update("tracking_id")} />
+                <TextField fullWidth multiline minRows={2} size="small" label="Customer Note" value={form.customer_note} onChange={update("customer_note")} />
+                <TextField fullWidth multiline minRows={2} size="small" label="Internal Note" value={form.internal_note} onChange={update("internal_note")} />
+              </Stack>
+            </Box>
+          </Grid>
+        </Grid>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, py: 2 }}>
+        <Button onClick={onClose} sx={{ textTransform: "none", color: "#6b7280" }}>Cancel</Button>
+        <Button
+          variant="contained"
+          onClick={() => mutation.mutate()}
+          disabled={mutation.isPending}
+          sx={{ textTransform: "none", bgcolor: "#065f46", "&:hover": { bgcolor: "#047857" }, borderRadius: "8px", fontWeight: 700 }}
+        >
+          {mutation.isPending ? "Saving..." : "Save Order"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 /* ─── Orders Tab ─── */
 const OrdersTab = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [channelFilter, setChannelFilter] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
   const { data: channelsData = [] } = useQuery({
     queryKey: ["channels"],
@@ -799,8 +998,17 @@ const OrdersTab = () => {
     select: (res: any) => res.data || [],
   });
 
-  const orders: any[] = data || [];
+  const orders: any[] = (data || []).filter((order: any) => {
+    const meta = getOrderMeta(order);
+    const paymentStatus = meta.payment_status || "unpaid";
+    const orderStatus = meta.order_status || "new";
+    return (!paymentFilter || paymentStatus === paymentFilter) && (!statusFilter || orderStatus === statusFilter);
+  });
   const totalRevenue = orders.reduce((s, o) => s + calcOrderTotal(o).total, 0);
+  const paidRevenue = orders
+    .filter((o) => (getOrderMeta(o).payment_status || "unpaid") === "paid")
+    .reduce((s, o) => s + calcOrderTotal(o).total, 0);
+  const pendingOrders = orders.filter((o) => !["delivered", "cancelled", "returned"].includes(getOrderMeta(o).order_status || "new")).length;
 
   return (
     <Box>
@@ -808,6 +1016,8 @@ const OrdersTab = () => {
         {[
           { label: "Total Orders", value: orders.length, icon: "🛒", color: "#065f46", bg: "#ecfdf5" },
           { label: "Total Revenue", value: `₹${totalRevenue.toFixed(2)}`, icon: "💰", color: "#1d4ed8", bg: "#eff6ff" },
+          { label: "Paid Revenue", value: `₹${paidRevenue.toFixed(2)}`, icon: "₹", color: "#15803d", bg: "#f0fdf4" },
+          { label: "In Progress", value: pendingOrders, icon: "↗", color: "#b45309", bg: "#fffbeb" },
         ].map((s) => (
           <Box key={s.label} sx={{ px: 3, py: 2, bgcolor: s.bg, borderRadius: "12px", border: `1px solid ${s.color}20`, minWidth: 160 }}>
             <Stack direction="row" alignItems="center" spacing={1}>
@@ -821,13 +1031,23 @@ const OrdersTab = () => {
         ))}
       </Box>
 
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: 2, display: "flex", gap: 1.5, flexWrap: "wrap" }}>
         <TextField select size="small" value={channelFilter} onChange={(e) => setChannelFilter(e.target.value)}
           sx={{ minWidth: 200, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}>
           <MenuItem value="">All Channels</MenuItem>
           {channelsData.map((ch: any) => (
             <MenuItem key={ch._id} value={ch._id} sx={{ fontSize: 13 }}>📱 {ch.channel_name || ch.display_phone_number}</MenuItem>
           ))}
+        </TextField>
+        <TextField select size="small" value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}
+          sx={{ minWidth: 170, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}>
+          <MenuItem value="">All Payments</MenuItem>
+          {PAYMENT_STATUS_OPTIONS.map((opt) => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
+        </TextField>
+        <TextField select size="small" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          sx={{ minWidth: 190, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}>
+          <MenuItem value="">All Order Status</MenuItem>
+          {ORDER_STATUS_OPTIONS.map((opt) => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
         </TextField>
       </Box>
 
@@ -848,27 +1068,44 @@ const OrdersTab = () => {
         <Box sx={{ bgcolor: "#fff", borderRadius: "14px", border: "1px solid #e5e7eb", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
           {orders.map((order: any, idx: number) => {
             const { total, currency, itemCount, items } = calcOrderTotal(order);
+            const meta = getOrderMeta(order);
             const contact = order.contact_id;
             const contactName = contact?.name || contact?.phone || "Unknown";
             const phone = contact?.phone || "";
             const channel = order.channel || channelsData.find((c: any) => c._id === (order.channel_id?._id || order.channel_id));
             const channelName = channel?.channel_name || channel?.display_phone_number || "";
             const note = order?.payload?.order?.text;
+            const paymentStatus = meta.payment_status || "unpaid";
+            const orderStatus = meta.order_status || "new";
+            const paymentType = meta.payment_type || "whatsapp_payment";
+            const shippingMethod = meta.shipping_method;
             return (
               <Box key={order._id || idx}>
                 {idx > 0 && <Divider sx={{ borderColor: "#f9fafb" }} />}
-                <Box onClick={() => contact?._id && navigate(`/chats?contactId=${contact._id}`)}
-                  sx={{ display: "flex", alignItems: "flex-start", gap: 2, px: 3, py: 2, cursor: contact?._id ? "pointer" : "default", "&:hover": contact?._id ? { bgcolor: "#f9fafb" } : {} }}>
+                <Box onClick={() => setSelectedOrder(order)}
+                  sx={{ display: "flex", alignItems: "flex-start", gap: 2, px: 3, py: 2, cursor: "pointer", "&:hover": { bgcolor: "#f9fafb" } }}>
                   <Box sx={{ width: 44, height: 44, borderRadius: "50%", bgcolor: "#ecfdf5", border: "2px solid #bbf7d0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🛒</Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Stack direction="row" alignItems="center" spacing={1}>
                       <Typography fontSize={14} fontWeight={600} color="#111827" noWrap>{contactName}</Typography>
                       <Chip label={`${itemCount} item${itemCount !== 1 ? "s" : ""}`} size="small"
                         sx={{ height: 20, fontSize: 10.5, fontWeight: 700, color: "#065f46", bgcolor: "#ecfdf5", border: "1px solid #bbf7d0", borderRadius: "6px" }} />
+                      <Chip label={statusLabel(PAYMENT_STATUS_OPTIONS, paymentStatus)} size="small"
+                        sx={{ height: 20, fontSize: 10.5, fontWeight: 800, color: paymentStatus === "paid" ? "#166534" : "#92400e", bgcolor: paymentStatus === "paid" ? "#dcfce7" : "#fef3c7", borderRadius: "6px" }} />
+                      <Chip label={statusLabel(ORDER_STATUS_OPTIONS, orderStatus)} size="small"
+                        sx={{ height: 20, fontSize: 10.5, fontWeight: 700, color: "#1f2937", bgcolor: "#f3f4f6", borderRadius: "6px" }} />
                     </Stack>
                     <Stack direction="row" alignItems="center" spacing={0.75} mt={0.25} flexWrap="wrap">
                       {phone && <Typography fontSize={12} color="#6b7280">{phone}</Typography>}
                       {channelName && <><Box sx={{ width: 3, height: 3, borderRadius: "50%", bgcolor: "#d1d5db" }} /><Typography fontSize={12} color="#6b7280">{channelName}</Typography></>}
+                      <Box sx={{ width: 3, height: 3, borderRadius: "50%", bgcolor: "#d1d5db" }} />
+                      <Typography fontSize={12} color="#6b7280">{statusLabel(PAYMENT_TYPE_OPTIONS, paymentType)}</Typography>
+                      {shippingMethod && (
+                        <>
+                          <Box sx={{ width: 3, height: 3, borderRadius: "50%", bgcolor: "#d1d5db" }} />
+                          <Typography fontSize={12} color="#6b7280">{statusLabel(SHIPPING_METHOD_OPTIONS, shippingMethod)}</Typography>
+                        </>
+                      )}
                     </Stack>
                     {items.slice(0, 2).map((item: any, i: number) => (
                       <Typography key={i} fontSize={11.5} color="#9ca3af" noWrap>
@@ -883,12 +1120,29 @@ const OrdersTab = () => {
                     <Tooltip title={new Date(order.createdAt).toLocaleString()}>
                       <Typography fontSize={11} color="#9ca3af" mt={0.25}>{formatTime(order.createdAt)}</Typography>
                     </Tooltip>
+                    {contact?._id && (
+                      <Button
+                        size="small"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/chats?contactId=${contact._id}`); }}
+                        sx={{ mt: 0.75, textTransform: "none", fontSize: 11, color: "#065f46", minWidth: 0, px: 1 }}
+                      >
+                        Chat
+                      </Button>
+                    )}
                   </Box>
                 </Box>
               </Box>
             );
           })}
         </Box>
+      )}
+      {selectedOrder && (
+        <OrderEditDialog
+          order={selectedOrder}
+          open={!!selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          onSaved={() => queryClient.invalidateQueries({ queryKey: ["ecommerce-orders"] })}
+        />
       )}
     </Box>
   );

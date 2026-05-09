@@ -27,4 +27,5 @@ export const NODE_EDITORS: any = {
   razorpay_payment: BuiltinNodeEditor,
   whatsapp_payment: BuiltinNodeEditor,
   payment_summary: BuiltinNodeEditor,
+  update_order: BuiltinNodeEditor,
 };
