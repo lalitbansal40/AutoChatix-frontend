@@ -783,7 +783,7 @@ const AutomationBuilder = () => {
 
         // 🔥 AUTO TYPE DETECT
         const nodeType =
-          sections.length > 0
+          sections.length > 0 && n.data?.type !== "product_list"
             ? "list"
             : n.data?.type || "auto_reply";
 

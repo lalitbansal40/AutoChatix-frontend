@@ -77,7 +77,7 @@ const ProductSelector = ({
   channelId: string;
   catalogId: string;
   value: string;
-  onChange: (retailerId: string) => void;
+  onChange: (retailerId: string, product?: any) => void;
   label?: string;
 }) => {
   const { data: products = [], isLoading } = useQuery({
@@ -92,7 +92,13 @@ const ProductSelector = ({
       <InputLabel shrink sx={labelSx}>{label}</InputLabel>
       <Select
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          const retailerId = e.target.value;
+          const product = products.find(
+            (p: any) => (p.retailer_id || p.id) === retailerId,
+          );
+          onChange(retailerId, product);
+        }}
         label={label}
         sx={{ borderRadius: "8px", fontSize: 13 }}
         displayEmpty
@@ -164,7 +170,12 @@ const SingleProductEditor = ({
         channelId={channelId}
         catalogId={data.catalog_id || ""}
         value={data.product_retailer_id || ""}
-        onChange={(v) => upd({ product_retailer_id: v })}
+        onChange={(v, product) =>
+          upd({
+            product_retailer_id: v,
+            product_name: product?.name || v,
+          })
+        }
       />
 
       <TextField
@@ -213,10 +224,10 @@ const ProductListEditor = ({
 }) => {
   const data = node.data || {};
 
-  const sections: Array<{ title: string; rows: Array<{ product_retailer_id: string }> }> =
+  const sections: Array<{ title: string; rows: Array<{ product_retailer_id: string; product_name?: string }> }> =
     Array.isArray(data.sections) && data.sections.length > 0
       ? data.sections
-      : [{ title: "Featured", rows: [{ product_retailer_id: "" }] }];
+      : [{ title: "Featured", rows: [{ product_retailer_id: "", product_name: "" }] }];
 
   const upd = (patch: Record<string, any>) =>
     updateNodeData(node.id, { ...data, ...patch });
@@ -224,14 +235,14 @@ const ProductListEditor = ({
   const handleCatalogChange = (catalogId: string) => {
     upd({
       catalog_id: catalogId,
-      sections: sections.map((s) => ({ ...s, rows: s.rows.map(() => ({ product_retailer_id: "" })) })),
+      sections: sections.map((s) => ({ ...s, rows: s.rows.map(() => ({ product_retailer_id: "", product_name: "" })) })),
     });
   };
 
   const updateSections = (next: typeof sections) => upd({ sections: next });
 
   const addSection = () =>
-    updateSections([...sections, { title: "", rows: [{ product_retailer_id: "" }] }]);
+    updateSections([...sections, { title: "", rows: [{ product_retailer_id: "", product_name: "" }] }]);
 
   const removeSection = (si: number) =>
     updateSections(sections.filter((_, i) => i !== si));
@@ -243,7 +254,7 @@ const ProductListEditor = ({
 
   const addRow = (si: number) => {
     const next = sections.map((s, i) =>
-      i === si ? { ...s, rows: [...s.rows, { product_retailer_id: "" }] } : s
+      i === si ? { ...s, rows: [...s.rows, { product_retailer_id: "", product_name: "" }] } : s
     );
     updateSections(next);
   };
@@ -255,10 +266,21 @@ const ProductListEditor = ({
     updateSections(next);
   };
 
-  const updateRow = (si: number, ri: number, retailerId: string) => {
+  const updateRow = (si: number, ri: number, retailerId: string, product?: any) => {
     const next = sections.map((s, i) =>
       i === si
-        ? { ...s, rows: s.rows.map((r, j) => (j === ri ? { product_retailer_id: retailerId } : r)) }
+        ? {
+            ...s,
+            rows: s.rows.map((r, j) =>
+              j === ri
+                ? {
+                    ...r,
+                    product_retailer_id: retailerId,
+                    product_name: product?.name || retailerId,
+                  }
+                : r,
+            ),
+          }
         : s
     );
     updateSections(next);
@@ -343,7 +365,7 @@ const ProductListEditor = ({
                     channelId={channelId}
                     catalogId={data.catalog_id || ""}
                     value={row.product_retailer_id}
-                    onChange={(v) => updateRow(si, ri, v)}
+                    onChange={(v, product) => updateRow(si, ri, v, product)}
                     label={`Product ${ri + 1}`}
                   />
                 </Box>

@@ -203,9 +203,15 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
     fields: [
       f.number("item_amount", "Item Amount (₹)", {
         required: true,
-        placeholder: "{{cart_total}} or 499",
+        defaultValue: "{{order_summary.total_amount}}",
+        placeholder: "{{order_summary.total_amount}} or 499",
       }),
       f.number("delivery_amount", "Delivery Amount (₹)", { defaultValue: 0 }),
+      f.json("additional_fees", "Additional Fees (JSON)", {
+        helperText:
+          'Format: [{"label":"Packing Fee","amount":"20"},{"label":"Service Fee","amount":"{{service_fee}}"}]',
+        defaultValue: [],
+      }),
       f.text("description", "Description", { defaultValue: "Payment" }),
     ],
   },
@@ -221,6 +227,7 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
         defaultValue: [
           { label: "Subtotal", value: "₹{{payment.item_amount}}" },
           { label: "Delivery", value: "₹{{payment.delivery_amount}}" },
+          { label: "Fees", value: "₹{{payment.fees_total}}" },
         ],
       }),
       f.text("button_text", "Pay Button Text", { defaultValue: "Pay Now 💳" }),
