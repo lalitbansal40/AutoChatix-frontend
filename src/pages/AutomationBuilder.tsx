@@ -8,6 +8,7 @@ import {
   Chip,
   Stack,
   Tooltip,
+  Alert,
 } from "@mui/material";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import SaveIcon from "@mui/icons-material/Save";
@@ -22,8 +23,9 @@ import ReactFlow, {
   addEdge, Connection, Handle, Position, NodeProps
 } from "reactflow";
 import "reactflow/dist/style.css";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import automationService from "service/automation.service";
+import { contactAttributeService, ContactAttribute } from "service/contactAttribute.service";
 import * as dagre from "dagre";
 import NodeOpenPopup from "components/NodeOpenPopup";
 import { MarkerType } from "reactflow";
@@ -43,6 +45,26 @@ type CustomNodeData = {
   message?: string;
   buttons?: any[];
   [key: string]: any;
+};
+
+type WebhookMapping = {
+  source_path: string;
+  attribute_key: string;
+};
+
+const flattenPayloadPaths = (value: any, prefix = ""): string[] => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return prefix ? [prefix] : [];
+  }
+
+  return Object.entries(value).flatMap(([key, child]) => {
+    const next = prefix ? `${prefix}.${key}` : key;
+    if (child && typeof child === "object" && !Array.isArray(child)) {
+      const nested = flattenPayloadPaths(child, next);
+      return nested.length ? nested : [next];
+    }
+    return [next];
+  });
 };
 
 const edgeTypes = {
@@ -113,6 +135,17 @@ const NODE_CONFIG: any = {
     sheet_name: "",
     action: "create",
     map: {},
+  },
+
+  api_request: {
+    config: {
+      method: "GET",
+      url: "",
+      headers: {},
+      params: {},
+      body: {},
+      response_map: {},
+    },
   },
 
   razorpay_payment: {
@@ -186,6 +219,7 @@ const NODE_STYLE: Record<string, { color: string; bg: string; icon: string; labe
   borzo_delivery: { color: "#dc2626", bg: "#fef2f2", icon: "🚚", label: "Borzo" },
   distance_check: { color: "#6366f1", bg: "#eef2ff", icon: "📏", label: "Distance" },
   integration_action: { color: "#0891b2", bg: "#ecfeff", icon: "🔌", label: "Integration" },
+  api_request: { color: "#7c3aed", bg: "#f5f3ff", icon: "🌐", label: "API Request" },
   single_product:     { color: "#db2777", bg: "#fdf2f8", icon: "🛒", label: "Single Product" },
   product_list:       { color: "#db2777", bg: "#fdf2f8", icon: "🛍️", label: "Product List" },
 };
@@ -480,15 +514,18 @@ const nodeTypes = {
 const AutomationBuilder = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [nodes, setNodes, onNodesChange] = useNodesState<CustomNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [createNodePos, setCreateNodePos] = useState<any>(null);
   const [openTriggerPopup, setOpenTriggerPopup] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingTriggerSettings, setSavingTriggerSettings] = useState(false);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [input, setInput] = useState("");
+  const [webhookMappings, setWebhookMappings] = useState<WebhookMapping[]>([]);
 
   const connectingNodeRef = useRef<{ nodeId: string | null; handleId: string | null }>({ nodeId: null, handleId: null });
   const pendingEdgeRef = useRef<{ sourceNodeId: string; sourceHandleId: string | null } | null>(null);
@@ -831,6 +868,18 @@ const AutomationBuilder = () => {
 
   const automation = data?.data || data;
 
+  useEffect(() => {
+    const mappings = automation?.trigger_config?.webhook_mappings;
+    setWebhookMappings(
+      Array.isArray(mappings) && mappings.length
+        ? mappings.map((m: any) => ({
+            source_path: m.source_path || "",
+            attribute_key: m.attribute_key || "",
+          }))
+        : [],
+    );
+  }, [automation?.trigger_config?.webhook_mappings]);
+
   // ── channel id (handles populated object or string) ──
   const channelId: string | undefined =
     typeof automation?.channel_id === "object"
@@ -869,14 +918,115 @@ const AutomationBuilder = () => {
     process.env.REACT_APP_API_URL ||
     "";
 
+  const publicApiBase = useMemo(() => {
+    const fallback =
+      typeof window !== "undefined"
+        ? `${window.location.protocol}//${window.location.hostname}:5005`
+        : "";
+    const raw = (apiBase || fallback).replace(/\/+$/, "");
+    return raw.replace(/\/api$/, "");
+  }, [apiBase]);
+
+  const customWebhookUrl = useMemo(() => {
+    if (!automation?._id) return "";
+    return `${publicApiBase}/api/automations/${automation._id}/webhook`;
+  }, [automation?._id, publicApiBase]);
+
   const integrationWebhookUrl = useMemo(() => {
     if (!integrationTriggerInfo) return "";
     const slug = integrationTriggerInfo.app.slug;
     const accountId = automation?.account_id;
     const ch = channelId;
-    const base = apiBase || `${window.location.protocol}//${window.location.host}`;
-    return `${base.replace(/\/+$/, "")}/api/integrations/webhook/${slug}?account_id=${accountId}&channel_id=${ch}`;
-  }, [integrationTriggerInfo, automation?.account_id, channelId, apiBase]);
+    return `${publicApiBase}/api/integrations/webhook/${slug}?account_id=${accountId}&channel_id=${ch}`;
+  }, [integrationTriggerInfo, automation?.account_id, channelId, publicApiBase]);
+
+  const {
+    data: webhookLogs = [],
+    refetch: refetchWebhookLogs,
+    isFetching: webhookLogsLoading,
+  } = useQuery({
+    queryKey: ["automation-webhook-logs", automation?._id],
+    queryFn: () => automationService.getWebhookLogs(automation._id),
+    enabled: !!automation?._id && automation?.trigger === "webhook_received",
+    refetchInterval: automation?.trigger === "webhook_received" ? 5000 : false,
+  });
+
+  const { data: contactAttributes = [] } = useQuery<ContactAttribute[]>({
+    queryKey: ["contact-attributes"],
+    queryFn: async () => {
+      const res = await contactAttributeService.getAttributes();
+      return res.data || [];
+    },
+    staleTime: 60_000,
+  });
+
+  const webhookDestinationFields = useMemo(
+    () => [
+      { id: "contact.name", name: "Contact Name" },
+      { id: "contact.phone", name: "Contact Phone" },
+      ...contactAttributes,
+    ],
+    [contactAttributes],
+  );
+
+  const webhookSourcePaths = useMemo(
+    () => flattenPayloadPaths(webhookLogs?.[0]?.payload || {}),
+    [webhookLogs],
+  );
+
+  const addWebhookMapping = () => {
+    setWebhookMappings((prev) => [
+      ...prev,
+      { source_path: webhookSourcePaths[0] || "", attribute_key: "" },
+    ]);
+  };
+
+  const updateWebhookMapping = (
+    index: number,
+    patch: Partial<WebhookMapping>,
+  ) => {
+    setWebhookMappings((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, ...patch } : item)),
+    );
+  };
+
+  const removeWebhookMapping = (index: number) => {
+    setWebhookMappings((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const saveTriggerSettings = async () => {
+    try {
+      setSavingTriggerSettings(true);
+
+      if (automation?.trigger === "new_message_received") {
+        selectedNode && updateNodeData(selectedNode.id, { keywords });
+      }
+
+      if (automation?.trigger === "webhook_received") {
+        const cleanMappings = webhookMappings
+          .map((m) => ({
+            source_path: m.source_path.trim(),
+            attribute_key: m.attribute_key.trim(),
+          }))
+          .filter((m) => m.source_path && m.attribute_key);
+
+        await automationService.updateAutomation(automation._id, {
+          trigger_config: {
+            ...(automation.trigger_config || {}),
+            webhook_mappings: cleanMappings,
+          },
+        });
+        queryClient.invalidateQueries({ queryKey: ["automation", id] });
+      }
+
+      setOpenTriggerPopup(false);
+    } catch (err) {
+      console.error("❌ saveTriggerSettings error:", err);
+      alert("Failed to save trigger settings");
+    } finally {
+      setSavingTriggerSettings(false);
+    }
+  };
 
   /* =========================
      LOAD FLOW
@@ -994,28 +1144,6 @@ const AutomationBuilder = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
-
-  useEffect(() => {
-    if (nodes.length === 0) {
-      const triggerNode: Node<CustomNodeData> = {
-        id: "trigger",
-        type: "custom",
-        position: { x: 200, y: 200 },
-        data: {
-          id: "trigger",
-          type: "trigger",
-          label: "trigger",
-
-          // 🔥 THIS WAS MISSING
-          triggerType: "all",
-          keywords: []
-        },
-      };
-
-      setNodes([triggerNode]);
-    }
-  }, []);
-
 
   useEffect(() => {
     const handleClick = (e: any) => {
@@ -1695,20 +1823,177 @@ const AutomationBuilder = () => {
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
               <Box sx={{ p: 2, borderRadius: "10px", bgcolor: "#f5f3ff", border: "1px solid #ddd6fe" }}>
                 <Typography fontSize={13} color="#5b21b6">
-                  🔗 This automation fires when a custom webhook is invoked.
+                  🔗 This automation fires when a custom webhook receives a POST request.
                 </Typography>
               </Box>
               <Box>
                 <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.6, mb: 0.75 }}>
                   Webhook URL
                 </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#6b7280", mb: 0.75 }}>
+                  Send JSON here with a phone field like <strong>phone</strong>, <strong>phone_number</strong>, <strong>contact_phone</strong>, <strong>mobile</strong>, or <strong>to</strong> to run this automation for a contact.
+                </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
                   <TextField
                     fullWidth size="small" InputProps={{ readOnly: true }}
-                    value={`${(apiBase || `${typeof window !== "undefined" ? window.location.origin : ""}`).replace(/\/+$/, "")}/webhook/custom?automation_id=${automation?._id}`}
+                    value={customWebhookUrl}
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontFamily: "monospace", fontSize: 11.5 } }}
                   />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => navigator.clipboard.writeText(customWebhookUrl)}
+                    sx={{ borderRadius: "8px", flexShrink: 0, fontWeight: 600 }}
+                  >
+                    Copy
+                  </Button>
                 </Box>
+              </Box>
+
+              <Alert severity="info" sx={{ borderRadius: "8px", fontSize: 12 }}>
+                Incoming payload fields are sources. Map them below to destination contact fields; every new webhook value will be saved before the automation continues.
+              </Alert>
+
+              <Box sx={{ p: 1.5, borderRadius: "10px", bgcolor: "#fff", border: "1px solid #e5e7eb" }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                  <Box>
+                    <Typography fontSize={11} fontWeight={700} color="#374151">
+                      Source → Contact Field
+                    </Typography>
+                    <Typography fontSize={11} color="#6b7280">
+                      Pick source keys from the latest test payload and save them into contact fields.
+                    </Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    onClick={addWebhookMapping}
+                    sx={{ fontSize: 11, minWidth: 0, px: 1, color: "#7c3aed", fontWeight: 700 }}
+                  >
+                    + Add
+                  </Button>
+                </Stack>
+
+                {webhookMappings.length === 0 ? (
+                  <Typography fontSize={11.5} color="#9ca3af">
+                    No mappings yet. Send a test payload, then add the fields you want to keep.
+                  </Typography>
+                ) : (
+                  <Stack spacing={1}>
+                    {webhookMappings.map((mapping, index) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr 32px",
+                          gap: 1,
+                          alignItems: "center",
+                        }}
+                      >
+                        <TextField
+                          select={webhookSourcePaths.length > 0}
+                          size="small"
+                          label="Source"
+                          value={mapping.source_path}
+                          onChange={(e) => updateWebhookMapping(index, { source_path: e.target.value })}
+                          placeholder="data.item_name"
+                          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                          InputLabelProps={{ shrink: true }}
+                        >
+                          {webhookSourcePaths.map((path) => (
+                            <MenuItem key={path} value={path} sx={{ fontSize: 12, fontFamily: "monospace" }}>
+                              {path}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+
+                        <TextField
+                          select={webhookDestinationFields.length > 0}
+                          size="small"
+                          label="Destination Contact Field"
+                          value={mapping.attribute_key}
+                          onChange={(e) => updateWebhookMapping(index, { attribute_key: e.target.value })}
+                          placeholder="item_name"
+                          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                          InputLabelProps={{ shrink: true }}
+                        >
+                          {webhookDestinationFields.map((attr) => (
+                            <MenuItem key={attr.id} value={attr.id} sx={{ fontSize: 12 }}>
+                              {attr.name} ({attr.id})
+                            </MenuItem>
+                          ))}
+                        </TextField>
+
+                        <IconButton
+                          size="small"
+                          onClick={() => removeWebhookMapping(index)}
+                          sx={{ color: "#ef4444", "&:hover": { bgcolor: "#fef2f2" } }}
+                        >
+                          ✕
+                        </IconButton>
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
+
+                {contactAttributes.length === 0 && (
+                  <Typography fontSize={11} color="#dc2626" sx={{ mt: 1 }}>
+                    No contact fields found. Create destination fields from Contact Fields first, or type a field key after a field exists.
+                  </Typography>
+                )}
+              </Box>
+
+              <Box sx={{ p: 1.5, borderRadius: "10px", bgcolor: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                  <Typography fontSize={11} fontWeight={700} color="#374151">
+                    Recent Test Payloads
+                  </Typography>
+                  <Button
+                    size="small"
+                    onClick={() => refetchWebhookLogs()}
+                    disabled={webhookLogsLoading}
+                    sx={{ fontSize: 11, minWidth: 0, px: 1, color: "#7c3aed", fontWeight: 700 }}
+                  >
+                    {webhookLogsLoading ? "Refreshing..." : "Refresh"}
+                  </Button>
+                </Stack>
+
+                {webhookLogs.length === 0 ? (
+                  <Typography fontSize={11.5} color="#9ca3af">
+                    No webhook payload received yet. Send a POST request to the URL above and it will appear here.
+                  </Typography>
+                ) : (
+                  <Stack spacing={1}>
+                    {webhookLogs.slice(0, 3).map((log: any) => (
+                      <Box key={log._id} sx={{ bgcolor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden" }}>
+                        <Box sx={{ px: 1.25, py: 0.75, borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", gap: 1 }}>
+                          <Typography fontSize={10.5} color="#6b7280" fontFamily="monospace">
+                            {log.method || "POST"}
+                          </Typography>
+                          <Typography fontSize={10.5} color="#6b7280">
+                            {log.received_at ? new Date(log.received_at).toLocaleString() : ""}
+                          </Typography>
+                        </Box>
+                        <Box
+                          component="pre"
+                          sx={{
+                            m: 0,
+                            p: 1.25,
+                            maxHeight: 160,
+                            overflow: "auto",
+                            fontSize: 10.5,
+                            lineHeight: 1.5,
+                            fontFamily: "monospace",
+                            color: "#374151",
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {JSON.stringify(log.payload || {}, null, 2)}
+                        </Box>
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
               </Box>
             </Box>
           )}
@@ -1789,15 +2074,11 @@ const AutomationBuilder = () => {
           </Button>
           <Button
             variant="contained"
-            onClick={() => {
-              if (automation?.trigger === "new_message_received") {
-                selectedNode && updateNodeData(selectedNode.id, { keywords });
-              }
-              setOpenTriggerPopup(false);
-            }}
+            onClick={saveTriggerSettings}
+            disabled={savingTriggerSettings}
             sx={{ borderRadius: "8px", fontWeight: 600, fontSize: 13, px: 2.5, bgcolor: "#f97316", "&:hover": { bgcolor: "#ea580c" }, boxShadow: "none" }}
           >
-            Save Settings
+            {savingTriggerSettings ? "Saving..." : "Save Settings"}
           </Button>
         </Box>
       </Dialog>

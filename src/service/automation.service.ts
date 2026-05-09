@@ -141,6 +141,16 @@ class AutomationService {
       throw error;
     }
   }
+
+  async getWebhookLogs(id: string) {
+    try {
+      const response = await axiosServices.get(`/automations/${id}/webhook-logs`);
+      return response.data.logs || [];
+    } catch (error) {
+      console.error("❌ getWebhookLogs error:", error);
+      throw error;
+    }
+  }
 }
 
 const automationService = new AutomationService();

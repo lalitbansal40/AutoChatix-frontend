@@ -5,6 +5,7 @@ import GoogleSheetEditor from "./GoogleSheetEditor";
 import IntegrationActionEditor from "./IntegrationActionEditor";
 import BuiltinNodeEditor from "./BuiltinNodeEditor";
 import ProductNodeEditor from "./ProductNodeEditor";
+import ApiRequestEditor from "./ApiRequestEditor";
 
 export const NODE_EDITORS: any = {
   auto_reply: AutoReplyEditor,
@@ -16,11 +17,11 @@ export const NODE_EDITORS: any = {
   integration_action: IntegrationActionEditor,
   single_product: ProductNodeEditor,
   product_list: ProductNodeEditor,
+  api_request: ApiRequestEditor,
   ask_location: BuiltinNodeEditor,
   address_message: BuiltinNodeEditor,
   distance_check: BuiltinNodeEditor,
   call_to_action: BuiltinNodeEditor,
-  api_request: BuiltinNodeEditor,
   send_flow: BuiltinNodeEditor,
   send_template: BuiltinNodeEditor,
 };
