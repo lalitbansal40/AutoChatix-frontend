@@ -236,6 +236,60 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
     ],
   },
 
+  /* ─── whatsapp_payment (native WA Order Details + Pay) ─── */
+  whatsapp_payment: {
+    root: "config",
+    fields: [
+      f.boolean("use_last_order", "Use Last Order Items", {
+        defaultValue: false,
+        helperText: "When on, items come from the contact's latest WhatsApp catalog order.",
+      }),
+      f.lineItems("manual_items", "Order Items", {
+        defaultValue: [{ name: "Item", qty: "1", price: "" }],
+        placeholder: "Product / Service",
+        helperText: "Used only when Use Last Order is off.",
+        visibleWhen: { field: "use_last_order", equals: false },
+      }),
+      f.lineItems("additional_rows", "Extra Charges", {
+        defaultValue: [],
+        placeholder: "Delivery Fee / Tax / Packing",
+        helperText: "Added on top of order items (treated as shipping).",
+      }),
+      f.text("currency", "Currency", {
+        defaultValue: "INR",
+        supportsInterpolation: false,
+        helperText: "ISO currency code, e.g. INR",
+      }),
+      f.select("payment_type", "Order Type", ["digital-goods", "physical-goods", "appointment"], {
+        defaultValue: "digital-goods",
+        supportsInterpolation: false,
+      }),
+      f.text("razorpay_config_name", "Razorpay Config Name", {
+        placeholder: "Name set in Meta Business Manager",
+        helperText: "The Razorpay payment configuration registered under your WABA in Meta.",
+        supportsInterpolation: false,
+      }),
+      f.text("razorpay_receipt", "Receipt / Reference ID", {
+        placeholder: "{{contact.phone}} or order_{{order_id}}",
+        helperText: "Unique receipt ID sent to Razorpay (supports {{variables}}).",
+        defaultValue: "",
+      }),
+      f.textarea("body", "Message Body", {
+        defaultValue: "Here is your order summary. Tap to review and pay. 💳",
+        helperText: "Message shown above the order items.",
+      }),
+      f.text("footer", "Footer", {
+        placeholder: "e.g. Thank you for shopping with us",
+        helperText: "Optional footer text.",
+      }),
+      f.text("save_to", "Save Payment Result As", {
+        defaultValue: "wa_payment",
+        supportsInterpolation: false,
+        helperText: "After payment, result is in {{wa_payment.status}}, {{wa_payment.transaction_id}}, etc.",
+      }),
+    ],
+  },
+
   /* ─── payment_summary (legacy — config.title/rows[]/button_text) ─── */
   payment_summary: {
     root: "config",

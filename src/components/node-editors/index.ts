@@ -25,4 +25,6 @@ export const NODE_EDITORS: any = {
   send_flow: BuiltinNodeEditor,
   send_template: BuiltinNodeEditor,
   razorpay_payment: BuiltinNodeEditor,
+  whatsapp_payment: BuiltinNodeEditor,
+  payment_summary: BuiltinNodeEditor,
 };

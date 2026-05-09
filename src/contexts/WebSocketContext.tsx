@@ -21,12 +21,32 @@ const WebSocketContext = createContext<WebSocketContextType>({
 
 export const useWebSocketChat = () => useContext(WebSocketContext);
 
+// Send a ping every 2 minutes so API Gateway doesn't close the idle connection (10-min timeout)
+const PING_INTERVAL_MS = 2 * 60 * 1000;
+
 export const WebSocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false);
   const { isLoggedIn, user } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const handlersRef = useRef<Set<(msg: WsMessage) => void>>(new Set());
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>();
+  const pingTimer = useRef<ReturnType<typeof setInterval>>();
+
+  const stopPing = () => {
+    if (pingTimer.current) {
+      clearInterval(pingTimer.current);
+      pingTimer.current = undefined;
+    }
+  };
+
+  const startPing = (ws: WebSocket) => {
+    stopPing();
+    pingTimer.current = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, PING_INTERVAL_MS);
+  };
 
   const connect = useCallback((accountId: string) => {
     const wsUrl = process.env.REACT_APP_WS_URL;
@@ -44,18 +64,21 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
     ws.onopen = () => {
       console.log('[WS] Connected ✅');
       setIsConnected(true);
+      startPing(ws);
     };
 
     ws.onmessage = (event) => {
       try {
         const data: WsMessage = JSON.parse(event.data);
-        console.log('[WS] Message received:', data);
+        // Ignore server pong — it's just a keepalive ack
+        if ((data as any).type === 'pong') return;
         handlersRef.current.forEach((handler) => handler(data));
       } catch {}
     };
 
     ws.onclose = () => {
       console.log('[WS] Disconnected, reconnecting in 3s...');
+      stopPing();
       setIsConnected(false);
       reconnectTimer.current = setTimeout(() => {
         if (accountId) connect(accountId);
@@ -66,15 +89,15 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
       console.error('[WS] Error:', err);
       ws.close();
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const accountId = (user as any)?.account_id || user?._id || user?.id;
-    console.log('[WS] Auth changed — isLoggedIn:', isLoggedIn, 'accountId:', accountId);
     if (isLoggedIn && accountId) {
       connect(accountId);
     } else {
       clearTimeout(reconnectTimer.current);
+      stopPing();
       wsRef.current?.close();
       wsRef.current = null;
       setIsConnected(false);
