@@ -91,29 +91,31 @@ const Channels = () => {
     sessionInfoRef.current = {};
 
     window.FB.login(
-      async (response: any) => {
+      (response: any) => {
         if (!response.authResponse?.code) {
           setToast({ open: true, message: 'Connection cancelled or failed. Please try again.', severity: 'error' });
           return;
         }
 
         setConnecting(true);
-        try {
-          await channelService.connectViaEmbeddedSignup({
+        channelService
+          .connectViaEmbeddedSignup({
             code: response.authResponse.code,
             waba_id: sessionInfoRef.current.waba_id,
             phone_number_id: sessionInfoRef.current.phone_number_id,
             display_phone_number: sessionInfoRef.current.display_phone_number,
+          })
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ['channels'] });
+            setToast({ open: true, message: 'WhatsApp channel connected successfully!', severity: 'success' });
+          })
+          .catch((err: any) => {
+            const msg = err?.response?.data?.message || err?.message || 'Failed to connect channel. Please try again.';
+            setToast({ open: true, message: msg, severity: 'error' });
+          })
+          .finally(() => {
+            setConnecting(false);
           });
-          // Refresh the channels list
-          queryClient.invalidateQueries({ queryKey: ['channels'] });
-          setToast({ open: true, message: 'WhatsApp channel connected successfully!', severity: 'success' });
-        } catch (err: any) {
-          const msg = err?.message || err?.response?.data?.message || 'Failed to connect channel. Please try again.';
-          setToast({ open: true, message: msg, severity: 'error' });
-        } finally {
-          setConnecting(false);
-        }
       },
       {
         config_id: META_CONFIG_ID,
