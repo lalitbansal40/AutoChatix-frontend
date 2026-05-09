@@ -638,6 +638,165 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
       );
     }
 
+    if (type === 'order') {
+      const orderData = payload?.order || payload;
+      const items: any[] = orderData?.product_items || [];
+      const total = items.reduce((sum: number, i: any) => sum + (Number(i.item_price) * Number(i.quantity || 1)), 0);
+      const currency = items[0]?.currency || 'INR';
+      const note = orderData?.text;
+      return (
+        <Box sx={{ minWidth: 220, maxWidth: 280, borderRadius: '12px', overflow: 'hidden', border: '1px solid #d1fae5', bgcolor: '#f0fdf4' }}>
+          <Box sx={{ px: 2, py: 1.25, bgcolor: '#065f46', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography fontSize={18} lineHeight={1}>🛒</Typography>
+            <Box>
+              <Typography fontSize={13} fontWeight={700} color="#fff">Order Received</Typography>
+              <Typography fontSize={11} color="#a7f3d0">{items.length} item{items.length !== 1 ? 's' : ''}</Typography>
+            </Box>
+          </Box>
+          <Box sx={{ px: 2, py: 1 }}>
+            {items.map((item: any, i: number) => (
+              <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5, borderBottom: i < items.length - 1 ? '1px solid #d1fae5' : 'none' }}>
+                <Box>
+                  <Typography fontSize={12} fontWeight={600} color="#065f46">{item.product_retailer_id}</Typography>
+                  <Typography fontSize={11} color="#6b7280">Qty: {item.quantity || 1}</Typography>
+                </Box>
+                <Typography fontSize={12} fontWeight={600} color="#111827">{currency} {(Number(item.item_price) * Number(item.quantity || 1)).toFixed(2)}</Typography>
+              </Box>
+            ))}
+            {note && <Typography fontSize={12} color="#6b7280" sx={{ mt: 0.75, fontStyle: 'italic' }}>"{note}"</Typography>}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, pt: 0.75, borderTop: '1px solid #d1fae5' }}>
+              <Typography fontSize={13} fontWeight={700} color="#065f46">Total</Typography>
+              <Typography fontSize={13} fontWeight={800} color="#065f46">{currency} {total.toFixed(2)}</Typography>
+            </Box>
+          </Box>
+        </Box>
+      );
+    }
+
+    if (type === 'product_list' || type === 'single_product') {
+      const action = payload?.interactive?.action || payload?.action || {};
+      const catalogId = action?.catalog_id || payload?.catalog_id || '';
+      const sections = action?.sections || [];
+      const singleProduct = action?.product_retailer_id || '';
+      const bodyText = payload?.interactive?.body?.text || payload?.body?.text || payload?.bodyText || 'Browse our catalog';
+      const headerText = payload?.interactive?.header?.text || payload?.header?.text || '';
+      const footerText = payload?.interactive?.footer?.text || payload?.footer?.text || '';
+      const totalProducts = type === 'single_product' ? 1 : sections.reduce((s: number, sec: any) => s + (sec?.product_items?.length || 0), 0);
+      return (
+        <Box sx={{ minWidth: 220, maxWidth: 280, borderRadius: '12px', overflow: 'hidden', border: '1px solid #bfdbfe', bgcolor: '#eff6ff' }}>
+          <Box sx={{ px: 2, py: 1.25, bgcolor: '#1d4ed8', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography fontSize={18} lineHeight={1}>🏪</Typography>
+            <Box>
+              <Typography fontSize={13} fontWeight={700} color="#fff">{type === 'single_product' ? 'Product' : 'Catalog'}</Typography>
+              <Typography fontSize={11} color="#bfdbfe">{totalProducts > 0 ? `${totalProducts} product${totalProducts !== 1 ? 's' : ''}` : catalogId}</Typography>
+            </Box>
+          </Box>
+          <Box sx={{ px: 2, py: 1.25 }}>
+            {headerText && <Typography fontSize={13} fontWeight={600} color="#1e3a8a" mb={0.5}>{headerText}</Typography>}
+            <Typography fontSize={13} color="#374151" sx={{ whiteSpace: 'pre-wrap' }}>{bodyText}</Typography>
+            {singleProduct && <Typography fontSize={11} color="#6b7280" mt={0.5}>SKU: {singleProduct}</Typography>}
+            {footerText && <Typography fontSize={11} color="#9ca3af" mt={0.5}>{footerText}</Typography>}
+            <Box sx={{ mt: 1, py: 0.75, textAlign: 'center', border: '1px solid #93c5fd', borderRadius: '8px', color: '#1d4ed8', fontWeight: 600, fontSize: 12.5 }}>
+              🛍️ View {type === 'single_product' ? 'Product' : 'Catalog'}
+            </Box>
+          </Box>
+        </Box>
+      );
+    }
+
+    if (type === 'order_details') {
+      const orderRef = payload?.order_reference || payload?.order_details?.reference_id || '';
+      const totalAmount = payload?.total_amount?.value || payload?.order_details?.total_amount || 0;
+      const currency = payload?.total_amount?.currency_code || 'INR';
+      const items: any[] = payload?.order_details?.order?.items || payload?.order?.items || [];
+      return (
+        <Box sx={{ minWidth: 220, maxWidth: 280, borderRadius: '12px', overflow: 'hidden', border: '1px solid #fed7aa', bgcolor: '#fff7ed' }}>
+          <Box sx={{ px: 2, py: 1.25, bgcolor: '#c2410c', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography fontSize={18} lineHeight={1}>📦</Typography>
+            <Box>
+              <Typography fontSize={13} fontWeight={700} color="#fff">Order Details</Typography>
+              {orderRef && <Typography fontSize={11} color="#fed7aa">Ref: {orderRef}</Typography>}
+            </Box>
+          </Box>
+          <Box sx={{ px: 2, py: 1.25 }}>
+            {items.slice(0, 3).map((item: any, i: number) => (
+              <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.4 }}>
+                <Typography fontSize={12} color="#374151">{item.name || item.retailer_id}</Typography>
+                <Typography fontSize={12} fontWeight={600}>{item.amount?.value || item.price || ''}</Typography>
+              </Box>
+            ))}
+            {totalAmount > 0 && (
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75, pt: 0.75, borderTop: '1px solid #fed7aa' }}>
+                <Typography fontSize={13} fontWeight={700} color="#c2410c">Total</Typography>
+                <Typography fontSize={13} fontWeight={800} color="#c2410c">{currency} {totalAmount}</Typography>
+              </Box>
+            )}
+            <Box sx={{ mt: 1, py: 0.75, textAlign: 'center', bgcolor: '#c2410c', borderRadius: '8px', color: '#fff', fontWeight: 700, fontSize: 13 }}>
+              💳 Pay Now
+            </Box>
+          </Box>
+        </Box>
+      );
+    }
+
+    if (type === 'payment_status') {
+      const status = (payload?.payment?.status || payload?.status || '').toLowerCase();
+      const isApproved = status === 'approved' || status === 'success';
+      const isDeclined = status === 'declined' || status === 'failed';
+      const icon = isApproved ? '✅' : isDeclined ? '❌' : '⏳';
+      const label = isApproved ? 'Payment Successful' : isDeclined ? 'Payment Failed' : 'Payment Pending';
+      const color = isApproved ? '#16a34a' : isDeclined ? '#dc2626' : '#d97706';
+      const bg = isApproved ? '#f0fdf4' : isDeclined ? '#fef2f2' : '#fffbeb';
+      const border = isApproved ? '#bbf7d0' : isDeclined ? '#fecaca' : '#fde68a';
+      const amount = payload?.payment?.amount || payload?.amount || '';
+      const method = payload?.payment?.method || '';
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1, borderRadius: '10px', bgcolor: bg, border: `1px solid ${border}`, minWidth: 180 }}>
+          <Typography fontSize={22} lineHeight={1}>{icon}</Typography>
+          <Box>
+            <Typography fontSize={13} fontWeight={700} color={color}>{label}</Typography>
+            {amount && <Typography fontSize={11} color="#6b7280">Amount: {amount}</Typography>}
+            {method && <Typography fontSize={11} color="#9ca3af">{method}</Typography>}
+          </Box>
+        </Box>
+      );
+    }
+
+    if (type === 'call') {
+      const callData = history?.call || payload?.call || payload;
+      const callStatus = (callData?.status || '').toUpperCase();
+      const direction = history?.direction || 'IN';
+
+      const isCompleted = callStatus === 'COMPLETED' || history?.status === 'CALL_COMPLETED';
+      const isMissed = ['NO_ANSWER', 'FAILED', 'BUSY', 'REJECTED'].includes(callStatus) ||
+        (history?.status || '').startsWith('CALL_') && !isCompleted;
+
+      const icon = direction === 'IN'
+        ? (isCompleted ? '📞' : '📵')
+        : '📲';
+
+      const label = direction === 'IN'
+        ? (isCompleted ? 'Incoming Call' : 'Missed Call')
+        : 'Outgoing Call';
+
+      const statusLabel = isCompleted ? 'Completed' : isMissed ? 'Missed' : callStatus || 'Unknown';
+      const color = isCompleted ? '#16a34a' : isMissed ? '#dc2626' : '#6b7280';
+      const bg = isCompleted ? '#f0fdf4' : isMissed ? '#fef2f2' : '#f9fafb';
+      const border = isCompleted ? '#bbf7d0' : isMissed ? '#fecaca' : '#e5e7eb';
+
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1, borderRadius: '10px', bgcolor: bg, border: `1px solid ${border}`, minWidth: 180 }}>
+          <Box sx={{ width: 36, height: 36, borderRadius: '50%', bgcolor: '#fff', border: `2px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+            {icon}
+          </Box>
+          <Box>
+            <Typography fontSize={13} fontWeight={700} color={color}>{label}</Typography>
+            <Typography fontSize={11} color="#6b7280">{statusLabel}</Typography>
+          </Box>
+        </Box>
+      );
+    }
+
     if (type === 'media_group') {
       const files: any[] = payload?.files || [];
       return (

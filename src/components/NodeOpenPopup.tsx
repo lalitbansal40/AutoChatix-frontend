@@ -30,6 +30,8 @@ const NODE_STYLE: Record<string, { color: string; bg: string; icon: string; labe
   borzo_delivery:        { color: "#dc2626", bg: "#fef2f2", icon: "🚚", label: "Borzo" },
   distance_check:        { color: "#6366f1", bg: "#eef2ff", icon: "📏", label: "Distance" },
   integration_action:    { color: "#0891b2", bg: "#ecfeff", icon: "🔌", label: "Integration" },
+  single_product:        { color: "#db2777", bg: "#fdf2f8", icon: "🛒", label: "Single Product" },
+  product_list:          { color: "#db2777", bg: "#fdf2f8", icon: "🛍️", label: "Product List" },
 };
 const DEFAULT_STYLE = { color: "#6b7280", bg: "#f9fafb", icon: "⚙️", label: "Node" };
 

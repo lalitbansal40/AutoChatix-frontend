@@ -11,6 +11,8 @@ import Automations from 'pages/Automation';
 import AutomationBuilder from 'pages/AutomationBuilder';
 import Integrations from 'pages/Integrations';
 import ContactFields from 'pages/ContactFields';
+import CallLogs from 'pages/CallLogs';
+import ECommerce from 'pages/ECommerce';
 
 // pages routing
 const MaintenanceError = Loadable(lazy(() => import('pages/maintenance/404')));
@@ -61,6 +63,14 @@ const MainRoutes = {
         {
           path: 'contact-fields',
           element: <ContactFields />
+        },
+        {
+          path: 'calls',
+          element: <CallLogs />
+        },
+        {
+          path: 'ecommerce',
+          element: <ECommerce />
         }
       ]
     },

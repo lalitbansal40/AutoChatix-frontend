@@ -37,8 +37,9 @@ const SectionLabel = ({ children, mb = 1 }: { children: any; mb?: number }) => (
   </Typography>
 );
 
-const createQuickReplyId = () =>
-  `b${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`.slice(0, 20);
+const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const genId = (len = 16) =>
+  Array.from({ length: len }, () => CHARS[Math.floor(Math.random() * CHARS.length)]).join("");
 
 const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
   const [messageType, setMessageType] = useState(
@@ -49,7 +50,6 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
 
   const data = node?.data || {};
   const buttons = data.buttons || [];
-  const nodesList = allNodes || [];
 
   const switchType = (v: string) => {
     setMessageType(v);
@@ -65,7 +65,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
 
   const handleAddButton = () => {
     updateNodeData(node.id, {
-      buttons: [...buttons, { id: createQuickReplyId(), title: "New Button", type: "quick_reply" }],
+      buttons: [...buttons, { id: genId(), title: "New Button", type: "quick_reply" }],
     });
   };
 
@@ -124,7 +124,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
       updateNodeData(node.id, {
         sections: [{
           title: "Section 1",
-          rows: [{ id: `row_${Date.now()}`, title: "Option 1", description: "", nextNode: "" }],
+          rows: [{ id: genId(), title: "Option 1", description: "" }],
         }],
       });
     }
@@ -133,7 +133,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
   useEffect(() => {
     if (messageType === "carousel" && (!node.data.cards || node.data.cards.length === 0)) {
       updateNodeData(node.id, {
-        cards: [{ id: `card_${Date.now()}`, media: null, body: "", buttons: [] }],
+        cards: [{ id: genId(), media: null, body: "", buttons: [] }],
       });
     }
   }, [messageType, node.data.cards]);
@@ -255,16 +255,10 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                   </Box>
 
                   {btn.type === "quick_reply" && (
-                    <TextField
-                      select fullWidth size="small" label="Next Node"
-                      value={btn.nextNode || ""}
-                      onChange={(e) => updateBtn(i, { nextNode: e.target.value })}
-                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
-                    >
-                      {nodesList.map((n: any) => (
-                        <MenuItem key={n.id} value={n.id}>{n.data?.label || n.id}</MenuItem>
-                      ))}
-                    </TextField>
+                    <Box sx={{ px: 1, py: 0.5, borderRadius: "6px", bgcolor: "#f3f4f6", border: "1px dashed #d1d5db" }}>
+                      <Typography sx={{ fontSize: 10, color: "#6b7280", mb: 0.25 }}>Handle ID (drag on canvas to connect)</Typography>
+                      <Typography sx={{ fontSize: 11, fontFamily: "monospace", fontWeight: 600, color: "#374151" }}>{btn.id}</Typography>
+                    </Box>
                   )}
                   {btn.type === "flow" && (
                     <TextField
@@ -373,7 +367,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                     {(section.rows || []).map((row: any, ri: number) => (
                       <Box
                         key={row.id}
-                        sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 36px", gap: 1, alignItems: "center", p: 1, borderRadius: "8px", bgcolor: "#f9fafb", border: "1px solid #f3f4f6" }}
+                        sx={{ display: "grid", gridTemplateColumns: "1fr 1fr auto 36px", gap: 1, alignItems: "center", p: 1, borderRadius: "8px", bgcolor: "#f9fafb", border: "1px solid #f3f4f6" }}
                       >
                         <TextField
                           size="small" placeholder="Title"
@@ -395,20 +389,10 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                           }}
                           sx={{ "& .MuiOutlinedInput-root": { borderRadius: "6px", fontSize: 12 } }}
                         />
-                        <TextField
-                          select size="small" label="Next Node"
-                          value={row.nextNode || ""}
-                          onChange={(e) => {
-                            const updated = JSON.parse(JSON.stringify(data.sections));
-                            updated[si].rows[ri].nextNode = e.target.value;
-                            updateNodeData(node.id, { sections: updated });
-                          }}
-                          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "6px", fontSize: 12 } }}
-                        >
-                          {nodesList.map((n: any) => (
-                            <MenuItem key={n.id} value={n.id}>{n.data?.label || n.id}</MenuItem>
-                          ))}
-                        </TextField>
+                        <Box sx={{ px: 1, py: 0.5, borderRadius: "6px", bgcolor: "#f3f4f6", border: "1px dashed #d1d5db", minWidth: 0 }}>
+                          <Typography sx={{ fontSize: 9, color: "#6b7280" }}>ID</Typography>
+                          <Typography sx={{ fontSize: 10, fontFamily: "monospace", fontWeight: 600, color: "#374151" }} noWrap>{row.id}</Typography>
+                        </Box>
                         <IconButton
                           size="small"
                           onClick={() => {
@@ -430,7 +414,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                       size="small" startIcon={<AddIcon />} variant="outlined"
                       onClick={() => {
                         const updated = JSON.parse(JSON.stringify(data.sections));
-                        updated[si].rows.push({ id: `row_${Date.now()}`, title: "New Option", description: "", nextNode: "" });
+                        updated[si].rows.push({ id: genId(), title: "New Option", description: "" });
                         updateNodeData(node.id, { sections: updated });
                       }}
                       sx={{ mt: 1, fontSize: 11, color: "#374151", borderColor: "#e5e7eb", "&:hover": { borderColor: "#22c55e", color: "#16a34a", bgcolor: "#f0fdf4" } }}
@@ -598,20 +582,10 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                         <MenuItem value="url">URL</MenuItem>
                       </TextField>
                       {btn.type === "quick_reply" ? (
-                        <TextField
-                          select size="small"
-                          value={btn.nextNode || ""}
-                          onChange={(e) => {
-                            const updated = JSON.parse(JSON.stringify(data.cards));
-                            updated[ci].buttons[bi].nextNode = e.target.value;
-                            updateNodeData(node.id, { cards: updated });
-                          }}
-                          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "6px", fontSize: 12 } }}
-                        >
-                          {nodesList.map((n: any) => (
-                            <MenuItem key={n.id} value={n.id}>{n.data?.label || n.id}</MenuItem>
-                          ))}
-                        </TextField>
+                        <Box sx={{ px: 1, py: 0.5, borderRadius: "6px", bgcolor: "#f3f4f6", border: "1px dashed #d1d5db" }}>
+                          <Typography sx={{ fontSize: 9, color: "#6b7280" }}>ID</Typography>
+                          <Typography sx={{ fontSize: 10, fontFamily: "monospace", fontWeight: 600, color: "#374151" }} noWrap>{btn.id}</Typography>
+                        </Box>
                       ) : (
                         <TextField
                           size="small" placeholder="https://…"
@@ -646,7 +620,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
                       const updated = JSON.parse(JSON.stringify(data.cards));
                       updated[ci].buttons = [
                         ...(updated[ci].buttons || []),
-                        { id: createQuickReplyId(), title: "Button", type: "quick_reply", nextNode: "" },
+                        { id: genId(), title: "Button", type: "quick_reply" },
                       ];
                       updateNodeData(node.id, { cards: updated });
                     }}
@@ -664,7 +638,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
               variant="outlined" startIcon={<AddIcon />}
               onClick={() => {
                 updateNodeData(node.id, {
-                  cards: [...(data.cards || []), { id: `card_${Date.now()}`, media: null, body: "", buttons: [] }],
+                  cards: [...(data.cards || []), { id: genId(), media: null, body: "", buttons: [] }],
                 });
               }}
               sx={{ mt: 1.5, borderRadius: "8px", borderColor: "#e5e7eb", color: "#374151", fontSize: 12, fontWeight: 600, "&:hover": { borderColor: "#22c55e", color: "#16a34a", bgcolor: "#f0fdf4" } }}

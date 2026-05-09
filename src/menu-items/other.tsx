@@ -2,7 +2,7 @@
 import { FormattedMessage } from 'react-intl';
 
 // assets
-import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined } from '@ant-design/icons';
+import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined } from '@ant-design/icons';
 
 // type
 import { NavItemType } from 'types/menu';
@@ -16,6 +16,8 @@ const icons = {
   RobotOutlined,
   ApiOutlined,
   TagsOutlined,
+  PhoneOutlined,
+  ShoppingOutlined,
 };
 
 // ==============================|| MENU ITEMS - SUPPORT ||============================== //
@@ -45,6 +47,20 @@ const other: NavItemType = {
       type: 'item',
       url: '/automations',
       icon: icons.DeploymentUnitOutlined
+    },
+    {
+      id: 'CallLogs',
+      title: <FormattedMessage id="Call Logs" />,
+      type: 'item',
+      url: '/calls',
+      icon: icons.PhoneOutlined
+    },
+    {
+      id: 'ECommerce',
+      title: <FormattedMessage id="E-Commerce" />,
+      type: 'item',
+      url: '/ecommerce',
+      icon: icons.ShoppingOutlined
     },
     {
       id: 'Integrations',

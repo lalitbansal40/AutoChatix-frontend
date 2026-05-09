@@ -21,6 +21,11 @@ class MessageService {
     const res = await axiosServices.post("/message/send-media", formData);
     return res.data;
   }
+
+  async getCallLogs(params?: { channel_id?: string; cursor?: string; status?: string; limit?: number }) {
+    const res = await axiosServices.get("/message/calls/logs", { params });
+    return res.data;
+  }
 }
 
 export const messageService = new MessageService();

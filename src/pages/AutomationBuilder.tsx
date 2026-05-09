@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -127,6 +127,19 @@ const NODE_CONFIG: any = {
     pickup: {},
     drop: {},
   },
+
+  single_product: {
+    catalog_id: "",
+    product_retailer_id: "",
+    body: "Check out this product 👇",
+  },
+
+  product_list: {
+    catalog_id: "",
+    header: "",
+    body: "Browse our products 👇",
+    sections: [{ title: "Featured", rows: [{ product_retailer_id: "" }] }],
+  },
 };
 
 /* =========================
@@ -173,8 +186,14 @@ const NODE_STYLE: Record<string, { color: string; bg: string; icon: string; labe
   borzo_delivery: { color: "#dc2626", bg: "#fef2f2", icon: "🚚", label: "Borzo" },
   distance_check: { color: "#6366f1", bg: "#eef2ff", icon: "📏", label: "Distance" },
   integration_action: { color: "#0891b2", bg: "#ecfeff", icon: "🔌", label: "Integration" },
+  single_product:     { color: "#db2777", bg: "#fdf2f8", icon: "🛒", label: "Single Product" },
+  product_list:       { color: "#db2777", bg: "#fdf2f8", icon: "🛍️", label: "Product List" },
 };
 const DEFAULT_STYLE = { color: "#6b7280", bg: "#f9fafb", icon: "⚙️", label: "Node" };
+
+const ID_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const genId = (len = 16) =>
+  Array.from({ length: len }, () => ID_CHARS[Math.floor(Math.random() * ID_CHARS.length)]).join("");
 
 const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
   const { disconnectRow } = data;
@@ -471,6 +490,10 @@ const AutomationBuilder = () => {
   const [keywords, setKeywords] = useState<string[]>([]);
   const [input, setInput] = useState("");
 
+  const connectingNodeRef = useRef<{ nodeId: string | null; handleId: string | null }>({ nodeId: null, handleId: null });
+  const pendingEdgeRef = useRef<{ sourceNodeId: string; sourceHandleId: string | null } | null>(null);
+  const suppressNextClickRef = useRef(false);
+
   const closeMenu = () => setAnchorEl(null);
 
   const disconnectRow = (nodeId: string, rowId: string) => {
@@ -501,6 +524,7 @@ const AutomationBuilder = () => {
       webhook_received: "Webhook",
       call_completed: "Call Completed",
       call_missed: "Call Missed",
+      order_received: "Order Received",
       integration_trigger: "Integration",
     };
 
@@ -515,7 +539,7 @@ const AutomationBuilder = () => {
     if (!type || !createNodePos) return;
 
     const config = NODE_CONFIG[type] || {};
-    const nodeId = `${type}_${Date.now()}`;
+    const nodeId = genId();
 
     const newNode: Node<CustomNodeData> = {
       id: nodeId,
@@ -552,16 +576,65 @@ const AutomationBuilder = () => {
       }
     };
 
-    setNodes((prev) => {
-      const updated = [...prev, newNode];
-      return updated;
-    });
+    setNodes((prev) => [...prev, newNode]);
+
+    // Auto-connect if this node was created by dragging from an existing handle
+    if (pendingEdgeRef.current) {
+      const { sourceNodeId, sourceHandleId } = pendingEdgeRef.current;
+      pendingEdgeRef.current = null;
+      setEdges((eds) => {
+        const exists = eds.find(
+          (e) => e.source === sourceNodeId && e.sourceHandle === (sourceHandleId || null)
+        );
+        if (exists) return eds;
+        return [
+          ...eds,
+          {
+            id: genId(),
+            source: sourceNodeId,
+            target: nodeId,
+            sourceHandle: sourceHandleId || null,
+            label: sourceHandleId || "",
+            type: "custom" as any,
+            animated: true,
+            style: { stroke: "#25D366", strokeWidth: 2 },
+            markerEnd: { type: MarkerType.ArrowClosed },
+          },
+        ];
+      });
+    }
 
     setCreateNodePos(null);
     setSelectedNode(newNode);
 
   };
 
+
+  const onConnectStart = (_event: any, { nodeId, handleId }: { nodeId: string | null; handleId: string | null }) => {
+    connectingNodeRef.current = { nodeId, handleId };
+  };
+
+  const onConnectEnd = (event: any) => {
+    const { nodeId, handleId } = connectingNodeRef.current;
+    connectingNodeRef.current = { nodeId: null, handleId: null };
+    if (!nodeId) return;
+
+    const target = event.target as HTMLElement;
+    // Dropped on a node/handle → connection handled by onConnect, nothing to do
+    if (target.closest(".react-flow__node") || target.closest(".react-flow__handle")) return;
+
+    // Dropped on empty canvas → show node picker and auto-connect when node is chosen
+    const reactFlowEl = document.querySelector(".react-flow");
+    const bounds = reactFlowEl?.getBoundingClientRect();
+    if (!bounds) return;
+
+    pendingEdgeRef.current = { sourceNodeId: nodeId, sourceHandleId: handleId };
+    suppressNextClickRef.current = true;
+    setCreateNodePos({
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    });
+  };
 
   const onConnect = (params: Connection) => {
     setEdges((eds) => {
@@ -808,8 +881,29 @@ const AutomationBuilder = () => {
   /* =========================
      LOAD FLOW
   ========================= */
+  const makeTriggerNode = (): Node<CustomNodeData> => ({
+    id: "trigger",
+    type: "custom",
+    position: { x: 200, y: 200 },
+    data: {
+      id: "trigger",
+      type: "trigger",
+      label: "trigger",
+      triggerType: "all",
+      keywords: [],
+      disconnectRow,
+    },
+  });
+
   useEffect(() => {
     if (!data) return;
+
+    // New automation — no nodes saved yet
+    if (!Array.isArray(data.nodes) || data.nodes.length === 0) {
+      setNodes([makeTriggerNode()]);
+      setEdges([]);
+      return;
+    }
 
     const flowNodes: Node<CustomNodeData>[] = data.nodes.map((node: any) => {
 
@@ -925,6 +1019,12 @@ const AutomationBuilder = () => {
 
   useEffect(() => {
     const handleClick = (e: any) => {
+      // Skip the click that fires immediately after a connection drag ends
+      if (suppressNextClickRef.current) {
+        suppressNextClickRef.current = false;
+        return;
+      }
+
       const target = e.target as HTMLElement;
 
       // ✅ Node create popup pe click → ignore
@@ -936,6 +1036,7 @@ const AutomationBuilder = () => {
       // 🔥 ADD THIS (ReactFlow nodes pe click ignore)
       if (target.closest(".react-flow__node")) return;
 
+      pendingEdgeRef.current = null;
       setCreateNodePos(null);
     };
 
@@ -1126,6 +1227,8 @@ const AutomationBuilder = () => {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onConnectStart={onConnectStart}
+          onConnectEnd={onConnectEnd}
           nodeOrigin={[0.5, 0.5]}
 
           deleteKeyCode={["Backspace", "Delete"]}
@@ -1501,26 +1604,90 @@ const AutomationBuilder = () => {
           )}
 
           {automation?.trigger === "call_completed" && (
-            <Box sx={{ p: 2, borderRadius: "10px", bgcolor: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-              <Typography fontSize={13} color="#166534">
-                📞 This automation fires when a call is completed.
-              </Typography>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, p: 2, borderRadius: "12px", bgcolor: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                <Box sx={{ width: 40, height: 40, borderRadius: "10px", bgcolor: "#dcfce7", border: "1px solid #bbf7d0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+                  📞
+                </Box>
+                <Box>
+                  <Typography fontSize={13} fontWeight={700} color="#166534">Call Completed</Typography>
+                  <Typography fontSize={12} color="#166534" sx={{ mt: 0.4, lineHeight: 1.5 }}>
+                    Fires automatically when a WhatsApp voice call ends successfully. Use this to send a follow-up message, log data, or trigger a workflow after every completed call.
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ p: 1.5, borderRadius: "10px", bgcolor: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                <Typography fontSize={11} fontWeight={700} color="#374151" mb={0.75}>Available variables</Typography>
+                {["{{contact.name}}", "{{contact.phone}}", "{{call.status}}", "{{call.direction}}"].map((v) => (
+                  <Box key={v} component="span" sx={{ display: "inline-block", mr: 0.75, mb: 0.5, px: 1, py: 0.25, borderRadius: "6px", bgcolor: "#e0f2fe", color: "#0369a1", fontSize: 11, fontFamily: "monospace", fontWeight: 600 }}>{v}</Box>
+                ))}
+              </Box>
             </Box>
           )}
 
           {automation?.trigger === "call_missed" && (
-            <Box sx={{ p: 2, borderRadius: "10px", bgcolor: "#fef2f2", border: "1px solid #fecaca" }}>
-              <Typography fontSize={13} color="#991b1b">
-                📵 This automation fires when a call is missed.
-              </Typography>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, p: 2, borderRadius: "12px", bgcolor: "#fef2f2", border: "1px solid #fecaca" }}>
+                <Box sx={{ width: 40, height: 40, borderRadius: "10px", bgcolor: "#fee2e2", border: "1px solid #fecaca", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+                  📵
+                </Box>
+                <Box>
+                  <Typography fontSize={13} fontWeight={700} color="#991b1b">Missed Call</Typography>
+                  <Typography fontSize={12} color="#991b1b" sx={{ mt: 0.4, lineHeight: 1.5 }}>
+                    Fires when a WhatsApp call goes unanswered, busy, rejected, or fails. Perfect for sending an automatic "Sorry we missed you" message to re-engage the contact.
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ p: 1.5, borderRadius: "10px", bgcolor: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                <Typography fontSize={11} fontWeight={700} color="#374151" mb={0.75}>Triggered when call status is</Typography>
+                {["NO_ANSWER", "BUSY", "REJECTED", "FAILED"].map((s) => (
+                  <Box key={s} component="span" sx={{ display: "inline-block", mr: 0.75, mb: 0.5, px: 1, py: 0.25, borderRadius: "6px", bgcolor: "#fee2e2", color: "#991b1b", fontSize: 11, fontFamily: "monospace", fontWeight: 600 }}>{s}</Box>
+                ))}
+              </Box>
             </Box>
           )}
 
           {automation?.trigger === "outgoing_message" && (
-            <Box sx={{ p: 2, borderRadius: "10px", bgcolor: "#eff6ff", border: "1px solid #bfdbfe" }}>
-              <Typography fontSize={13} color="#1e40af">
-                📤 This automation fires whenever an agent sends a message on this channel.
-              </Typography>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, p: 2, borderRadius: "12px", bgcolor: "#eff6ff", border: "1px solid #bfdbfe" }}>
+                <Box sx={{ width: 40, height: 40, borderRadius: "10px", bgcolor: "#dbeafe", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+                  📤
+                </Box>
+                <Box>
+                  <Typography fontSize={13} fontWeight={700} color="#1e40af">Outgoing Message</Typography>
+                  <Typography fontSize={12} color="#1e40af" sx={{ mt: 0.4, lineHeight: 1.5 }}>
+                    Fires whenever an agent sends a message from this channel. Useful for post-message follow-ups, CRM logging, or triggering workflows based on agent activity.
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          )}
+
+          {automation?.trigger === "order_received" && (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, p: 2, borderRadius: "12px", bgcolor: "#ecfdf5", border: "1px solid #6ee7b7" }}>
+                <Box sx={{ width: 40, height: 40, borderRadius: "10px", bgcolor: "#d1fae5", border: "1px solid #6ee7b7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+                  🛒
+                </Box>
+                <Box>
+                  <Typography fontSize={13} fontWeight={700} color="#065f46">Order Received</Typography>
+                  <Typography fontSize={12} color="#065f46" sx={{ mt: 0.4, lineHeight: 1.5 }}>
+                    Fires when a customer submits a product cart from your WhatsApp catalog. Use this to send an order confirmation, request payment, or kick off a fulfillment workflow automatically.
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ p: 1.5, borderRadius: "10px", bgcolor: "#f9fafb", border: "1px solid #e5e7eb" }}>
+                <Typography fontSize={11} fontWeight={700} color="#374151" mb={0.75}>Available variables</Typography>
+                {["{{contact.name}}", "{{contact.phone}}", "{{order.total}}", "{{order.item_count}}", "{{order.catalog_id}}", "{{order.note}}"].map((v) => (
+                  <Box key={v} component="span" sx={{ display: "inline-block", mr: 0.75, mb: 0.5, px: 1, py: 0.25, borderRadius: "6px", bgcolor: "#d1fae5", color: "#065f46", fontSize: 11, fontFamily: "monospace", fontWeight: 600 }}>{v}</Box>
+                ))}
+              </Box>
+              <Box sx={{ p: 1.5, borderRadius: "10px", bgcolor: "#fffbeb", border: "1px solid #fde68a" }}>
+                <Typography fontSize={12} color="#92400e" fontWeight={600} mb={0.5}>💡 Pro tip</Typography>
+                <Typography fontSize={11.5} color="#78350f" lineHeight={1.6}>
+                  Use a <strong>product_list</strong> or <strong>single_product</strong> node before this trigger to first show the catalog to the customer — the automation will advance here automatically when they submit the cart.
+                </Typography>
+              </Box>
             </Box>
           )}
 

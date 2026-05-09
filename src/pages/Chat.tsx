@@ -14,6 +14,7 @@ import {
   OutlinedInput,
   Popper,
   Stack,
+  Tooltip,
   Typography,
   useMediaQuery,
 } from '@mui/material';
@@ -38,7 +39,9 @@ import {
   PlusOutlined,
 } from '@ant-design/icons';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CallOutlinedIcon from '@mui/icons-material/CallOutlined';
 import SendIcon from '@mui/icons-material/Send';
+import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
 import { History as HistoryProps } from 'types/chat';
 import { UserProfile } from 'types/user-profile';
 import { messageService } from 'service/message.service';
@@ -80,6 +83,7 @@ const Chat = () => {
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [callDialogOpen, setCallDialogOpen] = useState(false);
   const [anchorElPlus, setAnchorElPlus] = useState<null | HTMLElement>(null);
   const openPlusMenu = Boolean(anchorElPlus);
   const [anchorElEmoji, setAnchorElEmoji] = useState<any>();
@@ -109,6 +113,8 @@ const Chat = () => {
       setDeleting(false);
     }
   };
+
+
   const handleOnEmojiButtonClick = (event: React.MouseEvent<HTMLButtonElement> | undefined) => {
     setAnchorElEmoji(anchorElEmoji ? null : event?.currentTarget);
   };
@@ -472,6 +478,17 @@ const Chat = () => {
                 <Typography sx={{ fontSize: 11.5, color: '#6b7280' }} noWrap>{user.phone}</Typography>
               </Box>
 
+              {/* Call options button */}
+              <Tooltip title="Call options">
+                <IconButton
+                  size="small"
+                  onClick={() => setCallDialogOpen(true)}
+                  sx={{ color: '#9ca3af', '&:hover': { color: '#25D366', bgcolor: '#f0fdf4' }, borderRadius: '8px' }}
+                >
+                  <CallOutlinedIcon style={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+
               {/* Edit button */}
               <IconButton
                 size="small"
@@ -807,6 +824,71 @@ const Chat = () => {
           user={user}
         />
       )}
+
+      {/* Call Options Dialog */}
+      <Dialog
+        open={callDialogOpen}
+        onClose={() => setCallDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: '16px' } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 0.5, fontSize: 15 }}>
+          📞 Contact Options
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1.5 }}>
+          <Typography fontSize={12.5} color="#6b7280" mb={2}>
+            Choose how to reach <strong>{user?.name || user?.phone}</strong>
+          </Typography>
+
+          {/* Phone number display */}
+          {user?.phone && (
+            <Box sx={{ mb: 2, px: 2, py: 1.5, bgcolor: '#f9fafb', borderRadius: '10px', border: '1px solid #e5e7eb' }}>
+              <Typography fontSize={11} color="#9ca3af" fontWeight={600} mb={0.25}>PHONE NUMBER</Typography>
+              <Typography fontSize={15} fontWeight={700} color="#111827" sx={{ letterSpacing: 0.5 }}>{user.phone}</Typography>
+            </Box>
+          )}
+
+          <Stack spacing={1.5}>
+            {/* Regular phone call */}
+            <Box
+              component="a"
+              href={`tel:${user?.phone}`}
+              onClick={() => setCallDialogOpen(false)}
+              sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, borderRadius: '10px', border: '1px solid #e5e7eb', cursor: 'pointer', textDecoration: 'none', color: 'inherit', '&:hover': { bgcolor: '#f0fdf4', borderColor: '#25D366' }, transition: 'all 0.15s' }}
+            >
+              <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <CallOutlinedIcon sx={{ fontSize: 20, color: '#25D366' }} />
+              </Box>
+              <Box>
+                <Typography fontSize={13} fontWeight={600} color="#111827">Regular Phone Call</Typography>
+                <Typography fontSize={11.5} color="#6b7280">Opens your phone dialer</Typography>
+              </Box>
+            </Box>
+
+            {/* WhatsApp chat (wa.me link) */}
+            <Box
+              component="a"
+              href={`https://wa.me/${(user?.phone || '').replace(/\D/g, '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setCallDialogOpen(false)}
+              sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, borderRadius: '10px', border: '1px solid #e5e7eb', cursor: 'pointer', textDecoration: 'none', color: 'inherit', '&:hover': { bgcolor: '#f0fdf4', borderColor: '#25D366' }, transition: 'all 0.15s' }}
+            >
+              <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <VideocamOutlinedIcon sx={{ fontSize: 20, color: '#25D366' }} />
+              </Box>
+              <Box>
+                <Typography fontSize={13} fontWeight={600} color="#111827">Open in WhatsApp</Typography>
+                <Typography fontSize={11.5} color="#6b7280">Opens WhatsApp app to start call/chat</Typography>
+              </Box>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setCallDialogOpen(false)} sx={{ borderRadius: '8px', textTransform: 'none', color: '#6b7280' }}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete Contact Confirm Dialog */}
       <Dialog
