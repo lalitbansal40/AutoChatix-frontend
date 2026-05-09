@@ -3,7 +3,7 @@ import {
   TextField,
   MenuItem,
   Typography,
-  Switch,
+  Checkbox,
   IconButton,
   Stack,
   Button,
@@ -198,6 +198,143 @@ const KeyValueEditor = ({
   );
 };
 
+type LineItemRow = {
+  id: string;
+  name: string;
+  qty: string;
+  price: string;
+};
+
+const parseLineItems = (value: any): any[] => {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+let __lineItemSeq = 0;
+const newLineItem = (): LineItemRow => ({
+  id: `line_${++__lineItemSeq}_${Date.now()}`,
+  name: "",
+  qty: "1",
+  price: "",
+});
+
+const lineItemsToRows = (value: any): LineItemRow[] =>
+  parseLineItems(value).map((item, i) => ({
+    id: item.id || `line_${i}`,
+    name: item.name || item.label || "",
+    qty: String(item.qty ?? item.quantity ?? 1),
+    price: String(item.price ?? item.item_price ?? item.amount ?? ""),
+  }));
+
+const rowsToLineItems = (rows: LineItemRow[]) =>
+  rows
+    .map(({ name, qty, price }) => ({
+      name: name.trim(),
+      qty: qty || "1",
+      price: price || "",
+    }))
+    .filter((row) => row.name || row.price);
+
+const LineItemsEditor = ({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: any;
+  onChange: (v: any[]) => void;
+  placeholder?: string;
+}) => {
+  const [rows, setRows] = useState<LineItemRow[]>(() => {
+    const parsed = lineItemsToRows(value);
+    return parsed.length ? parsed : [newLineItem()];
+  });
+
+  useEffect(() => {
+    const parsed = lineItemsToRows(value);
+    if (parsed.length) setRows(parsed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(value || [])]);
+
+  const commit = (next: LineItemRow[]) => {
+    setRows(next);
+    onChange(rowsToLineItems(next));
+  };
+
+  const setRow = (id: string, patch: Partial<LineItemRow>) => {
+    commit(rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  };
+
+  return (
+    <Stack spacing={0.75}>
+      <Stack direction="row" spacing={0.75} alignItems="center" sx={{ pl: 0.25 }}>
+        <Typography sx={{ flex: 2, fontSize: 10.5, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.4 }}>
+          Name
+        </Typography>
+        <Typography sx={{ width: 72, fontSize: 10.5, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.4 }}>
+          Qty
+        </Typography>
+        <Typography sx={{ flex: 1, fontSize: 10.5, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.4 }}>
+          Price
+        </Typography>
+        <Box sx={{ width: 28 }} />
+      </Stack>
+
+      {rows.map((row) => (
+        <Stack key={row.id} direction="row" spacing={0.75} alignItems="center">
+          <TextField
+            size="small"
+            placeholder={placeholder || "Item name"}
+            value={row.name}
+            onChange={(e) => setRow(row.id, { name: e.target.value })}
+            sx={{ flex: 2, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}
+          />
+          <TextField
+            size="small"
+            value={row.qty}
+            onChange={(e) => setRow(row.id, { qty: e.target.value })}
+            sx={{ width: 72, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}
+          />
+          <TextField
+            size="small"
+            placeholder="₹"
+            value={row.price}
+            onChange={(e) => setRow(row.id, { price: e.target.value })}
+            sx={{ flex: 1, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}
+          />
+          <IconButton
+            size="small"
+            onClick={() => commit(rows.length > 1 ? rows.filter((r) => r.id !== row.id) : [newLineItem()])}
+            sx={{ color: "#ef4444" }}
+          >
+            <DeleteOutlineIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+      ))}
+
+      <Button
+        size="small"
+        startIcon={<AddIcon />}
+        onClick={() => commit([...rows, newLineItem()])}
+        sx={{
+          alignSelf: "flex-start",
+          textTransform: "none",
+          fontSize: 12,
+          color: "#16a34a",
+          "&:hover": { bgcolor: "#f0fdf4" },
+        }}
+      >
+        Add row
+      </Button>
+    </Stack>
+  );
+};
+
 /* ─────────────────────────────────────────────────────────
    Single field renderer
 ───────────────────────────────────────────────────────── */
@@ -279,8 +416,16 @@ export const DynamicField = ({
 
     case "boolean":
       return (
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.5 }}>
-          <Switch checked={!!value} onChange={(e) => onChange(e.target.checked)} />
+        <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ py: 0.5 }}>
+          <Checkbox
+            checked={!!value}
+            onChange={(e) => onChange(e.target.checked)}
+            sx={{
+              p: 0,
+              color: "#9ca3af",
+              "&.Mui-checked": { color: "#25D366" },
+            }}
+          />
           <Box>
             <Typography fontSize={13} fontWeight={600}>{field.label}</Typography>
             {field.helperText && (
@@ -316,6 +461,18 @@ export const DynamicField = ({
             placeholder={field.placeholder || "{ }"}
             onChange={(e) => onChange(e.target.value)}
             sx={{ ...baseSx, "& .MuiInputBase-input": { fontFamily: "monospace", fontSize: 12 } }}
+          />
+        </Box>
+      );
+
+    case "line_items":
+      return (
+        <Box>
+          <SectionLabel helper={helper}>{field.label}{field.required ? " *" : ""}</SectionLabel>
+          <LineItemsEditor
+            value={value ?? field.defaultValue ?? []}
+            onChange={onChange}
+            placeholder={field.placeholder}
           />
         </Box>
       );

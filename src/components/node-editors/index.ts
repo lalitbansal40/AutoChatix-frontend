@@ -24,4 +24,5 @@ export const NODE_EDITORS: any = {
   call_to_action: BuiltinNodeEditor,
   send_flow: BuiltinNodeEditor,
   send_template: BuiltinNodeEditor,
+  razorpay_payment: BuiltinNodeEditor,
 };

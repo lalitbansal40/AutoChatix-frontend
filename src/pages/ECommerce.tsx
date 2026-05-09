@@ -608,10 +608,15 @@ const ProductsTab = () => {
   const products: any[] = productsData || [];
 
   const handleSync = async () => {
+    if (!selectedChannel || !selectedCatalog) return;
     setSyncing(true);
-    await queryClient.invalidateQueries({ queryKey: ["products", selectedChannel, selectedCatalog] });
-    await queryClient.invalidateQueries({ queryKey: ["catalogs", selectedChannel] });
-    setSyncing(false);
+    try {
+      await ecommerceService.syncProducts(selectedChannel, selectedCatalog);
+      await queryClient.invalidateQueries({ queryKey: ["products", selectedChannel, selectedCatalog] });
+      await queryClient.invalidateQueries({ queryKey: ["catalogs", selectedChannel] });
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleCatalogSuccess = () => {
@@ -867,7 +872,7 @@ const OrdersTab = () => {
                     </Stack>
                     {items.slice(0, 2).map((item: any, i: number) => (
                       <Typography key={i} fontSize={11.5} color="#9ca3af" noWrap>
-                        {item.product_retailer_id} × {item.quantity || 1} — {currency} {(Number(item.item_price) * Number(item.quantity || 1)).toFixed(2)}
+                        {item.name || item.product_name || item.product_retailer_id} × {item.quantity || 1} — {currency} {(Number(item.item_price) * Number(item.quantity || 1)).toFixed(2)}
                       </Typography>
                     ))}
                     {items.length > 2 && <Typography fontSize={11} color="#9ca3af">+{items.length - 2} more</Typography>}

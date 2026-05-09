@@ -31,6 +31,11 @@ class ECommerceService {
     return res.data;
   }
 
+  async syncProducts(channelId: string, catalogId: string) {
+    const res = await axiosServices.post(`/catalog/${channelId}/products/${catalogId}/sync`);
+    return res.data;
+  }
+
   async addProduct(channelId: string, catalogId: string, data: Record<string, any>) {
     const res = await axiosServices.post(`/catalog/${channelId}/products/${catalogId}`, data);
     return res.data;

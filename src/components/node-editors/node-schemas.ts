@@ -32,6 +32,9 @@ const f = {
   number: (key: string, label: string, opts: Partial<FieldDef> = {}): FieldDef => ({
     key, label, type: "number", required: false, isSecret: false, supportsInterpolation: true, ...opts,
   }),
+  boolean: (key: string, label: string, opts: Partial<FieldDef> = {}): FieldDef => ({
+    key, label, type: "boolean", required: false, isSecret: false, supportsInterpolation: false, ...opts,
+  }),
   url: (key: string, label: string, opts: Partial<FieldDef> = {}): FieldDef => ({
     key, label, type: "url", required: false, isSecret: false, supportsInterpolation: true, ...opts,
   }),
@@ -43,6 +46,9 @@ const f = {
   }),
   json: (key: string, label: string, opts: Partial<FieldDef> = {}): FieldDef => ({
     key, label, type: "json", required: false, isSecret: false, ...opts,
+  }),
+  lineItems: (key: string, label: string, opts: Partial<FieldDef> = {}): FieldDef => ({
+    key, label, type: "line_items", required: false, isSecret: false, supportsInterpolation: true, ...opts,
   }),
 };
 
@@ -201,18 +207,32 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
   razorpay_payment: {
     root: "config",
     fields: [
-      f.number("item_amount", "Item Amount (₹)", {
-        required: true,
-        defaultValue: "{{order_summary.total_amount}}",
-        placeholder: "{{order_summary.total_amount}} or 499",
+      f.boolean("use_last_order", "Use Last Order", {
+        defaultValue: false,
+        helperText: "When checked, payment amount starts from the contact's latest WhatsApp catalog order.",
       }),
-      f.number("delivery_amount", "Delivery Amount (₹)", { defaultValue: 0 }),
-      f.json("additional_fees", "Additional Fees (JSON)", {
-        helperText:
-          'Format: [{"label":"Packing Fee","amount":"20"},{"label":"Service Fee","amount":"{{service_fee}}"}]',
+      f.lineItems("manual_items", "Manual Items", {
+        defaultValue: [{ name: "Item", qty: "1", price: "" }],
+        placeholder: "Cake / Product / Service",
+        helperText: "Used only when Use Last Order is off.",
+        visibleWhen: { field: "use_last_order", equals: false },
+      }),
+      f.lineItems("additional_rows", "Extra Items / Charges", {
         defaultValue: [],
+        placeholder: "Delivery Fee / Packing Fee / Extra Item",
+        helperText: "Always added on top of last-order or manual items.",
       }),
-      f.text("description", "Description", { defaultValue: "Payment" }),
+      f.textarea("manual_message", "Manual Message", {
+        placeholder: "Example: Please complete your payment below.",
+        helperText: "If filled, this node sends a Pay Now URL button with the generated summary.",
+      }),
+      f.text("button_text", "Pay Button Text", { defaultValue: "Pay Now" }),
+      f.text("summary_key", "Save Summary As", {
+        defaultValue: "payment_summary",
+        supportsInterpolation: false,
+        helperText: "Saved into contact/session data, e.g. {{payment_summary.total_amount}}.",
+      }),
+      f.text("description", "Razorpay Description", { defaultValue: "Payment" }),
     ],
   },
 

@@ -8,6 +8,7 @@ export type FieldType =
   | "number"
   | "boolean"
   | "json"
+  | "line_items"
   | "key_value";
 
 export type IntegrationCategory =

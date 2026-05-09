@@ -150,8 +150,13 @@ const NODE_CONFIG: any = {
 
   razorpay_payment: {
     config: {
-      item_amount: "",
-      delivery_amount: "",
+      use_last_order: false,
+      manual_items: [{ name: "Item", qty: "1", price: "" }],
+      additional_rows: [],
+      manual_message: "Please complete your payment below.",
+      button_text: "Pay Now",
+      summary_key: "payment_summary",
+      description: "Payment",
     },
   },
 
