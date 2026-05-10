@@ -258,18 +258,28 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
       }),
 
       // ── Tax & Discount ──
-      f.number("tax_amount", "Tax Amount (₹)", {
+      f.select("tax_mode", "Tax Type", ["percent", "amount"], {
+        defaultValue: "percent",
+        supportsInterpolation: false,
+        helperText: "Choose whether the tax value is a percentage or fixed amount.",
+      }),
+      f.number("tax_amount", "Tax Value", {
         defaultValue: 0,
-        helperText: "e.g. 18 for ₹18 GST. Use {{variables}} or a fixed number.",
+        helperText: "Percent mode: 18 means 18%. Amount mode: 18 means ₹18. Supports {{variables}}.",
       }),
       f.text("tax_description", "Tax Label", {
         defaultValue: "Tax",
         placeholder: "e.g. GST 18%",
         helperText: "Label shown on the tax line in the order.",
       }),
-      f.number("discount_amount", "Discount Amount (₹)", {
+      f.select("discount_mode", "Discount Type", ["amount", "percent"], {
+        defaultValue: "amount",
+        supportsInterpolation: false,
+        helperText: "Choose whether the discount value is a fixed amount or percentage.",
+      }),
+      f.number("discount_amount", "Discount Value", {
         defaultValue: 0,
-        helperText: "Deducted from total. e.g. 50 for ₹50 off.",
+        helperText: "Amount mode: 50 means ₹50 off. Percent mode: 10 means 10% off. Supports {{variables}}.",
       }),
       f.text("discount_description", "Discount Label", {
         defaultValue: "Discount",

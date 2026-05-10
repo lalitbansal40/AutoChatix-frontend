@@ -65,12 +65,23 @@ const WhatsAppNotificationEditor = ({
 }) => {
   const data = node.data || {};
   const isBroadcast = data.type === "broadcast_message";
-  const sendMode = data.send_mode || "text";
-  const bodyParams = asArray(data.body_params);
+  const sendMode =
+    data.send_mode ||
+    (isBroadcast && (data.template?.name || data.template_name)
+      ? "template"
+      : "text");
+  const bodyParams = asArray(data.body_params ?? data.template?.body);
   const [phoneDraft, setPhoneDraft] = useState("");
   const phoneNumbers = useMemo(
-    () => Array.from(new Set(parsePhoneNumbers(data.numbers))),
-    [data.numbers],
+    () =>
+      Array.from(
+        new Set(
+          parsePhoneNumbers(
+            data.numbers ?? data.phone_numbers ?? data.recipients,
+          ),
+        ),
+      ),
+    [data.numbers, data.phone_numbers, data.recipients],
   );
 
   const { data: templates = [], isLoading } = useQuery({
@@ -87,8 +98,13 @@ const WhatsAppNotificationEditor = ({
   });
 
   const selectedTemplate = useMemo(
-    () => templates.find((template: any) => template.name === data.template_name) || null,
-    [templates, data.template_name],
+    () =>
+      templates.find(
+        (template: any) =>
+          template.name === (data.template_name || data.template?.name),
+      ) ||
+      (data.template?.name ? data.template : null),
+    [templates, data.template_name, data.template],
   );
   const bodyText = extractBodyText(selectedTemplate);
   const variables = extractVariables(bodyText);
@@ -119,9 +135,17 @@ const WhatsAppNotificationEditor = ({
   const handleTemplateChange = (template: any | null) => {
     const nextBody = extractVariables(extractBodyText(template)).map((_, index) => bodyParams[index] || "");
     patchNode({
+      send_mode: "template",
       template_name: template?.name || "",
       language: template?.language || data.language || "en_US",
       body_params: nextBody,
+      template: template
+        ? {
+            name: template.name,
+            language: template.language || data.language || "en_US",
+            body: nextBody,
+          }
+        : { language: data.language || "en_US" },
       message: template ? renderTemplateText(extractBodyText(template), nextBody) : "",
     });
   };
@@ -131,6 +155,12 @@ const WhatsAppNotificationEditor = ({
     nextBody[index] = value;
     patchNode({
       body_params: nextBody,
+      template: data.template
+        ? {
+            ...data.template,
+            body: nextBody,
+          }
+        : undefined,
       message: renderTemplateText(bodyText, nextBody),
     });
   };
@@ -268,6 +298,9 @@ const WhatsAppNotificationEditor = ({
               patchNode({
                 send_mode: event.target.value,
                 message: event.target.value === "text" ? data.message || "" : previewText,
+                ...(event.target.value === "template" && data.template?.name
+                  ? { template_name: data.template.name }
+                  : {}),
               })
             }
           >

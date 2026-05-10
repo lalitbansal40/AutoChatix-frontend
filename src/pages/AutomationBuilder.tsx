@@ -202,8 +202,10 @@ const NODE_CONFIG: any = {
       payment_method: "razorpay",
       razorpay_config_name: "",
       razorpay_receipt: "",
+      tax_mode: "percent",
       tax_amount: "",
       tax_description: "Tax",
+      discount_mode: "amount",
       discount_amount: "",
       discount_description: "Discount",
       reference_id: "",
@@ -922,6 +924,24 @@ const AutomationBuilder = () => {
           type: nodeType,
           sections,
           position: n.position,
+          ...(nodeType === "broadcast_message" && {
+            send_mode:
+              n.data.send_mode ||
+              (n.data.template?.name || n.data.template_name
+                ? "template"
+                : "text"),
+            numbers:
+              n.data.numbers ||
+              n.data.phone_numbers ||
+              n.data.recipients ||
+              "",
+            template_name:
+              n.data.template_name || n.data.template?.name || "",
+            language:
+              n.data.language || n.data.template?.language || "en_US",
+            body_params:
+              n.data.body_params || n.data.template?.body || [],
+          }),
 
           // 🔥 THIS LINE ADD KAR (IMPORTANT)
           cards: n.data.cards
