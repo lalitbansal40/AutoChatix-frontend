@@ -23,8 +23,9 @@ const formatMoney = (amount: number, currency = 'INR') =>
   new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency,
-    maximumFractionDigits: 2
-  }).format(Number(amount || 0) / 100);
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6
+  }).format(Number(amount || 0) / 1000000);
 
 const describeCharge = (row: any) => {
   if (row.type === 'AI_CONVERSATION') return `AI reply (${row.ai_model || 'model'})`;

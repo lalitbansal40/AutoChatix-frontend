@@ -7,6 +7,7 @@ import BuiltinNodeEditor from "./BuiltinNodeEditor";
 import ProductNodeEditor from "./ProductNodeEditor";
 import ApiRequestEditor from "./ApiRequestEditor";
 import AiResponseEditor from "./AiResponseEditor";
+import WhatsAppNotificationEditor from "./WhatsAppNotificationEditor";
 
 export const NODE_EDITORS: any = {
   auto_reply: AutoReplyEditor,
@@ -25,7 +26,8 @@ export const NODE_EDITORS: any = {
   distance_check: BuiltinNodeEditor,
   call_to_action: BuiltinNodeEditor,
   send_flow: BuiltinNodeEditor,
-  send_template: BuiltinNodeEditor,
+  send_template: WhatsAppNotificationEditor,
+  broadcast_message: WhatsAppNotificationEditor,
   razorpay_payment: BuiltinNodeEditor,
   whatsapp_payment: BuiltinNodeEditor,
   payment_summary: BuiltinNodeEditor,

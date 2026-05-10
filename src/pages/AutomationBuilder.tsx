@@ -165,6 +165,21 @@ const NODE_CONFIG: any = {
     },
   },
 
+  send_template: {
+    template_name: "",
+    language: "en_US",
+    body_params: [],
+  },
+
+  broadcast_message: {
+    send_mode: "text",
+    numbers: "",
+    message: "",
+    template_name: "",
+    language: "en_US",
+    body_params: [],
+  },
+
   razorpay_payment: {
     config: {
       use_last_order: false,
@@ -291,6 +306,8 @@ const NODE_STYLE: Record<string, { color: string; bg: string; icon: string; labe
   integration_action: { color: "#0891b2", bg: "#ecfeff", icon: "🔌", label: "Integration" },
   api_request: { color: "#7c3aed", bg: "#f5f3ff", icon: "🌐", label: "API Request" },
   ai_response: { color: "#f59e0b", bg: "#fffbeb", icon: "🤖", label: "AI Response" },
+  send_template: { color: "#16a34a", bg: "#f0fdf4", icon: "📨", label: "Send Template" },
+  broadcast_message: { color: "#0f766e", bg: "#f0fdfa", icon: "📣", label: "Send WhatsApp Notification" },
   single_product:     { color: "#db2777", bg: "#fdf2f8", icon: "🛒", label: "Single Product" },
   product_list:       { color: "#db2777", bg: "#fdf2f8", icon: "🛍️", label: "Product List" },
 };

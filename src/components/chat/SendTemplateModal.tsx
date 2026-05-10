@@ -44,8 +44,13 @@ const SendTemplateModal = ({ open, onClose, user, channelId }: Props) => {
     const [bodyValues, setBodyValues] = useState<string[]>([]);
 
     const formatMoney = (amount: number, currency = "INR") => {
-        const value = Number(amount || 0) / 100;
-        return new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 2 }).format(value);
+        const value = Number(amount || 0) / 1000000;
+        return new Intl.NumberFormat("en-IN", {
+            style: "currency",
+            currency,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 6
+        }).format(value);
     };
 
     const { data: walletData } = useQuery({

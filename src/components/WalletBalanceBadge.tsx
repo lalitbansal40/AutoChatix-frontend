@@ -5,11 +5,12 @@ import { useNavigate } from 'react-router-dom';
 import { walletService } from 'service/wallet.service';
 
 const formatMoney = (amount: number, currency = 'INR') => {
-  const value = Number(amount || 0) / 100;
+  const value = Number(amount || 0) / 1000000;
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
   }).format(value);
 };
 

@@ -79,12 +79,14 @@ const ManageDialog = ({
   const qc = useQueryClient();
   const [tab, setTab] = useState(0);
 
-  // Wallet state — balance/balance_limit stored in paise in DB, displayed in rupees
+  // Wallet state — balance/balance_limit stored in micro-units in DB, displayed in rupees
   const [wallet, setWallet] = useState({
-    balance: (acc.wallet?.balance ?? 0) / 100,
-    balance_limit: (acc.wallet?.balance_limit ?? 0) / 100,
-    commission_percent: acc.wallet?.commission_percent ?? 15,
-    commission_enabled: acc.wallet?.commission_enabled ?? true,
+    balance: (acc.wallet?.balance ?? 0) / 1000000,
+    balance_limit: (acc.wallet?.balance_limit ?? 0) / 1000000,
+    template_commission_percent: acc.wallet?.template_commission_percent ?? acc.wallet?.commission_percent ?? 15,
+    template_commission_enabled: acc.wallet?.template_commission_enabled ?? acc.wallet?.commission_enabled ?? true,
+    ai_commission_percent: acc.wallet?.ai_commission_percent ?? acc.wallet?.commission_percent ?? 15,
+    ai_commission_enabled: acc.wallet?.ai_commission_enabled ?? acc.wallet?.commission_enabled ?? true,
     meta_payer: acc.wallet?.meta_payer ?? 'customer',
   });
 
@@ -105,8 +107,10 @@ const ManageDialog = ({
     mutationFn: () => axios.patch(`/superadmin/accounts/${acc._id}/wallet`, {
       balance: Number(wallet.balance),
       balance_limit: Number(wallet.balance_limit),
-      commission_percent: Number(wallet.commission_percent),
-      commission_enabled: wallet.commission_enabled,
+      template_commission_percent: Number(wallet.template_commission_percent),
+      template_commission_enabled: wallet.template_commission_enabled,
+      ai_commission_percent: Number(wallet.ai_commission_percent),
+      ai_commission_enabled: wallet.ai_commission_enabled,
       meta_payer: wallet.meta_payer,
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sa-accounts'] }); showToast('Wallet updated'); },
@@ -172,26 +176,48 @@ const ManageDialog = ({
                 InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
               />
             </Stack>
-            <Divider>Platform Commission</Divider>
+            <Divider>Template Commission</Divider>
             <Stack direction="row" spacing={2} alignItems="center">
               <TextField
-                label="Commission %"
+                label="Template Commission %"
                 type="number"
-                value={wallet.commission_percent}
-                onChange={(e) => setWallet({ ...wallet, commission_percent: Number(e.target.value) })}
+                value={wallet.template_commission_percent}
+                onChange={(e) => setWallet({ ...wallet, template_commission_percent: Number(e.target.value) })}
                 size="small"
                 sx={{ width: 160 }}
                 InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                helperText="% added on AI and template usage"
+                helperText="% added on WhatsApp template usage"
               />
               <FormControlLabel
                 control={
                   <Switch
-                    checked={wallet.commission_enabled}
-                    onChange={(e) => setWallet({ ...wallet, commission_enabled: e.target.checked })}
+                    checked={wallet.template_commission_enabled}
+                    onChange={(e) => setWallet({ ...wallet, template_commission_enabled: e.target.checked })}
                   />
                 }
-                label="Commission Enabled"
+                label="Template commission enabled"
+              />
+            </Stack>
+            <Divider>AI Commission</Divider>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <TextField
+                label="AI Commission %"
+                type="number"
+                value={wallet.ai_commission_percent}
+                onChange={(e) => setWallet({ ...wallet, ai_commission_percent: Number(e.target.value) })}
+                size="small"
+                sx={{ width: 160 }}
+                InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                helperText="% added on OpenAI usage"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={wallet.ai_commission_enabled}
+                    onChange={(e) => setWallet({ ...wallet, ai_commission_enabled: e.target.checked })}
+                  />
+                }
+                label="AI commission enabled"
               />
             </Stack>
             <Box>
@@ -494,15 +520,18 @@ const SuperAdmin = () => {
                   </TableCell>
                   <TableCell align="center">
                     <Typography fontSize={13} fontWeight={500} color={acc.wallet?.balance > 0 ? 'success.main' : 'text.secondary'}>
-                      ₹{((acc.wallet?.balance ?? 0) / 100).toFixed(2)}
+                      ₹{((acc.wallet?.balance ?? 0) / 1000000).toFixed(4)}
                     </Typography>
                     {acc.wallet?.balance_limit > 0 && (
                       <Typography variant="caption" color="text.secondary">
-                        / ₹{((acc.wallet.balance_limit) / 100).toFixed(0)} max
+                        / ₹{((acc.wallet.balance_limit) / 1000000).toFixed(0)} max
                       </Typography>
                     )}
-                    {acc.wallet?.commission_enabled && (
-                      <Typography variant="caption" color="text.secondary"> {acc.wallet?.commission_percent ?? 15}% comm.</Typography>
+                    {(acc.wallet?.template_commission_enabled ?? acc.wallet?.commission_enabled) && (
+                      <Typography variant="caption" color="text.secondary"> T{acc.wallet?.template_commission_percent ?? acc.wallet?.commission_percent ?? 15}%</Typography>
+                    )}
+                    {(acc.wallet?.ai_commission_enabled ?? acc.wallet?.commission_enabled) && (
+                      <Typography variant="caption" color="text.secondary"> AI{acc.wallet?.ai_commission_percent ?? acc.wallet?.commission_percent ?? 15}%</Typography>
                     )}
                   </TableCell>
                   <TableCell align="right">

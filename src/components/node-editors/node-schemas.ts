@@ -466,6 +466,35 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
       }),
     ],
   },
+
+  /* ─── broadcast_message ─── */
+  broadcast_message: {
+    root: "data",
+    fields: [
+      f.select("send_mode", "Send Type", ["text", "template"], {
+        defaultValue: "text",
+        helperText: "Choose whether to send a normal message or an approved template.",
+      }),
+      f.textarea("numbers", "Phone Numbers", {
+        required: true,
+        placeholder: "919999999999\n918888888888",
+        helperText: "Enter multiple numbers separated by comma, space, or new line.",
+      }),
+      f.textarea("message", "Message", {
+        placeholder: "Hello {{contact.name}}",
+        helperText: "Used when Send Type is Text Message.",
+      }),
+      f.text("template_name", "Template Name", {
+        helperText: "Used when Send Type is Template.",
+        supportsInterpolation: false,
+      }),
+      f.text("language", "Language Code", { defaultValue: "en_US", supportsInterpolation: false }),
+      f.json("body_params", "Template Body Variables (JSON array)", {
+        helperText: 'e.g. ["{{contact.name}}", "{{order_id}}"]',
+        defaultValue: [],
+      }),
+    ],
+  },
 };
 
 export const hasBuiltinSchema = (type: string) => Boolean(NODE_SCHEMAS[type]);
