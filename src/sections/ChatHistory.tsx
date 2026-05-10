@@ -85,7 +85,7 @@ const getMessageText = (history: any) => {
     payload?.interactive?.button_reply?.title ||
     payload?.interactive?.list_reply?.title ||
     payload?.interactive?.nfm_reply?.response_json ||
-    payload?.text ||
+    (typeof payload?.text === 'string' ? payload?.text : '') ||
     ''
   );
 };
@@ -116,7 +116,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
       payload?.interactive?.button_reply?.title ||
       payload?.interactive?.list_reply?.title ||
       payload?.options?.body ||
-      payload?.text ||
+      (typeof payload?.text === 'string' ? payload?.text : '') ||
       'Message'
     );
   };
@@ -748,7 +748,12 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
       const color = isApproved ? '#16a34a' : isDeclined ? '#dc2626' : '#d97706';
       const bg = isApproved ? '#f0fdf4' : isDeclined ? '#fef2f2' : '#fffbeb';
       const border = isApproved ? '#bbf7d0' : isDeclined ? '#fecaca' : '#fde68a';
-      const amount = payload?.payment?.amount || payload?.amount || '';
+      const rawAmount = payload?.payment?.amount || payload?.amount;
+      const amount = rawAmount
+        ? typeof rawAmount === 'object'
+          ? (Number(rawAmount.value || 0) / (rawAmount.offset || 1)).toFixed(2)
+          : String(rawAmount)
+        : '';
       const method = payload?.payment?.method || '';
       return (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, py: 1, borderRadius: '10px', bgcolor: bg, border: `1px solid ${border}`, minWidth: 180 }}>
@@ -822,7 +827,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
 
     return (
       <Typography fontSize={14} sx={{ wordBreak: 'break-word' }}>
-        {payload?.bodyText || payload?.text?.body || payload?.text || text || ''}
+        {payload?.bodyText || payload?.text?.body || (typeof payload?.text === 'string' ? payload?.text : '') || (typeof text === 'string' ? text : '') || ''}
       </Typography>
     );
   };

@@ -156,6 +156,15 @@ const NODE_CONFIG: any = {
     },
   },
 
+  ai_response: {
+    config: {
+      ai_config_id: "",
+      input_variable: "last_message",
+      save_to: "ai_response",
+      send_to_user: true,
+    },
+  },
+
   razorpay_payment: {
     config: {
       use_last_order: false,
@@ -281,6 +290,7 @@ const NODE_STYLE: Record<string, { color: string; bg: string; icon: string; labe
   distance_check: { color: "#6366f1", bg: "#eef2ff", icon: "📏", label: "Distance" },
   integration_action: { color: "#0891b2", bg: "#ecfeff", icon: "🔌", label: "Integration" },
   api_request: { color: "#7c3aed", bg: "#f5f3ff", icon: "🌐", label: "API Request" },
+  ai_response: { color: "#f59e0b", bg: "#fffbeb", icon: "🤖", label: "AI Response" },
   single_product:     { color: "#db2777", bg: "#fdf2f8", icon: "🛒", label: "Single Product" },
   product_list:       { color: "#db2777", bg: "#fdf2f8", icon: "🛍️", label: "Product List" },
 };

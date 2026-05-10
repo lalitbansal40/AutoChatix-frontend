@@ -2,7 +2,7 @@
 import { FormattedMessage } from 'react-intl';
 
 // assets
-import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined, WalletOutlined } from '@ant-design/icons';
+import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined, WalletOutlined, ThunderboltOutlined } from '@ant-design/icons';
 
 // type
 import { NavItemType } from 'types/menu';
@@ -19,6 +19,7 @@ const icons = {
   PhoneOutlined,
   ShoppingOutlined,
   WalletOutlined,
+  ThunderboltOutlined,
 };
 
 // ==============================|| MENU ITEMS - SUPPORT ||============================== //
@@ -83,6 +84,13 @@ const other: NavItemType = {
       type: 'item',
       url: '/payments',
       icon: icons.WalletOutlined
+    },
+    {
+      id: 'AiConfigs',
+      title: <FormattedMessage id="AI Configs" defaultMessage="AI Configs" />,
+      type: 'item',
+      url: '/ai-configs',
+      icon: icons.ThunderboltOutlined
     }
   ]
 };

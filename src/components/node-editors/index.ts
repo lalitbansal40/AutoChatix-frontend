@@ -6,6 +6,7 @@ import IntegrationActionEditor from "./IntegrationActionEditor";
 import BuiltinNodeEditor from "./BuiltinNodeEditor";
 import ProductNodeEditor from "./ProductNodeEditor";
 import ApiRequestEditor from "./ApiRequestEditor";
+import AiResponseEditor from "./AiResponseEditor";
 
 export const NODE_EDITORS: any = {
   auto_reply: AutoReplyEditor,
@@ -18,6 +19,7 @@ export const NODE_EDITORS: any = {
   single_product: ProductNodeEditor,
   product_list: ProductNodeEditor,
   api_request: ApiRequestEditor,
+  ai_response: AiResponseEditor,
   ask_location: BuiltinNodeEditor,
   address_message: BuiltinNodeEditor,
   distance_check: BuiltinNodeEditor,
