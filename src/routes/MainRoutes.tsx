@@ -18,6 +18,7 @@ import SuperAdmin from 'pages/SuperAdmin';
 import UsersPage from 'pages/Users';
 import Payments from 'pages/Payments';
 import AiConfigs from 'pages/AiConfigs';
+import Wallet from 'pages/Wallet';
 
 // pages routing
 const MaintenanceError = Loadable(lazy(() => import('pages/maintenance/404')));
@@ -84,6 +85,10 @@ const MainRoutes = {
         {
           path: 'payments',
           element: <Payments />
+        },
+        {
+          path: 'wallet',
+          element: <Wallet />
         },
         {
           path: 'ai-configs',

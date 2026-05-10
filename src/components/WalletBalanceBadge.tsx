@@ -1,6 +1,7 @@
 import { Chip, Tooltip } from '@mui/material';
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { walletService } from 'service/wallet.service';
 
 const formatMoney = (amount: number, currency = 'INR') => {
@@ -13,6 +14,7 @@ const formatMoney = (amount: number, currency = 'INR') => {
 };
 
 const WalletBalanceBadge = () => {
+  const navigate = useNavigate();
   const { data } = useQuery({
     queryKey: ['wallet'],
     queryFn: () => walletService.getWallet(),
@@ -31,9 +33,11 @@ const WalletBalanceBadge = () => {
         icon={<AccountBalanceWalletOutlinedIcon sx={{ fontSize: '16px !important' }} />}
         label={formatMoney(available, currency)}
         size="small"
+        onClick={() => navigate('/wallet')}
         sx={{
           height: 28,
           borderRadius: '8px',
+          cursor: 'pointer',
           bgcolor: available < 0 ? '#fef2f2' : '#f0fdf4',
           color: available < 0 ? '#dc2626' : '#15803d',
           fontWeight: 700,

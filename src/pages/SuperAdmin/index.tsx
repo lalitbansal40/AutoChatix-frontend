@@ -83,7 +83,7 @@ const ManageDialog = ({
   const [wallet, setWallet] = useState({
     balance: (acc.wallet?.balance ?? 0) / 100,
     balance_limit: (acc.wallet?.balance_limit ?? 0) / 100,
-    commission_percent: acc.wallet?.commission_percent ?? 10,
+    commission_percent: acc.wallet?.commission_percent ?? 15,
     commission_enabled: acc.wallet?.commission_enabled ?? true,
     meta_payer: acc.wallet?.meta_payer ?? 'customer',
   });
@@ -172,7 +172,7 @@ const ManageDialog = ({
                 InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
               />
             </Stack>
-            <Divider>Meta Template Commission</Divider>
+            <Divider>Platform Commission</Divider>
             <Stack direction="row" spacing={2} alignItems="center">
               <TextField
                 label="Commission %"
@@ -182,7 +182,7 @@ const ManageDialog = ({
                 size="small"
                 sx={{ width: 160 }}
                 InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                helperText="% taken on each template"
+                helperText="% added on AI and template usage"
               />
               <FormControlLabel
                 control={
@@ -502,7 +502,7 @@ const SuperAdmin = () => {
                       </Typography>
                     )}
                     {acc.wallet?.commission_enabled && (
-                      <Typography variant="caption" color="text.secondary"> {acc.wallet?.commission_percent ?? 10}% comm.</Typography>
+                      <Typography variant="caption" color="text.secondary"> {acc.wallet?.commission_percent ?? 15}% comm.</Typography>
                     )}
                   </TableCell>
                   <TableCell align="right">

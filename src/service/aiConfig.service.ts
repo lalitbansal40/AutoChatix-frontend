@@ -14,6 +14,14 @@ export interface AiFunction {
   name: string;
   description: string;
   parameters: string; // JSON schema string
+  execution_type?: 'api' | 'calculation' | 'static';
+  api_method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  api_url?: string;
+  api_headers?: string;
+  api_body?: string;
+  result_path?: string;
+  expression?: string;
+  static_response?: string;
 }
 
 export interface AiConfig {

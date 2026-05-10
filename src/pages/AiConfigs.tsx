@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import {
   Box, Button, Chip, CircularProgress, Dialog, DialogContent,
   Grid, IconButton, Stack, Switch, TextField, Tooltip, Typography,
-  Collapse, Alert,
+  Collapse, Alert, MenuItem,
 } from '@mui/material';
 import {
   PlusOutlined, DeleteOutlined, EditOutlined,
@@ -47,6 +47,14 @@ const DEFAULT_FN = (): AiFunction => ({
   name: '',
   description: '',
   parameters: JSON.stringify({ type: 'object', properties: {}, required: [] }, null, 2),
+  execution_type: 'static',
+  api_method: 'GET',
+  api_url: '',
+  api_headers: '{}',
+  api_body: '',
+  result_path: '',
+  expression: '',
+  static_response: '',
 });
 
 const defaultForm = (): CreateAiConfigPayload => ({
@@ -160,6 +168,103 @@ const FnRow = ({
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px', fontSize: 12, fontFamily: 'monospace' } }}
             InputLabelProps={{ shrink: true, sx: { fontSize: 12 } }}
           />
+          <Stack direction="row" gap={1.5}>
+            <TextField
+              select
+              fullWidth
+              size="small"
+              label="How to execute"
+              value={fn.execution_type || 'static'}
+              onChange={e => onChange({ ...fn, execution_type: e.target.value as any })}
+              InputLabelProps={{ shrink: true, sx: { fontSize: 12 } }}
+            >
+              <MenuItem value="static">Static response</MenuItem>
+              <MenuItem value="api">API call</MenuItem>
+              <MenuItem value="calculation">Calculation</MenuItem>
+            </TextField>
+            <TextField
+              fullWidth
+              size="small"
+              label="Result path"
+              value={fn.result_path || ''}
+              onChange={e => onChange({ ...fn, result_path: e.target.value })}
+              placeholder="data.price"
+              helperText="Optional dotted path from API result"
+              InputLabelProps={{ shrink: true, sx: { fontSize: 12 } }}
+            />
+          </Stack>
+          {(fn.execution_type || 'static') === 'api' && (
+            <Stack spacing={1.5}>
+              <Stack direction="row" gap={1.5}>
+                <TextField
+                  select
+                  size="small"
+                  label="Method"
+                  value={fn.api_method || 'GET'}
+                  onChange={e => onChange({ ...fn, api_method: e.target.value as any })}
+                  sx={{ width: 140 }}
+                  InputLabelProps={{ shrink: true, sx: { fontSize: 12 } }}
+                >
+                  {['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(method => (
+                    <MenuItem key={method} value={method}>{method}</MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="API URL"
+                  value={fn.api_url || ''}
+                  onChange={e => onChange({ ...fn, api_url: e.target.value })}
+                  placeholder="https://api.example.com/products/{{product_id}}"
+                  helperText="Use {{argument_name}} placeholders"
+                  InputLabelProps={{ shrink: true, sx: { fontSize: 12 } }}
+                />
+              </Stack>
+              <TextField
+                fullWidth
+                size="small"
+                label="Headers JSON"
+                value={fn.api_headers || '{}'}
+                onChange={e => onChange({ ...fn, api_headers: e.target.value })}
+                placeholder='{"Authorization":"Bearer ..."}'
+                InputLabelProps={{ shrink: true, sx: { fontSize: 12 } }}
+              />
+              <TextField
+                fullWidth
+                size="small"
+                label="Body JSON / template"
+                multiline
+                rows={3}
+                value={fn.api_body || ''}
+                onChange={e => onChange({ ...fn, api_body: e.target.value })}
+                placeholder='{"sku":"{{sku}}"}'
+                InputLabelProps={{ shrink: true, sx: { fontSize: 12 } }}
+              />
+            </Stack>
+          )}
+          {(fn.execution_type || 'static') === 'calculation' && (
+            <TextField
+              fullWidth
+              size="small"
+              label="Calculation expression"
+              value={fn.expression || ''}
+              onChange={e => onChange({ ...fn, expression: e.target.value })}
+              placeholder="Number(args.price) * Number(args.qty)"
+              helperText="Use args.<field>. Result is returned to AI."
+              InputLabelProps={{ shrink: true, sx: { fontSize: 12 } }}
+            />
+          )}
+          {(fn.execution_type || 'static') === 'static' && (
+            <TextField
+              fullWidth
+              size="small"
+              label="Static response"
+              value={fn.static_response || ''}
+              onChange={e => onChange({ ...fn, static_response: e.target.value })}
+              placeholder="Function result returned to AI"
+              InputLabelProps={{ shrink: true, sx: { fontSize: 12 } }}
+            />
+          )}
         </Stack>
       </Collapse>
     </Box>
