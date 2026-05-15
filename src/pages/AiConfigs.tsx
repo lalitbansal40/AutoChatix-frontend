@@ -4,6 +4,8 @@ import {
   Grid, IconButton, Stack, Switch, TextField, Tooltip, Typography,
   Collapse, Alert, MenuItem,
 } from '@mui/material';
+import PlanGateModal from 'components/PlanGateModal';
+import { usePlanGate } from 'hooks/usePlanGate';
 import {
   PlusOutlined, DeleteOutlined, EditOutlined,
   FileTextOutlined, CloudUploadOutlined, CloseOutlined,
@@ -419,6 +421,7 @@ export default function AiConfigs() {
   const qc = useQueryClient();
   const { enqueueSnackbar } = useSnackbar();
 
+  const { guard, gateOpen, closeGate } = usePlanGate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'config' | 'functions'>('config');
   const [editingConfig, setEditingConfig] = useState<AiConfig | null>(null);
@@ -502,7 +505,7 @@ export default function AiConfigs() {
         </Stack>
       }
       secondary={
-        <Button variant="contained" startIcon={<PlusOutlined />} onClick={openCreate}
+        <Button variant="contained" startIcon={<PlusOutlined />} onClick={() => guard(openCreate)}
           sx={{ borderRadius: '8px', bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' }, fontWeight: 600 }}>
           New AI Config
         </Button>
@@ -517,7 +520,7 @@ export default function AiConfigs() {
           <Typography color="text.secondary" mb={3} sx={{ fontSize: 13 }}>
             Create an AI Config to enable intelligent responses in your WhatsApp automations.
           </Typography>
-          <Button variant="contained" startIcon={<PlusOutlined />} onClick={openCreate}
+          <Button variant="contained" startIcon={<PlusOutlined />} onClick={() => guard(openCreate)}
             sx={{ borderRadius: '8px', bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' } }}>
             Create AI Config
           </Button>
@@ -791,6 +794,7 @@ export default function AiConfigs() {
           </Stack>
         </Box>
       </Dialog>
+      <PlanGateModal open={gateOpen} onClose={closeGate} feature="create AI configs" />
     </MainCard>
   );
 }

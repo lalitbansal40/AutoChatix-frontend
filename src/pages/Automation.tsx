@@ -11,17 +11,20 @@ import AddIcon from "@mui/icons-material/Add";
 import { useQuery } from "@tanstack/react-query";
 import AutomationCard from "components/AutomationCard";
 import CreateAutomationModal from "components/CreateAutomationModal";
+import PlanGateModal from "components/PlanGateModal";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import automationService from "service/automation.service";
 import { AutomationT } from "types/automation";
 import axios from "utils/axios";
+import { usePlanGate } from "hooks/usePlanGate";
 
 const fetchAccountLimits = () => axios.get('/team/limits').then((r) => r.data);
 
 const Automations = () => {
   const navigate = useNavigate();
   const [openCreate, setOpenCreate] = useState(false);
+  const { guard, gateOpen, closeGate } = usePlanGate();
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["automations"],
@@ -87,7 +90,7 @@ const Automations = () => {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => setOpenCreate(true)}
+              onClick={() => guard(() => setOpenCreate(true))}
               disabled={autoLimitReached}
               sx={{
                 borderRadius: "10px",
@@ -166,6 +169,8 @@ const Automations = () => {
           navigate(`/automations/${newAutomation._id}`);
         }}
       />
+
+      <PlanGateModal open={gateOpen} onClose={closeGate} feature="create automations" />
     </Box>
   );
 };

@@ -774,7 +774,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
 
       const isCompleted = callStatus === 'COMPLETED' || history?.status === 'CALL_COMPLETED';
       const isMissed = ['NO_ANSWER', 'FAILED', 'BUSY', 'REJECTED'].includes(callStatus) ||
-        (history?.status || '').startsWith('CALL_') && !isCompleted;
+        ((history?.status || '').startsWith('CALL_') && !isCompleted);
 
       const icon = direction === 'IN'
         ? (isCompleted ? '📞' : '📵')

@@ -12,6 +12,7 @@ const AuthForgotPassword = Loadable(lazy(() => import('pages/auth/forgot-passwor
 const AuthCheckMail = Loadable(lazy(() => import('pages/auth/check-mail')));
 const AuthResetPassword = Loadable(lazy(() => import('pages/auth/reset-password')));
 const AuthCodeVerification = Loadable(lazy(() => import('pages/auth/code-verification')));
+const PaymentSuccess = Loadable(lazy(() => import('pages/auth/payment-success')));
 
 // ==============================|| AUTH ROUTING ||============================== //
 
@@ -53,6 +54,10 @@ const LoginRoutes = {
         {
           path: 'code-verification',
           element: <AuthCodeVerification />
+        },
+        {
+          path: 'payment-success',
+          element: <PaymentSuccess />
         }
       ]
     }

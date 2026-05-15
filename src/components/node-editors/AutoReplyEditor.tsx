@@ -128,6 +128,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
         }],
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messageType, node.data.sections]);
 
   useEffect(() => {
@@ -136,6 +137,7 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
         cards: [{ id: genId(), media: null, body: "", buttons: [] }],
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messageType, node.data.cards]);
 
   return (

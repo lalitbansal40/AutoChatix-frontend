@@ -2,7 +2,7 @@
 import { FormattedMessage } from 'react-intl';
 
 // assets
-import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined, WalletOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined, WalletOutlined, ThunderboltOutlined, CreditCardOutlined } from '@ant-design/icons';
 
 // type
 import { NavItemType } from 'types/menu';
@@ -20,6 +20,7 @@ const icons = {
   ShoppingOutlined,
   WalletOutlined,
   ThunderboltOutlined,
+  CreditCardOutlined,
 };
 
 // ==============================|| MENU ITEMS - SUPPORT ||============================== //
@@ -91,6 +92,20 @@ const other: NavItemType = {
       type: 'item',
       url: '/ai-configs',
       icon: icons.ThunderboltOutlined
+    },
+    {
+      id: 'Wallet',
+      title: <FormattedMessage id="Wallet" defaultMessage="Wallet" />,
+      type: 'item',
+      url: '/wallet',
+      icon: icons.WalletOutlined
+    },
+    {
+      id: 'Billing',
+      title: <FormattedMessage id="Billing" defaultMessage="Billing & Plans" />,
+      type: 'item',
+      url: '/billing',
+      icon: icons.CreditCardOutlined
     }
   ]
 };

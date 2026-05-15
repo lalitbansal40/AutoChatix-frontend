@@ -72,6 +72,7 @@ export const JWTProvider = ({ children }: { children: React.ReactElement }) => {
     dispatch({ type: LOGIN, payload: { isLoggedIn: true, user } });
   };
 
+  // Simple register (internal/manual use). Self-service uses registerCheckout directly in AuthRegister.
   const register = async (email: string, password: string, firstName: string, lastName: string) => {
     await axios.post('/auth/register', {
       email,

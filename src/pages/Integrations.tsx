@@ -11,10 +11,12 @@ import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import SearchIcon from '@mui/icons-material/Search';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ConnectModal from 'components/integrations/ConnectModal';
+import PlanGateModal from 'components/PlanGateModal';
 import { integrationService } from 'service/integration.service';
 import { channelService } from 'service/channel.service';
 import { IntegrationDefinition, IntegrationT } from 'types/integration';
 import { ChannelT } from 'types/channels';
+import { usePlanGate } from 'hooks/usePlanGate';
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
   payments:     { bg: '#eff6ff', text: '#1d4ed8' },
@@ -277,6 +279,7 @@ const FilterChip = ({ label, active, onClick }: { label: string; active: boolean
 /* ─── Main Page ──────────────────────────────────────────────── */
 const Integrations = () => {
   const queryClient = useQueryClient();
+  const { guard, gateOpen, closeGate } = usePlanGate();
 
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [search, setSearch] = useState('');
@@ -343,13 +346,15 @@ const Integrations = () => {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['integrations'] });
 
   const handleToggle = async (integration: IntegrationT) => {
-    setTogglingId(integration._id);
-    try {
-      await integrationService.toggleIntegration(integration.slug, integration.channel_id);
-      invalidate();
-    } finally {
-      setTogglingId(null);
-    }
+    guard(async () => {
+      setTogglingId(integration._id);
+      try {
+        await integrationService.toggleIntegration(integration.slug, integration.channel_id);
+        invalidate();
+      } finally {
+        setTogglingId(null);
+      }
+    });
   };
 
   const handleDelete = async (integration: IntegrationT) => {
@@ -364,15 +369,19 @@ const Integrations = () => {
   };
 
   const openConnect = (app: IntegrationDefinition) => {
-    setSelectedApp(app);
-    setEditingIntegration(null);
-    setModalOpen(true);
+    guard(() => {
+      setSelectedApp(app);
+      setEditingIntegration(null);
+      setModalOpen(true);
+    });
   };
 
   const openEdit = (integration: IntegrationT) => {
-    setSelectedApp(registryMap[integration.slug] ?? null);
-    setEditingIntegration(integration);
-    setModalOpen(true);
+    guard(() => {
+      setSelectedApp(registryMap[integration.slug] ?? null);
+      setEditingIntegration(integration);
+      setModalOpen(true);
+    });
   };
 
   return (
@@ -554,6 +563,8 @@ const Integrations = () => {
         editing={editingIntegration}
         onSuccess={invalidate}
       />
+
+      <PlanGateModal open={gateOpen} onClose={closeGate} feature="configure integrations" />
     </Box>
   );
 };

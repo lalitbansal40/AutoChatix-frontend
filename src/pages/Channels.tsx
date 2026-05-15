@@ -3,9 +3,11 @@ import { Alert, Box, Button, CircularProgress, Fade, Grid, Snackbar, Tooltip, Ty
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ChannelCard from 'components/ChannelCard';
+import PlanGateModal from 'components/PlanGateModal';
 import { channelService } from 'service/channel.service';
 import { ChannelT } from 'types/channels';
 import axios from 'utils/axios';
+import { usePlanGate } from 'hooks/usePlanGate';
 
 const fetchAccountLimits = () => axios.get('/team/limits').then((r) => r.data);
 
@@ -21,6 +23,7 @@ const META_CONFIG_ID = '1917533792228152';
 
 const Channels = () => {
   const queryClient = useQueryClient();
+  const { guard, gateOpen, closeGate } = usePlanGate();
 
   // Stores phone_number_id + waba_id received from Meta iframe message event
   const sessionInfoRef = useRef<{
@@ -178,7 +181,7 @@ const Channels = () => {
             <Button
               variant="contained"
               startIcon={connecting ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <AddCircleOutlineIcon sx={{ fontSize: 18 }} />}
-              onClick={launchWhatsAppSignup}
+              onClick={() => guard(launchWhatsAppSignup)}
               disabled={connectDisabled}
               sx={{
                 bgcolor: '#25D366',
@@ -220,6 +223,8 @@ const Channels = () => {
           ))}
         </Grid>
       )}
+
+      <PlanGateModal open={gateOpen} onClose={closeGate} feature="connect channels" />
 
       {/* ── TOAST NOTIFICATIONS ── */}
       <Snackbar
