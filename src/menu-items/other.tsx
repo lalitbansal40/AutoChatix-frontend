@@ -2,7 +2,7 @@
 import { FormattedMessage } from 'react-intl';
 
 // assets
-import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined, WalletOutlined, ThunderboltOutlined, CreditCardOutlined } from '@ant-design/icons';
+import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined, WalletOutlined, ThunderboltOutlined, CreditCardOutlined, BranchesOutlined } from '@ant-design/icons';
 
 // type
 import { NavItemType } from 'types/menu';
@@ -21,6 +21,7 @@ const icons = {
   WalletOutlined,
   ThunderboltOutlined,
   CreditCardOutlined,
+  BranchesOutlined,
 };
 
 // ==============================|| MENU ITEMS - SUPPORT ||============================== //
@@ -92,6 +93,13 @@ const other: NavItemType = {
       type: 'item',
       url: '/ai-configs',
       icon: icons.ThunderboltOutlined
+    },
+    {
+      id: 'FlowBuilder',
+      title: <FormattedMessage id="WA Flows" defaultMessage="WA Flows" />,
+      type: 'item',
+      url: '/flow-builder',
+      icon: icons.BranchesOutlined
     },
     {
       id: 'Wallet',

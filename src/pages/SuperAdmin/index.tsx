@@ -134,6 +134,16 @@ const ManageDialog = ({
     onError: () => showToast('Failed to update subscription', 'error'),
   });
 
+  // WA Flow limit override
+  const [flowLimitInput, setFlowLimitInput] = useState<string>(
+    acc.wa_flow_limit_override != null ? String(acc.wa_flow_limit_override) : ''
+  );
+  const saveFlowLimit = useMutation({
+    mutationFn: (val: number | null) => axios.patch(`/superadmin/accounts/${acc._id}/flow-limit`, { wa_flow_limit: val }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sa-accounts'] }); showToast('Flow limit updated'); },
+    onError: () => showToast('Failed to update flow limit', 'error'),
+  });
+
   const handleExtend = (days: number) => {
     saveSub.mutate({ extend_days: days });
   };
@@ -347,6 +357,56 @@ const ManageDialog = ({
                 Current end date: <b>{new Date(acc.subscription.payment_end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</b>
               </Alert>
             )}
+
+            <Divider>WhatsApp Flows Limit</Divider>
+            <Box>
+              <Typography variant="body2" color="text.secondary" mb={1.5} fontSize={12}>
+                Plan default: <b>{acc.limits?.wa_flows === -1 ? 'Unlimited' : (acc.limits?.wa_flows ?? 0)}</b> flows.
+                Set a custom override below (−1 = unlimited, empty = use plan default).
+                Currently using: <b>{acc.stats?.wa_flows ?? 0}</b> flows.
+              </Typography>
+              <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                <TextField
+                  label="Custom WA Flow Limit"
+                  type="number"
+                  size="small"
+                  value={flowLimitInput}
+                  onChange={(e) => setFlowLimitInput(e.target.value)}
+                  placeholder="e.g. 3 or -1 for unlimited"
+                  helperText="-1 = unlimited · empty = use plan default"
+                  sx={{ width: 220 }}
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">🔀</InputAdornment>,
+                  }}
+                />
+                <Stack direction="row" spacing={1} mt={0.5}>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    disabled={saveFlowLimit.isPending}
+                    onClick={() => {
+                      const val = flowLimitInput.trim() === '' ? null : Number(flowLimitInput);
+                      saveFlowLimit.mutate(val);
+                    }}
+                    sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' }, fontSize: 12, borderRadius: '8px' }}
+                  >
+                    Save Limit
+                  </Button>
+                  {acc.wa_flow_limit_override != null && (
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="error"
+                      disabled={saveFlowLimit.isPending}
+                      onClick={() => { setFlowLimitInput(''); saveFlowLimit.mutate(null); }}
+                      sx={{ fontSize: 12, borderRadius: '8px' }}
+                    >
+                      Reset to Plan
+                    </Button>
+                  )}
+                </Stack>
+              </Stack>
+            </Box>
           </Stack>
         )}
       </DialogContent>
@@ -395,6 +455,7 @@ const SuperAdmin = () => {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sa-accounts'] }); showToast('Plan updated'); },
     onError: () => showToast('Failed to update plan', 'error'),
   });
+
 
   const createAccount = useMutation({
     mutationFn: (data: typeof form) => axios.post('/superadmin/accounts', data),
@@ -549,6 +610,7 @@ const SuperAdmin = () => {
                   <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: '#475569' }} align="center">Users</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: '#475569' }} align="center">Channels</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: '#475569' }} align="center">Automations</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: '#7c3aed' }} align="center">WA Flows</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: '#475569' }} align="center">Wallet</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: '#475569' }} align="right">Actions</TableCell>
                 </TableRow>
@@ -623,6 +685,17 @@ const SuperAdmin = () => {
                         <Typography fontSize={13} fontWeight={600} color="#1e293b">
                           {acc.stats?.automations}<Typography component="span" variant="caption" color="text.secondary"> / {acc.limits?.automations === -1 ? '∞' : acc.limits?.automations}</Typography>
                         </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Typography fontSize={13} fontWeight={700} color="#7c3aed">
+                          {acc.stats?.wa_flows ?? 0}
+                          <Typography component="span" variant="caption" color="text.secondary">
+                            {' / '}{acc.limits?.wa_flows === -1 ? '∞' : (acc.limits?.wa_flows ?? 0)}
+                          </Typography>
+                        </Typography>
+                        {acc.wa_flow_limit_override != null && (
+                          <Typography fontSize={9} color="#7c3aed" fontWeight={700}>CUSTOM</Typography>
+                        )}
                       </TableCell>
                       <TableCell align="center">
                         <Typography fontSize={13} fontWeight={700} color={acc.wallet?.balance > 0 ? '#15803d' : '#94a3b8'}>

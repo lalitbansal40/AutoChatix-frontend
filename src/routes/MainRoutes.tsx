@@ -20,6 +20,8 @@ import Payments from 'pages/Payments';
 import AiConfigs from 'pages/AiConfigs';
 import Wallet from 'pages/Wallet';
 import Billing from 'pages/Billing';
+import FlowBuilderList from 'pages/FlowBuilderList';
+import FlowBuilderEditor from 'pages/FlowBuilderEditor';
 
 // pages routing
 const MaintenanceError = Loadable(lazy(() => import('pages/maintenance/404')));
@@ -98,6 +100,14 @@ const MainRoutes = {
         {
           path: 'ai-configs',
           element: <AiConfigs />
+        },
+        {
+          path: 'flow-builder',
+          element: <FlowBuilderList />
+        },
+        {
+          path: 'flow-builder/:id',
+          element: <FlowBuilderEditor />
         },
         {
           path: 'superadmin',
