@@ -8,9 +8,13 @@ import {
   IconButton,
   Stack,
   Paper,
+  Switch,
+  FormControlLabel,
+  Tooltip,
 } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { useEffect, useState } from "react";
 import mediaService from "service/media.service";
 import { templateService } from "service/template.service";
@@ -320,15 +324,28 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
             />
           </Box>
 
-          <Box>
-            <SectionLabel>CTA Button Label</SectionLabel>
-            <TextField
-              fullWidth size="small"
-              placeholder="e.g. View Options"
-              value={data.button_text || ""}
-              onChange={(e) => updateNodeData(node.id, { button_text: e.target.value })}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", fontSize: 13 } }}
-            />
+          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+            <Box>
+              <SectionLabel>CTA Button Label</SectionLabel>
+              <TextField
+                fullWidth size="small"
+                placeholder="e.g. View Options"
+                value={data.button_text || ""}
+                onChange={(e) => updateNodeData(node.id, { button_text: e.target.value })}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", fontSize: 13 } }}
+              />
+            </Box>
+            <Box>
+              <SectionLabel>Save selection to</SectionLabel>
+              <TextField
+                fullWidth size="small"
+                placeholder="e.g. appointment_date"
+                value={data.save_to || ""}
+                onChange={(e) => updateNodeData(node.id, { save_to: e.target.value })}
+                helperText="Variable name for {{…}} templates"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", fontSize: 13 } }}
+              />
+            </Box>
           </Box>
 
           <Divider />
@@ -336,96 +353,364 @@ const AutoReplyEditor = ({ node, updateNodeData, allNodes }: any) => {
           <Box>
             <SectionLabel mb={1.5}>Sections</SectionLabel>
             <Stack spacing={1.5}>
-              {(data.sections || []).map((section: any, si: number) => (
-                <Paper key={si} variant="outlined" sx={{ borderRadius: "10px", p: 1.5, borderColor: "#e5e7eb" }}>
-                  {/* Section header */}
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
-                    <TextField
-                      size="small" fullWidth placeholder="Section title"
-                      value={section.title}
-                      onChange={(e) => {
-                        const updated = JSON.parse(JSON.stringify(data.sections));
-                        updated[si].title = e.target.value;
-                        updateNodeData(node.id, { sections: updated });
-                      }}
-                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12, fontWeight: 600 } }}
-                    />
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        const updated = JSON.parse(JSON.stringify(data.sections));
-                        updated.splice(si, 1);
-                        updateNodeData(node.id, { sections: updated });
-                      }}
-                      disabled={(data.sections || []).length <= 1}
-                      sx={{ color: "#ef4444", "&:hover": { bgcolor: "#fef2f2" }, "&.Mui-disabled": { color: "#d1d5db" } }}
-                    >
-                      <DeleteOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
+              {(data.sections || []).map((section: any, si: number) => {
+                const isDynamic = !!section.dynamic?.type;
+                const dynType   = section.dynamic?.type || "date";
 
-                  {/* Rows */}
-                  <Stack spacing={0.75}>
-                    {(section.rows || []).map((row: any, ri: number) => (
-                      <Box
-                        key={row.id}
-                        sx={{ display: "grid", gridTemplateColumns: "1fr 1fr auto 36px", gap: 1, alignItems: "center", p: 1, borderRadius: "8px", bgcolor: "#f9fafb", border: "1px solid #f3f4f6" }}
+                const updateSection = (patch: Record<string, any>) => {
+                  const updated = JSON.parse(JSON.stringify(data.sections));
+                  Object.assign(updated[si], patch);
+                  updateNodeData(node.id, { sections: updated });
+                };
+
+                const updateDynamic = (patch: Record<string, any>) => {
+                  const updated = JSON.parse(JSON.stringify(data.sections));
+                  updated[si].dynamic = { ...(updated[si].dynamic || {}), ...patch };
+                  updateNodeData(node.id, { sections: updated });
+                };
+
+                const toggleDynamic = (on: boolean) => {
+                  const updated = JSON.parse(JSON.stringify(data.sections));
+                  if (on) {
+                    updated[si].dynamic = { type: "date", from_offset: 0, to_offset: 6, date_format: "EEE, DD MMM" };
+                    updated[si].rows = [];
+                  } else {
+                    updated[si].dynamic = null;
+                    if (!updated[si].rows?.length)
+                      updated[si].rows = [{ id: genId(), title: "Option 1", description: "" }];
+                  }
+                  updateNodeData(node.id, { sections: updated });
+                };
+
+                return (
+                  <Paper key={si} variant="outlined" sx={{ borderRadius: "10px", p: 1.5, borderColor: isDynamic ? "#a78bfa" : "#e5e7eb", bgcolor: isDynamic ? "#faf5ff" : "#fff" }}>
+                    {/* Section header row */}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+                      <TextField
+                        size="small" fullWidth placeholder="Section title"
+                        value={section.title}
+                        onChange={(e) => updateSection({ title: e.target.value })}
+                        sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12, fontWeight: 600 } }}
+                      />
+                      <Tooltip title={isDynamic ? "Switch to static rows" : "Generate rows dynamically from date/time"}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              size="small"
+                              checked={isDynamic}
+                              onChange={(e) => toggleDynamic(e.target.checked)}
+                              sx={{ "& .MuiSwitch-thumb": { bgcolor: isDynamic ? "#7c3aed" : undefined } }}
+                            />
+                          }
+                          label={<Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}><AutoAwesomeIcon sx={{ fontSize: 13, color: isDynamic ? "#7c3aed" : "#9ca3af" }} /><Typography sx={{ fontSize: 11, fontWeight: 600, color: isDynamic ? "#7c3aed" : "#9ca3af" }}>Dynamic</Typography></Box>}
+                          sx={{ mr: 0, ml: 0.5, whiteSpace: "nowrap" }}
+                        />
+                      </Tooltip>
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          const updated = JSON.parse(JSON.stringify(data.sections));
+                          updated.splice(si, 1);
+                          updateNodeData(node.id, { sections: updated });
+                        }}
+                        disabled={(data.sections || []).length <= 1}
+                        sx={{ color: "#ef4444", "&:hover": { bgcolor: "#fef2f2" }, "&.Mui-disabled": { color: "#d1d5db" } }}
                       >
-                        <TextField
-                          size="small" placeholder="Title"
-                          value={row.title}
-                          onChange={(e) => {
-                            const updated = JSON.parse(JSON.stringify(data.sections));
-                            updated[si].rows[ri].title = e.target.value;
-                            updateNodeData(node.id, { sections: updated });
-                          }}
-                          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "6px", fontSize: 12 } }}
-                        />
-                        <TextField
-                          size="small" placeholder="Description (opt.)"
-                          value={row.description || ""}
-                          onChange={(e) => {
-                            const updated = JSON.parse(JSON.stringify(data.sections));
-                            updated[si].rows[ri].description = e.target.value;
-                            updateNodeData(node.id, { sections: updated });
-                          }}
-                          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "6px", fontSize: 12 } }}
-                        />
-                        <Box sx={{ px: 1, py: 0.5, borderRadius: "6px", bgcolor: "#f3f4f6", border: "1px dashed #d1d5db", minWidth: 0 }}>
-                          <Typography sx={{ fontSize: 9, color: "#6b7280" }}>ID</Typography>
-                          <Typography sx={{ fontSize: 10, fontFamily: "monospace", fontWeight: 600, color: "#374151" }} noWrap>{row.id}</Typography>
-                        </Box>
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            const updated = JSON.parse(JSON.stringify(data.sections));
-                            updated[si].rows.splice(ri, 1);
-                            updateNodeData(node.id, { sections: updated });
-                          }}
-                          disabled={(section.rows || []).length <= 1}
-                          sx={{ color: "#ef4444", "&:hover": { bgcolor: "#fef2f2" }, "&.Mui-disabled": { color: "#d1d5db" } }}
-                        >
-                          <DeleteOutlineIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    ))}
-                  </Stack>
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
 
-                  {(section.rows || []).length < 10 && (
-                    <Button
-                      size="small" startIcon={<AddIcon />} variant="outlined"
-                      onClick={() => {
-                        const updated = JSON.parse(JSON.stringify(data.sections));
-                        updated[si].rows.push({ id: genId(), title: "New Option", description: "" });
-                        updateNodeData(node.id, { sections: updated });
-                      }}
-                      sx={{ mt: 1, fontSize: 11, color: "#374151", borderColor: "#e5e7eb", "&:hover": { borderColor: "#22c55e", color: "#16a34a", bgcolor: "#f0fdf4" } }}
-                    >
-                      Add Row
-                    </Button>
-                  )}
-                </Paper>
-              ))}
+                    {/* ── DYNAMIC CONFIG ── */}
+                    {isDynamic && (
+                      <Box sx={{ bgcolor: "#f5f3ff", borderRadius: "8px", p: 1.5, border: "1px solid #ddd6fe", mb: 1 }}>
+                        <Stack spacing={1.5}>
+                          {/* Type picker */}
+                          <TextField
+                            select size="small" label="Generate rows for"
+                            value={dynType}
+                            onChange={(e) => {
+                              const t = e.target.value;
+                              const base: any = { type: t };
+                              if (t === "date")    Object.assign(base, { from_offset: 0, to_offset: 6, date_format: "EEE, DD MMM" });
+                              if (t === "hours")   Object.assign(base, { mode: "absolute", start_hour: 9, end_hour: 17, interval: 1, skip_past: true, date_context_key: "" });
+                              if (t === "minutes") Object.assign(base, { from_offset: 0, count: 8, interval: 30, skip_past: true });
+                              const updated = JSON.parse(JSON.stringify(data.sections));
+                              updated[si].dynamic = base;
+                              updateNodeData(node.id, { sections: updated });
+                            }}
+                            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                          >
+                            <MenuItem value="date">📅 Date</MenuItem>
+                            <MenuItem value="hours">🕐 Hours</MenuItem>
+                            <MenuItem value="minutes">⏱️ Minutes</MenuItem>
+                          </TextField>
+
+                          {/* DATE options */}
+                          {dynType === "date" && (
+                            <>
+                              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
+                                <TextField
+                                  size="small" type="number" label="From (days from today)"
+                                  value={section.dynamic?.from_offset ?? 0}
+                                  onChange={(e) => updateDynamic({ from_offset: Number(e.target.value) })}
+                                  inputProps={{ min: -30, max: 365 }}
+                                  helperText={section.dynamic?.from_offset === 0 ? "0 = Today" : section.dynamic?.from_offset === 1 ? "1 = Tomorrow" : section.dynamic?.from_offset === -1 ? "-1 = Yesterday" : ""}
+                                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                                />
+                                <TextField
+                                  size="small" type="number" label="To (days from today)"
+                                  value={section.dynamic?.to_offset ?? 6}
+                                  onChange={(e) => updateDynamic({ to_offset: Number(e.target.value) })}
+                                  inputProps={{ min: -30, max: 365 }}
+                                  helperText={`Shows ${Math.max(0, (section.dynamic?.to_offset ?? 6) - (section.dynamic?.from_offset ?? 0) + 1)} date${((section.dynamic?.to_offset ?? 6) - (section.dynamic?.from_offset ?? 0) + 1) !== 1 ? "s" : ""}`}
+                                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                                />
+                              </Box>
+                              <TextField
+                                select size="small" label="Date format"
+                                value={section.dynamic?.date_format || "EEE, DD MMM"}
+                                onChange={(e) => updateDynamic({ date_format: e.target.value })}
+                                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                              >
+                                <MenuItem value="EEE, DD MMM">Mon, 19 May</MenuItem>
+                                <MenuItem value="EEEE, DD MMM">Monday, 19 May</MenuItem>
+                                <MenuItem value="DD MMM YYYY">19 May 2025</MenuItem>
+                                <MenuItem value="DD/MM/YYYY">19/05/2025</MenuItem>
+                                <MenuItem value="EEEE">Monday (day name only)</MenuItem>
+                              </TextField>
+                            </>
+                          )}
+
+                          {/* HOURS options */}
+                          {dynType === "hours" && (
+                            <>
+                              {/* Mode selector */}
+                              <TextField
+                                select size="small" label="Hour mode"
+                                value={section.dynamic?.mode || "absolute"}
+                                onChange={(e) => {
+                                  const m = e.target.value;
+                                  if (m === "absolute") {
+                                    updateDynamic({ mode: "absolute", start_hour: 9, end_hour: 17, from_offset: undefined, count: undefined });
+                                  } else {
+                                    updateDynamic({ mode: "relative", from_offset: 0, count: 8, start_hour: undefined, end_hour: undefined });
+                                  }
+                                }}
+                                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                              >
+                                <MenuItem value="absolute">🕐 Fixed clock hours (e.g. 9 AM – 5 PM)</MenuItem>
+                                <MenuItem value="relative">⏩ Relative to now (e.g. next 8 hours)</MenuItem>
+                              </TextField>
+
+                              {/* Absolute mode fields */}
+                              {(section.dynamic?.mode === "absolute" || (!section.dynamic?.mode && section.dynamic?.start_hour !== undefined)) && (
+                                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1 }}>
+                                  <TextField
+                                    size="small" type="number" label="Start hour (0–23)"
+                                    value={section.dynamic?.start_hour ?? 9}
+                                    onChange={(e) => updateDynamic({ start_hour: Number(e.target.value) })}
+                                    inputProps={{ min: 0, max: 23 }}
+                                    helperText={`${section.dynamic?.start_hour ?? 9}:00`}
+                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                                  />
+                                  <TextField
+                                    size="small" type="number" label="End hour (0–23)"
+                                    value={section.dynamic?.end_hour ?? 17}
+                                    onChange={(e) => updateDynamic({ end_hour: Number(e.target.value) })}
+                                    inputProps={{ min: 0, max: 23 }}
+                                    helperText={`${section.dynamic?.end_hour ?? 17}:00`}
+                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                                  />
+                                  <TextField
+                                    select size="small" label="Interval"
+                                    value={section.dynamic?.interval ?? 1}
+                                    onChange={(e) => updateDynamic({ interval: Number(e.target.value) })}
+                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                                  >
+                                    <MenuItem value={1}>Every 1 hr</MenuItem>
+                                    <MenuItem value={2}>Every 2 hrs</MenuItem>
+                                    <MenuItem value={3}>Every 3 hrs</MenuItem>
+                                    <MenuItem value={4}>Every 4 hrs</MenuItem>
+                                  </TextField>
+                                </Box>
+                              )}
+
+                              {/* Relative mode fields */}
+                              {section.dynamic?.mode === "relative" && (
+                                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1 }}>
+                                  <TextField
+                                    size="small" type="number" label="Start (hrs from now)"
+                                    value={section.dynamic?.from_offset ?? 0}
+                                    onChange={(e) => updateDynamic({ from_offset: Number(e.target.value) })}
+                                    inputProps={{ min: 0, max: 24 }}
+                                    helperText="0 = current hour"
+                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                                  />
+                                  <TextField
+                                    size="small" type="number" label="No. of slots"
+                                    value={section.dynamic?.count ?? 8}
+                                    onChange={(e) => updateDynamic({ count: Number(e.target.value) })}
+                                    inputProps={{ min: 1, max: 24 }}
+                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                                  />
+                                  <TextField
+                                    select size="small" label="Interval"
+                                    value={section.dynamic?.interval ?? 1}
+                                    onChange={(e) => updateDynamic({ interval: Number(e.target.value) })}
+                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                                  >
+                                    <MenuItem value={1}>Every 1 hr</MenuItem>
+                                    <MenuItem value={2}>Every 2 hrs</MenuItem>
+                                    <MenuItem value={3}>Every 3 hrs</MenuItem>
+                                    <MenuItem value={4}>Every 4 hrs</MenuItem>
+                                  </TextField>
+                                </Box>
+                              )}
+
+                              {/* date_context_key — shown for both modes */}
+                              {(() => {
+                                const saveToKeys = (allNodes || [])
+                                  .filter((n: any) => n.id !== node.id && n.data?.save_to)
+                                  .map((n: any) => n.data.save_to as string)
+                                  .filter((v: string, i: number, arr: string[]) => arr.indexOf(v) === i);
+                                return (
+                                  <TextField
+                                    select size="small" label="Date context (optional)"
+                                    value={section.dynamic?.date_context_key || ""}
+                                    onChange={(e) => updateDynamic({ date_context_key: e.target.value || undefined })}
+                                    helperText="If set: skip past slots only when user picked today"
+                                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                                  >
+                                    <MenuItem value="">(none — always apply skip_past)</MenuItem>
+                                    {saveToKeys.map((key: string) => (
+                                      <MenuItem key={key} value={key}>{key}</MenuItem>
+                                    ))}
+                                  </TextField>
+                                );
+                              })()}
+
+                              <FormControlLabel
+                                control={<Switch size="small" checked={section.dynamic?.skip_past !== false} onChange={(e) => updateDynamic({ skip_past: e.target.checked })} />}
+                                label={<Typography sx={{ fontSize: 11, color: "#374151" }}>Skip past time slots</Typography>}
+                              />
+                            </>
+                          )}
+
+                          {/* MINUTES options */}
+                          {dynType === "minutes" && (
+                            <>
+                              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1 }}>
+                                <TextField
+                                  size="small" type="number" label="Start (mins from now)"
+                                  value={section.dynamic?.from_offset ?? 0}
+                                  onChange={(e) => updateDynamic({ from_offset: Number(e.target.value) })}
+                                  inputProps={{ min: 0, max: 120 }}
+                                  helperText="0 = right now"
+                                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                                />
+                                <TextField
+                                  size="small" type="number" label="No. of slots"
+                                  value={section.dynamic?.count ?? 8}
+                                  onChange={(e) => updateDynamic({ count: Number(e.target.value) })}
+                                  inputProps={{ min: 1, max: 48 }}
+                                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                                />
+                                <TextField
+                                  select size="small" label="Interval"
+                                  value={section.dynamic?.interval ?? 30}
+                                  onChange={(e) => updateDynamic({ interval: Number(e.target.value) })}
+                                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                                >
+                                  <MenuItem value={15}>Every 15 min</MenuItem>
+                                  <MenuItem value={30}>Every 30 min</MenuItem>
+                                  <MenuItem value={45}>Every 45 min</MenuItem>
+                                  <MenuItem value={60}>Every 60 min</MenuItem>
+                                </TextField>
+                              </Box>
+                              <FormControlLabel
+                                control={<Switch size="small" checked={section.dynamic?.skip_past !== false} onChange={(e) => updateDynamic({ skip_past: e.target.checked })} />}
+                                label={<Typography sx={{ fontSize: 11, color: "#374151" }}>Skip past time slots</Typography>}
+                              />
+                            </>
+                          )}
+
+                          {/* Preview hint */}
+                          <Box sx={{ px: 1.25, py: 0.75, borderRadius: "6px", bgcolor: "#ede9fe", border: "1px solid #ddd6fe" }}>
+                            <Typography sx={{ fontSize: 10.5, color: "#5b21b6", lineHeight: 1.6 }}>
+                              ✨ Rows are generated <strong>live</strong> when the message is sent — based on the date/time at that moment.
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </Box>
+                    )}
+
+                    {/* ── STATIC ROWS ── */}
+                    {!isDynamic && (
+                      <>
+                        <Stack spacing={0.75}>
+                          {(section.rows || []).map((row: any, ri: number) => (
+                            <Box
+                              key={row.id}
+                              sx={{ display: "grid", gridTemplateColumns: "1fr 1fr auto 36px", gap: 1, alignItems: "center", p: 1, borderRadius: "8px", bgcolor: "#f9fafb", border: "1px solid #f3f4f6" }}
+                            >
+                              <TextField
+                                size="small" placeholder="Title"
+                                value={row.title}
+                                onChange={(e) => {
+                                  const updated = JSON.parse(JSON.stringify(data.sections));
+                                  updated[si].rows[ri].title = e.target.value;
+                                  updateNodeData(node.id, { sections: updated });
+                                }}
+                                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "6px", fontSize: 12 } }}
+                              />
+                              <TextField
+                                size="small" placeholder="Description (opt.)"
+                                value={row.description || ""}
+                                onChange={(e) => {
+                                  const updated = JSON.parse(JSON.stringify(data.sections));
+                                  updated[si].rows[ri].description = e.target.value;
+                                  updateNodeData(node.id, { sections: updated });
+                                }}
+                                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "6px", fontSize: 12 } }}
+                              />
+                              <Box sx={{ px: 1, py: 0.5, borderRadius: "6px", bgcolor: "#f3f4f6", border: "1px dashed #d1d5db", minWidth: 0 }}>
+                                <Typography sx={{ fontSize: 9, color: "#6b7280" }}>ID</Typography>
+                                <Typography sx={{ fontSize: 10, fontFamily: "monospace", fontWeight: 600, color: "#374151" }} noWrap>{row.id}</Typography>
+                              </Box>
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  const updated = JSON.parse(JSON.stringify(data.sections));
+                                  updated[si].rows.splice(ri, 1);
+                                  updateNodeData(node.id, { sections: updated });
+                                }}
+                                disabled={(section.rows || []).length <= 1}
+                                sx={{ color: "#ef4444", "&:hover": { bgcolor: "#fef2f2" }, "&.Mui-disabled": { color: "#d1d5db" } }}
+                              >
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          ))}
+                        </Stack>
+
+                        {(section.rows || []).length < 10 && (
+                          <Button
+                            size="small" startIcon={<AddIcon />} variant="outlined"
+                            onClick={() => {
+                              const updated = JSON.parse(JSON.stringify(data.sections));
+                              updated[si].rows.push({ id: genId(), title: "New Option", description: "" });
+                              updateNodeData(node.id, { sections: updated });
+                            }}
+                            sx={{ mt: 1, fontSize: 11, color: "#374151", borderColor: "#e5e7eb", "&:hover": { borderColor: "#22c55e", color: "#16a34a", bgcolor: "#f0fdf4" } }}
+                          >
+                            Add Row
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </Paper>
+                );
+              })}
             </Stack>
 
             <Button
