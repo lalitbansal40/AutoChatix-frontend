@@ -2,7 +2,7 @@
 import { FormattedMessage } from 'react-intl';
 
 // assets
-import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined, WalletOutlined, ThunderboltOutlined, CreditCardOutlined, BranchesOutlined } from '@ant-design/icons';
+import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined, WalletOutlined, ThunderboltOutlined, CreditCardOutlined, BranchesOutlined, ContactsOutlined } from '@ant-design/icons';
 
 // type
 import { NavItemType } from 'types/menu';
@@ -22,6 +22,7 @@ const icons = {
   ThunderboltOutlined,
   CreditCardOutlined,
   BranchesOutlined,
+  ContactsOutlined,
 };
 
 // ==============================|| MENU ITEMS - SUPPORT ||============================== //
@@ -72,6 +73,13 @@ const other: NavItemType = {
       type: 'item',
       url: '/integrations',
       icon: icons.ApiOutlined
+    },
+    {
+      id: 'Leads',
+      title: <FormattedMessage id="Leads" defaultMessage="Leads" />,
+      type: 'item',
+      url: '/leads',
+      icon: icons.ContactsOutlined
     },
     {
       id: 'ContactFields',
