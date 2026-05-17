@@ -23,6 +23,7 @@ import { IntegrationDefinition } from "types/integration";
 
 const BUILTIN_TRIGGERS = [
   { value: "new_message_received", icon: "📩", label: "Incoming Message", desc: "When contact sends a message" },
+  { value: "callback_id",          icon: "🔘", label: "Callback ID",       desc: "When a button/list ID is tapped" },
   { value: "outgoing_message",     icon: "📤", label: "Outgoing Message",  desc: "When you send a message" },
   { value: "webhook_received",     icon: "🔗", label: "Webhook",           desc: "On webhook call" },
   { value: "call_completed",       icon: "📞", label: "Call Completed",    desc: "After a call ends" },
