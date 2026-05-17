@@ -770,6 +770,7 @@ const AutomationBuilder = () => {
   const [callbackIds, setCallbackIds] = useState<string[]>([]);
   const [callbackInput, setCallbackInput] = useState("");
   const [callbackMatchType, setCallbackMatchType] = useState<"exact" | "prefix" | "contains">("exact");
+  const [pendingTriggerType, setPendingTriggerType] = useState<string>("new_message_received");
   const [webhookMappings, setWebhookMappings] = useState<WebhookMapping[]>([]);
 
   const { user } = useAuth();
@@ -1312,6 +1313,17 @@ const AutomationBuilder = () => {
     }
   }, [automation?.trigger, automation?.trigger_config?.callback_ids, automation?.trigger_config?.match_type]);
 
+  // Sync pendingTriggerType when popup opens or automation changes
+  useEffect(() => {
+    if (openTriggerPopup) {
+      setPendingTriggerType(automation?.trigger || "new_message_received");
+      if (automation?.trigger === "callback_id") {
+        setCallbackIds(automation.trigger_config?.callback_ids || []);
+        setCallbackMatchType(automation.trigger_config?.match_type || "exact");
+      }
+    }
+  }, [openTriggerPopup]);
+
   // ── channel id (handles populated object or string) ──
   const channelId: string | undefined =
     typeof automation?.channel_id === "object"
@@ -1434,13 +1446,23 @@ const AutomationBuilder = () => {
         selectedNode && updateNodeData(selectedNode.id, { keywords });
       }
 
-      if (automation?.trigger === "callback_id") {
+      // Handle callback_id — including switching trigger type
+      if (pendingTriggerType === "callback_id") {
         await automationService.updateAutomation(automation._id, {
+          ...(automation?.trigger !== "callback_id" ? { trigger: "callback_id" } : {}),
           trigger_config: {
-            ...(automation.trigger_config || {}),
             callback_ids: callbackIds,
             match_type: callbackMatchType,
           },
+        });
+        queryClient.invalidateQueries({ queryKey: ["automation", id] });
+      }
+
+      // Switching back FROM callback_id → new_message_received
+      if (automation?.trigger === "callback_id" && pendingTriggerType !== "callback_id") {
+        await automationService.updateAutomation(automation._id, {
+          trigger: "new_message_received",
+          trigger_config: {},
         });
         queryClient.invalidateQueries({ queryKey: ["automation", id] });
       }
@@ -2196,7 +2218,7 @@ const AutomationBuilder = () => {
 
         {/* ── CONTENT ── */}
         <DialogContent sx={{ p: 2.5 }}>
-          {automation?.trigger === "new_message_received" && (
+          {(automation?.trigger === "new_message_received" || automation?.trigger === "callback_id") && (
             <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
               <Box>
                 <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.6, mb: 1.25 }}>
@@ -2204,14 +2226,25 @@ const AutomationBuilder = () => {
                 </Typography>
                 <Stack spacing={1}>
                   {[
-                    { value: "all", icon: "📩", title: "All Messages", desc: "Fire for every incoming message" },
-                    { value: "keyword", icon: "🔑", title: "Keyword Match", desc: "Only fire when message matches a keyword" },
+                    { value: "all",         icon: "📩", title: "All Messages",  desc: "Fire for every incoming message" },
+                    { value: "keyword",     icon: "🔑", title: "Keyword Match", desc: "Only fire when message matches a keyword" },
+                    { value: "callback_id", icon: "🔘", title: "Callback ID",   desc: "Fire when a button or list reply ID matches" },
                   ].map((opt) => {
-                    const active = (selectedNode?.data?.triggerType || "all") === opt.value;
+                    const currentMode = pendingTriggerType === "callback_id"
+                      ? "callback_id"
+                      : (selectedNode?.data?.triggerType || "all");
+                    const active = currentMode === opt.value;
                     return (
                       <Box
                         key={opt.value}
-                        onClick={() => selectedNode && updateNodeData(selectedNode.id, { triggerType: opt.value })}
+                        onClick={() => {
+                          if (opt.value === "callback_id") {
+                            setPendingTriggerType("callback_id");
+                          } else {
+                            setPendingTriggerType("new_message_received");
+                            selectedNode && updateNodeData(selectedNode.id, { triggerType: opt.value });
+                          }
+                        }}
                         sx={{
                           display: "flex", alignItems: "center", gap: 1.5, p: 1.5, borderRadius: "10px",
                           border: "2px solid", borderColor: active ? "#f97316" : "#e5e7eb",
@@ -2239,7 +2272,7 @@ const AutomationBuilder = () => {
                 </Stack>
               </Box>
 
-              {selectedNode?.data?.triggerType === "keyword" && (
+              {pendingTriggerType !== "callback_id" && selectedNode?.data?.triggerType === "keyword" && (
                 <Box>
                   <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.6, mb: 1 }}>
                     Keywords
@@ -2295,125 +2328,111 @@ const AutomationBuilder = () => {
                   )}
                 </Box>
               )}
-            </Box>
-          )}
 
-          {automation?.trigger === "callback_id" && (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-
-              {/* Info banner */}
-              <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, p: 2, borderRadius: "12px", bgcolor: "#eff6ff", border: "1px solid #bfdbfe" }}>
-                <Box sx={{ width: 40, height: 40, borderRadius: "10px", bgcolor: "#dbeafe", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
-                  🔘
-                </Box>
-                <Box>
-                  <Typography fontSize={13} fontWeight={700} color="#1e40af">Callback ID Trigger</Typography>
-                  <Typography fontSize={11.5} color="#1e40af" sx={{ mt: 0.4, lineHeight: 1.6 }}>
-                    This automation fires when a contact taps a <strong>button</strong>, <strong>list row</strong>, or <strong>carousel button</strong> whose ID matches one of the IDs below — even if the contact is in a different automation flow.
-                  </Typography>
-                </Box>
-              </Box>
-
-              {/* Match type */}
-              <Box>
-                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.6, mb: 1 }}>
-                  Match Mode
-                </Typography>
-                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0.75 }}>
-                  {[
-                    { value: "exact",    label: "Exact",    desc: "ID must match exactly",        icon: "🎯" },
-                    { value: "prefix",   label: "Prefix",   desc: "ID must start with the value", icon: "▶️" },
-                    { value: "contains", label: "Contains", desc: "ID must contain the value",     icon: "🔍" },
-                  ].map((opt) => {
-                    const active = callbackMatchType === opt.value;
-                    return (
-                      <Box
-                        key={opt.value}
-                        onClick={() => setCallbackMatchType(opt.value as any)}
-                        sx={{
-                          p: 1.25, borderRadius: "10px", cursor: "pointer", userSelect: "none",
-                          border: "2px solid", borderColor: active ? "#3b82f6" : "#e5e7eb",
-                          bgcolor: active ? "#eff6ff" : "#f9fafb",
-                          transition: "all 0.15s",
-                          "&:hover": { borderColor: "#3b82f6", bgcolor: "#eff6ff" },
-                        }}
-                      >
-                        <Typography fontSize={16} mb={0.25}>{opt.icon}</Typography>
-                        <Typography fontSize={12} fontWeight={700} color={active ? "#1d4ed8" : "#374151"} lineHeight={1.2}>{opt.label}</Typography>
-                        <Typography fontSize={10} color="text.secondary" lineHeight={1.3}>{opt.desc}</Typography>
-                      </Box>
-                    );
-                  })}
-                </Box>
-              </Box>
-
-              {/* Callback IDs input */}
-              <Box>
-                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.6, mb: 1 }}>
-                  Callback IDs
-                </Typography>
-                <Box sx={{ display: "flex", gap: 1, mb: 1.5 }}>
-                  <TextField
-                    fullWidth size="small"
-                    placeholder={callbackMatchType === "exact" ? "e.g. book_slot_1, confirm_order" : callbackMatchType === "prefix" ? "e.g. slot_, book_" : "e.g. appointment, slot"}
-                    value={callbackInput}
-                    onChange={(e) => setCallbackInput(e.target.value)}
-                    onKeyDown={(e: any) => {
-                      if (e.key === "Enter" && callbackInput.trim()) {
-                        setCallbackIds((prev) => [...prev, callbackInput.trim()]);
-                        setCallbackInput("");
-                      }
-                    }}
-                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13, fontFamily: "monospace" } }}
-                  />
-                  <Button
-                    variant="contained"
-                    onClick={() => {
-                      if (!callbackInput.trim()) return;
-                      setCallbackIds((prev) => [...prev, callbackInput.trim()]);
-                      setCallbackInput("");
-                    }}
-                    sx={{ borderRadius: "8px", bgcolor: "#3b82f6", "&:hover": { bgcolor: "#2563eb" }, fontWeight: 600, px: 2.5, flexShrink: 0, boxShadow: "none" }}
-                  >
-                    Add
-                  </Button>
-                </Box>
-                {callbackIds.length > 0 ? (
-                  <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap" }}>
-                    {callbackIds.map((k, i) => (
-                      <Box
-                        key={i}
-                        sx={{ display: "flex", alignItems: "center", gap: 0.5, px: 1.25, py: 0.4, borderRadius: "20px", bgcolor: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, fontWeight: 600, color: "#1d4ed8", fontFamily: "monospace" }}
-                      >
-                        {k}
-                        <Box
-                          component="span"
-                          onClick={() => setCallbackIds((prev) => prev.filter((_, idx) => idx !== i))}
-                          sx={{ ml: 0.5, cursor: "pointer", fontSize: 10, lineHeight: 1, opacity: 0.7, "&:hover": { opacity: 1 } }}
-                        >
-                          ✕
-                        </Box>
-                      </Box>
-                    ))}
+              {/* ── CALLBACK ID CONFIG (inline, shown when callback_id mode selected) ── */}
+              {pendingTriggerType === "callback_id" && (
+                <>
+                  {/* Match type */}
+                  <Box>
+                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.6, mb: 1 }}>
+                      Match Mode
+                    </Typography>
+                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0.75 }}>
+                      {[
+                        { value: "exact",    label: "Exact",    desc: "ID must match exactly",        icon: "🎯" },
+                        { value: "prefix",   label: "Prefix",   desc: "ID must start with the value", icon: "▶️" },
+                        { value: "contains", label: "Contains", desc: "ID must contain the value",     icon: "🔍" },
+                      ].map((opt) => {
+                        const active = callbackMatchType === opt.value;
+                        return (
+                          <Box
+                            key={opt.value}
+                            onClick={() => setCallbackMatchType(opt.value as any)}
+                            sx={{
+                              p: 1.25, borderRadius: "10px", cursor: "pointer", userSelect: "none",
+                              border: "2px solid", borderColor: active ? "#3b82f6" : "#e5e7eb",
+                              bgcolor: active ? "#eff6ff" : "#f9fafb",
+                              transition: "all 0.15s",
+                              "&:hover": { borderColor: "#3b82f6", bgcolor: "#eff6ff" },
+                            }}
+                          >
+                            <Typography fontSize={16} mb={0.25}>{opt.icon}</Typography>
+                            <Typography fontSize={12} fontWeight={700} color={active ? "#1d4ed8" : "#374151"} lineHeight={1.2}>{opt.label}</Typography>
+                            <Typography fontSize={10} color="text.secondary" lineHeight={1.3}>{opt.desc}</Typography>
+                          </Box>
+                        );
+                      })}
+                    </Box>
                   </Box>
-                ) : (
-                  <Typography fontSize={12} color="text.secondary" sx={{ fontStyle: "italic" }}>
-                    Add at least one ID then click Save Settings
-                  </Typography>
-                )}
-              </Box>
 
-              {/* Variable hint */}
-              <Box sx={{ p: 1.5, borderRadius: "10px", bgcolor: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-                <Typography fontSize={11} fontWeight={700} color="#166534" mb={0.5}>💡 Available in this automation</Typography>
-                <Box component="span" sx={{ display: "inline-block", mr: 0.75, px: 1, py: 0.25, borderRadius: "6px", bgcolor: "#dcfce7", color: "#166534", fontSize: 11, fontFamily: "monospace", fontWeight: 600 }}>
-                  {`{{trigger_callback_id}}`}
-                </Box>
-                <Typography fontSize={11} color="#166534" sx={{ mt: 0.5 }}>
-                  The exact button/list ID that fired this automation — use it in messages or Eval nodes.
-                </Typography>
-              </Box>
+                  {/* Callback IDs input */}
+                  <Box>
+                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.6, mb: 1 }}>
+                      Callback IDs
+                    </Typography>
+                    <Box sx={{ display: "flex", gap: 1, mb: 1.5 }}>
+                      <TextField
+                        fullWidth size="small"
+                        placeholder={callbackMatchType === "exact" ? "e.g. book_slot_1, confirm_order" : callbackMatchType === "prefix" ? "e.g. slot_, book_" : "e.g. appointment, slot"}
+                        value={callbackInput}
+                        onChange={(e) => setCallbackInput(e.target.value)}
+                        onKeyDown={(e: any) => {
+                          if (e.key === "Enter" && callbackInput.trim()) {
+                            setCallbackIds((prev) => [...prev, callbackInput.trim()]);
+                            setCallbackInput("");
+                          }
+                        }}
+                        sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13, fontFamily: "monospace" } }}
+                      />
+                      <Button
+                        variant="contained"
+                        onClick={() => {
+                          if (!callbackInput.trim()) return;
+                          setCallbackIds((prev) => [...prev, callbackInput.trim()]);
+                          setCallbackInput("");
+                        }}
+                        sx={{ borderRadius: "8px", bgcolor: "#3b82f6", "&:hover": { bgcolor: "#2563eb" }, fontWeight: 600, px: 2.5, flexShrink: 0, boxShadow: "none" }}
+                      >
+                        Add
+                      </Button>
+                    </Box>
+                    {callbackIds.length > 0 ? (
+                      <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap" }}>
+                        {callbackIds.map((k, i) => (
+                          <Box
+                            key={i}
+                            sx={{ display: "flex", alignItems: "center", gap: 0.5, px: 1.25, py: 0.4, borderRadius: "20px", bgcolor: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12, fontWeight: 600, color: "#1d4ed8", fontFamily: "monospace" }}
+                          >
+                            {k}
+                            <Box
+                              component="span"
+                              onClick={() => setCallbackIds((prev) => prev.filter((_, idx) => idx !== i))}
+                              sx={{ ml: 0.5, cursor: "pointer", fontSize: 10, lineHeight: 1, opacity: 0.7, "&:hover": { opacity: 1 } }}
+                            >
+                              ✕
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
+                    ) : (
+                      <Typography fontSize={12} color="text.secondary" sx={{ fontStyle: "italic" }}>
+                        Add at least one ID then click Save Settings
+                      </Typography>
+                    )}
+                  </Box>
 
+                  {/* Variable hint */}
+                  <Box sx={{ p: 1.5, borderRadius: "10px", bgcolor: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                    <Typography fontSize={11} fontWeight={700} color="#166534" mb={0.5}>💡 Available in this automation</Typography>
+                    <Box component="span" sx={{ display: "inline-block", mr: 0.75, px: 1, py: 0.25, borderRadius: "6px", bgcolor: "#dcfce7", color: "#166534", fontSize: 11, fontFamily: "monospace", fontWeight: 600 }}>
+                      {`{{trigger_callback_id}}`}
+                    </Box>
+                    <Typography fontSize={11} color="#166534" sx={{ mt: 0.5 }}>
+                      The exact button/list ID that fired this automation — use it in messages or Eval nodes.
+                    </Typography>
+                  </Box>
+                </>
+              )}
             </Box>
           )}
 
