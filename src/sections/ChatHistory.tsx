@@ -244,36 +244,40 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
     let parsed: any = {};
     try { parsed = JSON.parse(response); } catch { return <Typography>{response}</Typography>; }
 
+    const HIDDEN_KEYS = new Set(['flow_token', 'token', '_flow_data']);
     const formatKey = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-    const renderObject = (obj: any): any => Object.entries(obj).map(([key, value]: any) => {
-      if (typeof value === 'object' && value !== null) {
-        return (
-          <Stack key={key} spacing={0.5} sx={{ mt: 1 }}>
-            <Typography fontWeight={600} fontSize={13}>{formatKey(key)}</Typography>
-            <Stack sx={{ border: '1px solid #eee', borderRadius: 2, overflow: 'hidden' }}>
-              {Object.entries(value).map(([k, v]: any, i, arr) => (
-                <Stack key={k} direction="row" justifyContent="space-between" sx={{ px: 1.5, py: 1, background: i % 2 === 0 ? '#fafafa' : '#fff', borderBottom: i !== arr.length - 1 ? '1px solid #eee' : 'none' }}>
-                  <Typography fontSize={12} fontWeight={500}>{formatKey(k)}</Typography>
-                  <Typography fontSize={12}>{String(v)}</Typography>
-                </Stack>
-              ))}
-            </Stack>
-          </Stack>
-        );
-      }
+    const visibleEntries = Object.entries(parsed).filter(([key]) => !HIDDEN_KEYS.has(key));
+
+    // Dynamic flow: only flow_token was in response_json — show clean submitted badge
+    if (visibleEntries.length === 0) {
       return (
-        <Stack key={key} direction="row" justifyContent="space-between" sx={{ px: 0.5, py: 0.5 }}>
-          <Typography fontSize={12} fontWeight={500}>{formatKey(key)}</Typography>
-          <Typography fontSize={12}>{String(value)}</Typography>
+        <Stack direction="row" alignItems="center" spacing={1}
+          sx={{ px: 1.5, py: 1, borderRadius: '10px', bgcolor: '#f0fdf4', border: '1px solid #bbf7d0', display: 'inline-flex' }}>
+          <Typography sx={{ fontSize: 15 }}>✅</Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#15803d' }}>Form Submitted</Typography>
         </Stack>
       );
-    });
+    }
 
+    // Static flow: show actual submitted fields
     return (
-      <Stack spacing={1}>
-        <Typography variant="body2" fontWeight={600}>Flow Response</Typography>
-        {renderObject(parsed)}
+      <Stack spacing={0.75}>
+        <Stack direction="row" alignItems="center" spacing={0.75}>
+          <Typography sx={{ fontSize: 13 }}>✅</Typography>
+          <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#15803d' }}>Form Submitted</Typography>
+        </Stack>
+        <Stack sx={{ border: '1px solid #d1fae5', borderRadius: '8px', overflow: 'hidden', bgcolor: '#f0fdf4' }}>
+          {visibleEntries.map(([key, value]: any, i, arr) => (
+            <Stack key={key} direction="row" justifyContent="space-between" alignItems="center"
+              sx={{ px: 1.5, py: 0.75, borderBottom: i !== arr.length - 1 ? '1px solid #d1fae5' : 'none' }}>
+              <Typography sx={{ fontSize: 11, fontWeight: 600, color: '#6b7280' }}>{formatKey(key)}</Typography>
+              <Typography sx={{ fontSize: 11, color: '#111827', maxWidth: 150, textAlign: 'right', wordBreak: 'break-word' }}>
+                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+              </Typography>
+            </Stack>
+          ))}
+        </Stack>
       </Stack>
     );
   };
