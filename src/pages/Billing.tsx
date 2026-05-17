@@ -29,17 +29,15 @@ import {
   CheckCircleFilled,
   CloseCircleFilled,
   CrownOutlined,
-  DisconnectOutlined,
   PlusOutlined,
   SafetyCertificateFilled,
   SyncOutlined,
   TeamOutlined,
-  ThunderboltFilled,
   WalletOutlined,
   WifiOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchMySubscription, fetchPlanPrices, createRenewalLink, fetchAddonStatus, createChannelAddonLink, createUserAddonLink, updateAutoRenew, renewFromWallet, cancelAutoDebit, PlanPrice } from 'service/subscription.service';
+import { fetchMySubscription, fetchPlanPrices, createRenewalLink, fetchAddonStatus, createChannelAddonLink, createUserAddonLink, updateAutoRenew, renewFromWallet, PlanPrice } from 'service/subscription.service';
 import { walletService } from 'service/wallet.service';
 import MainCard from 'components/MainCard';
 import useAuth from 'hooks/useAuth';
@@ -328,7 +326,6 @@ export default function Billing() {
   const [addonModal, setAddonModal] = useState<'channel' | 'user' | null>(null);
   const [autoRenewSaving, setAutoRenewSaving] = useState(false);
   const [walletRenewLoading, setWalletRenewLoading] = useState(false);
-  const [cancelAutoDebitLoading, setCancelAutoDebitLoading] = useState(false);
   const [billingError, setBillingError] = useState('');
 
   const { data: subData, isLoading: subLoading } = useQuery({
@@ -395,20 +392,6 @@ export default function Billing() {
       setBillingError(err?.response?.data?.message || err?.message || 'Unable to renew from wallet');
     } finally {
       setWalletRenewLoading(false);
-    }
-  };
-
-  const handleCancelAutoDebit = async () => {
-    if (!window.confirm('Cancel auto-debit? Your plan will continue until expiry but will not be renewed automatically.')) return;
-    setCancelAutoDebitLoading(true);
-    setBillingError('');
-    try {
-      await cancelAutoDebit();
-      refreshBilling();
-    } catch (err: any) {
-      setBillingError(err?.response?.data?.message || err?.message || 'Unable to cancel auto-debit');
-    } finally {
-      setCancelAutoDebitLoading(false);
     }
   };
 
@@ -595,60 +578,6 @@ export default function Billing() {
                     </Box>
                   )}
 
-                  {/* ── Auto-debit (Razorpay Subscription) status ── */}
-                  {sub.razorpay_subscription_id && (
-                    <Box
-                      sx={{
-                        border: '1.5px solid',
-                        borderColor: sub.auto_charge_enabled && sub.razorpay_subscription_status !== 'halted'
-                          ? 'success.light'
-                          : 'warning.light',
-                        borderRadius: 2,
-                        p: 2,
-                        bgcolor: sub.auto_charge_enabled && sub.razorpay_subscription_status !== 'halted'
-                          ? 'success.lighter'
-                          : 'warning.lighter',
-                      }}
-                    >
-                      <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" gap={1.5}>
-                        <Stack direction="row" alignItems="center" gap={1}>
-                          <ThunderboltFilled style={{
-                            fontSize: 18,
-                            color: sub.razorpay_subscription_status === 'halted' ? '#fa8c16' : '#52c41a',
-                          }} />
-                          <Box>
-                            <Typography variant="subtitle2" fontWeight={700}>
-                              Auto-debit {sub.razorpay_subscription_status === 'halted' ? '— Payment Failed' : 'Active'}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {sub.razorpay_subscription_status === 'halted'
-                                ? 'Razorpay could not charge your saved payment method. Please update it via Razorpay or renew manually.'
-                                : 'Your card/UPI is charged automatically each month via Razorpay. No action needed.'}
-                            </Typography>
-                            {sub.auto_renew_failed_at && sub.razorpay_subscription_status === 'halted' && (
-                              <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5 }}>
-                                {sub.auto_renew_failure_reason}
-                              </Typography>
-                            )}
-                          </Box>
-                        </Stack>
-                        {sub.auto_charge_enabled && sub.razorpay_subscription_status !== 'cancelled' && (
-                          <Button
-                            size="small"
-                            color="error"
-                            variant="outlined"
-                            startIcon={cancelAutoDebitLoading ? <CircularProgress size={14} /> : <DisconnectOutlined />}
-                            disabled={cancelAutoDebitLoading}
-                            onClick={handleCancelAutoDebit}
-                          >
-                            Cancel Auto-debit
-                          </Button>
-                        )}
-                      </Stack>
-                    </Box>
-                  )}
-
-                  {/* ── Wallet auto-renew (fallback / manual) ── */}
                   <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2, bgcolor: 'background.paper' }}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" gap={1.5}>
                       <Box>
@@ -656,7 +585,7 @@ export default function Billing() {
                         <Typography variant="caption" color="text.secondary">
                           On expiry, plan and active add-ons are deducted from wallet balance automatically.
                         </Typography>
-                        {sub.auto_renew_failed_at && !sub.razorpay_subscription_id && (
+                        {sub.auto_renew_failed_at && (
                           <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5 }}>
                             Last auto-renew failed: {sub.auto_renew_failure_reason || 'Wallet balance was insufficient'}
                           </Typography>

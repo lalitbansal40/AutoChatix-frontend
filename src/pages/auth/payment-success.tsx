@@ -13,9 +13,6 @@ const PaymentSuccess = () => {
   // Razorpay appends ?razorpay_payment_link_status=paid (or cancelled)
   const status = searchParams.get('razorpay_payment_link_status') || 'paid';
   const isPaid = status === 'paid';
-  // type=renewal → user was already logged in (billing page upgrade/renew)
-  const isRenewal = searchParams.get('type') === 'renewal';
-  const redirectTo = isRenewal ? '/billing' : '/login';
 
   useEffect(() => {
     if (!isPaid) return;
@@ -23,13 +20,13 @@ const PaymentSuccess = () => {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          navigate(redirectTo, { replace: true });
+          navigate('/login', { replace: true });
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [isPaid, navigate, redirectTo]);
+  }, [isPaid, navigate]);
 
   return (
     <Box
@@ -50,15 +47,13 @@ const PaymentSuccess = () => {
               Payment Successful! 🎉
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              {isRenewal
-              ? 'Your plan has been renewed successfully.'
-              : 'Your AutoChatix subscription is now active. Log in to start building your WhatsApp bot.'}
+              Your AutoChatix subscription is now active. Log in to start building your WhatsApp bot.
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Redirecting to {isRenewal ? 'billing' : 'login'} in <strong>{countdown}</strong> seconds…
+              Redirecting to login in <strong>{countdown}</strong> seconds…
             </Typography>
-            <Button variant="contained" size="large" onClick={() => navigate(redirectTo, { replace: true })}>
-              {isRenewal ? 'Go to Billing' : 'Login Now'}
+            <Button variant="contained" size="large" onClick={() => navigate('/login', { replace: true })}>
+              Login Now
             </Button>
           </>
         ) : (
