@@ -16,6 +16,10 @@ export interface SubscriptionInfo {
   plan_name: string;
   payment_status: 'pending' | 'paid' | 'expired' | 'cancelled';
   is_active: boolean;
+  auto_renew_enabled?: boolean;
+  last_auto_renewed_at?: string;
+  auto_renew_failed_at?: string;
+  auto_renew_failure_reason?: string;
   payment_start_date?: string;
   payment_end_date?: string;
   base_amount?: number;
@@ -40,6 +44,18 @@ export const fetchMySubscription = async (): Promise<{ subscription: Subscriptio
 export const createRenewalLink = async (plan_name?: string): Promise<string> => {
   const { data } = await axios.post('/auth/renew-subscription', { plan_name });
   return data.payment_url;
+};
+
+/* Renew immediately from wallet balance */
+export const renewFromWallet = async (plan_name?: string) => {
+  const { data } = await axios.post('/auth/renew-subscription', { plan_name, pay_from_wallet: true });
+  return data;
+};
+
+/* Enable/disable subscription auto-renew from wallet */
+export const updateAutoRenew = async (enabled: boolean): Promise<SubscriptionInfo> => {
+  const { data } = await axios.put('/auth/my-subscription/auto-renew', { enabled });
+  return data.subscription;
 };
 
 /* Create wallet top-up payment link */

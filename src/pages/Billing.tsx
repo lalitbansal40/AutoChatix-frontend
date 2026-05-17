@@ -15,6 +15,7 @@ import {
   Grid,
   LinearProgress,
   Stack,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -35,8 +36,8 @@ import {
   WalletOutlined,
   WifiOutlined,
 } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
-import { fetchMySubscription, fetchPlanPrices, createRenewalLink, fetchAddonStatus, createChannelAddonLink, createUserAddonLink, PlanPrice } from 'service/subscription.service';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchMySubscription, fetchPlanPrices, createRenewalLink, fetchAddonStatus, createChannelAddonLink, createUserAddonLink, updateAutoRenew, renewFromWallet, PlanPrice } from 'service/subscription.service';
 import { walletService } from 'service/wallet.service';
 import MainCard from 'components/MainCard';
 import useAuth from 'hooks/useAuth';
@@ -318,10 +319,14 @@ const AddonModal = ({
 /* ─── Main Page ─── */
 export default function Billing() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const isSuperAdmin = (user as any)?.role === 'superadmin';
 
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [addonModal, setAddonModal] = useState<'channel' | 'user' | null>(null);
+  const [autoRenewSaving, setAutoRenewSaving] = useState(false);
+  const [walletRenewLoading, setWalletRenewLoading] = useState(false);
+  const [billingError, setBillingError] = useState('');
 
   const { data: subData, isLoading: subLoading } = useQuery({
     queryKey: ['my-subscription'],
@@ -356,6 +361,39 @@ export default function Billing() {
   const planColor = PLAN_COLORS[sub?.plan_name || ''] || '#1890ff';
   const ledger = (ledgerData as any)?.ledger || [];
   const wallet = (walletInfo as any)?.wallet;
+  const availableWalletBalance = (wallet?.balance || 0) - (wallet?.hold_balance || 0);
+
+  const refreshBilling = () => {
+    queryClient.invalidateQueries({ queryKey: ['my-subscription'] });
+    queryClient.invalidateQueries({ queryKey: ['billing-ledger'] });
+    queryClient.invalidateQueries({ queryKey: ['wallet'] });
+  };
+
+  const handleAutoRenewToggle = async (enabled: boolean) => {
+    setAutoRenewSaving(true);
+    setBillingError('');
+    try {
+      await updateAutoRenew(enabled);
+      refreshBilling();
+    } catch (err: any) {
+      setBillingError(err?.response?.data?.message || err?.message || 'Unable to update auto-renew');
+    } finally {
+      setAutoRenewSaving(false);
+    }
+  };
+
+  const handleWalletRenew = async () => {
+    setWalletRenewLoading(true);
+    setBillingError('');
+    try {
+      await renewFromWallet(sub?.plan_name);
+      refreshBilling();
+    } catch (err: any) {
+      setBillingError(err?.response?.data?.message || err?.message || 'Unable to renew from wallet');
+    } finally {
+      setWalletRenewLoading(false);
+    }
+  };
 
   const daysProgress =
     sub?.payment_start_date && sub?.payment_end_date
@@ -539,6 +577,49 @@ export default function Billing() {
                       />
                     </Box>
                   )}
+
+                  <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2, bgcolor: 'background.paper' }}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" gap={1.5}>
+                      <Box>
+                        <Typography variant="subtitle2" fontWeight={700}>Auto-renew from wallet</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          On expiry, plan and active add-ons are deducted from wallet balance automatically.
+                        </Typography>
+                        {sub.auto_renew_failed_at && (
+                          <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5 }}>
+                            Last auto-renew failed: {sub.auto_renew_failure_reason || 'Wallet balance was insufficient'}
+                          </Typography>
+                        )}
+                      </Box>
+                      <Stack direction="row" alignItems="center" gap={1}>
+                        <Typography variant="caption" color={sub.auto_renew_enabled ? 'success.main' : 'text.secondary'}>
+                          {sub.auto_renew_enabled ? 'Enabled' : 'Off'}
+                        </Typography>
+                        <Switch
+                          checked={Boolean(sub.auto_renew_enabled)}
+                          disabled={autoRenewSaving}
+                          onChange={(event) => handleAutoRenewToggle(event.target.checked)}
+                        />
+                      </Stack>
+                    </Stack>
+                    <Divider sx={{ my: 1.5 }} />
+                    <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" gap={1}>
+                      <Typography variant="caption" color="text.secondary">
+                        Available wallet: {fmtMoney(availableWalletBalance, wallet?.currency)}
+                      </Typography>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={walletRenewLoading ? <CircularProgress size={14} /> : <WalletOutlined />}
+                        disabled={walletRenewLoading || !sub}
+                        onClick={handleWalletRenew}
+                      >
+                        Renew from Wallet
+                      </Button>
+                    </Stack>
+                  </Box>
+
+                  {billingError && <Alert severity="error">{billingError}</Alert>}
                 </Stack>
               )}
             </MainCard>
