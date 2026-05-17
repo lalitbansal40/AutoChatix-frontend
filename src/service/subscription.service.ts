@@ -26,6 +26,10 @@ export interface SubscriptionInfo {
   tax_amount?: number;
   amount_paid?: number;
   currency?: string;
+  // Razorpay Subscription (auto-debit)
+  razorpay_subscription_id?: string;
+  razorpay_subscription_status?: string;
+  auto_charge_enabled?: boolean;
 }
 
 /* Fetch active plan prices (no auth required) */
@@ -91,4 +95,9 @@ export const createChannelAddonLink = async (qty: number): Promise<string> => {
 export const createUserAddonLink = async (qty: number): Promise<string> => {
   const { data } = await axios.post('/addon/user', { qty });
   return data.payment_url;
+};
+
+/* Cancel Razorpay auto-debit subscription */
+export const cancelAutoDebit = async (): Promise<void> => {
+  await axios.post('/auth/cancel-auto-debit');
 };
