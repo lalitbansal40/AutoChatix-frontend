@@ -9,8 +9,10 @@ import ApiRequestEditor from "./ApiRequestEditor";
 import AiResponseEditor from "./AiResponseEditor";
 import WhatsAppNotificationEditor from "./WhatsAppNotificationEditor";
 import ConditionRouterEditor from "./ConditionRouterEditor";
+import EvalNodeEditor from "./EvalNodeEditor";
 
 export const NODE_EDITORS: any = {
+  eval: EvalNodeEditor,
   condition_router: ConditionRouterEditor,
   auto_reply: AutoReplyEditor,
   list: AutoReplyEditor,

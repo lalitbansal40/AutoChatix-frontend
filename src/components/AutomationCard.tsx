@@ -30,6 +30,7 @@ const TRIGGER_META: Record<string, { icon: string; label: string }> = {
   webhook_received:     { icon: "🔗", label: "Webhook" },
   call_completed:       { icon: "📞", label: "Call Completed" },
   call_missed:          { icon: "📵", label: "Call Missed" },
+  callback_id:          { icon: "🔘", label: "Callback ID" },
 };
 
 const AutomationCard = ({ automation, onRefresh }: Props) => {
