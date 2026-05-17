@@ -1,6 +1,11 @@
 import axios from 'axios';
 
-const axiosServices = axios.create({ baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5005/api/' });
+const axiosServices = axios.create({
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5005/api/',
+  headers: {
+    'ngrok-skip-browser-warning': '1',
+  },
+});
 
 
 // ==============================|| AXIOS - FOR MOCK SERVICES ||============================== //

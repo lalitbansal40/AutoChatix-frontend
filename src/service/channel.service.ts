@@ -30,6 +30,22 @@ class ChannelService {
     const response = await axiosServices.get(`channel/${channelId}/flow-public-key`);
     return response.data;
   }
+
+  async getOnboardingLink() {
+    const response = await axiosServices.get(`channel/onboarding-link`);
+    return response.data;
+  }
+
+  async oauthCallback(payload: {
+    code: string;
+    state: string;
+    waba_id?: string;
+    phone_number_id?: string;
+    display_phone_number?: string;
+  }) {
+    const response = await axiosServices.post(`channel/oauth-callback`, payload);
+    return response.data;
+  }
 }
 
 export const channelService = new ChannelService();

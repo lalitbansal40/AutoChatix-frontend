@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Fade, Grid, Snackbar, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Fade, Grid, IconButton, InputAdornment, Snackbar, TextField, Tooltip, Typography } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import LinkIcon from '@mui/icons-material/Link';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CheckIcon from '@mui/icons-material/Check';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ChannelCard from 'components/ChannelCard';
 import PlanGateModal from 'components/PlanGateModal';
@@ -33,6 +36,9 @@ const Channels = () => {
   }>({});
 
   const [connecting, setConnecting] = useState(false);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [onboardingUrl, setOnboardingUrl] = useState('');
+  const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState<{
     open: boolean;
     message: string;
@@ -96,6 +102,28 @@ const Channels = () => {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
+
+  const generateOnboardingLink = () => {
+    setLinkLoading(true);
+    setOnboardingUrl('');
+    channelService
+      .getOnboardingLink()
+      .then((res: any) => {
+        setOnboardingUrl(res.url);
+      })
+      .catch((err: any) => {
+        const msg = err?.response?.data?.message || 'Failed to generate link. Please try again.';
+        setToast({ open: true, message: msg, severity: 'error' });
+      })
+      .finally(() => setLinkLoading(false));
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(onboardingUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
 
   const launchWhatsAppSignup = () => {
     if (!window.FB) {
@@ -223,6 +251,80 @@ const Channels = () => {
           ))}
         </Grid>
       )}
+
+      {/* ── ZERO INTEGRATION ONBOARDING LINK ── */}
+      <Box
+        sx={{
+          mt: 4,
+          p: 3,
+          borderRadius: '16px',
+          border: '1.5px dashed #d1d5db',
+          bgcolor: '#f9fafb',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          <Box>
+            <Typography fontSize={14} fontWeight={700} color="#111827" mb={0.5}>
+              Share Onboarding Link
+            </Typography>
+            <Typography fontSize={12.5} color="#6b7280" maxWidth={480}>
+              Generate a link to send to anyone — they open it, connect their WhatsApp Business account,
+              and it gets added to your workspace automatically. No manual steps needed.
+            </Typography>
+          </Box>
+          <Tooltip title={channelLimitReached ? connectTooltip : ''} arrow>
+            <span>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={linkLoading ? <CircularProgress size={14} /> : <LinkIcon sx={{ fontSize: 16 }} />}
+                onClick={() => guard(generateOnboardingLink)}
+                disabled={linkLoading || channelLimitReached}
+                sx={{
+                  fontWeight: 600,
+                  fontSize: 12.5,
+                  borderRadius: '9px',
+                  textTransform: 'none',
+                  borderColor: '#d1d5db',
+                  color: '#374151',
+                  '&:hover': { borderColor: '#6b7280' },
+                }}
+              >
+                {linkLoading ? 'Generating...' : 'Generate Link'}
+              </Button>
+            </span>
+          </Tooltip>
+        </Box>
+
+        {onboardingUrl && (
+          <Box sx={{ mt: 2 }}>
+            <TextField
+              fullWidth
+              value={onboardingUrl}
+              size="small"
+              InputProps={{
+                readOnly: true,
+                sx: { fontSize: 12, borderRadius: '10px', bgcolor: '#fff' },
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <Tooltip title={copied ? 'Copied!' : 'Copy link'}>
+                      <IconButton size="small" onClick={copyLink}>
+                        {copied
+                          ? <CheckIcon sx={{ fontSize: 16, color: '#25D366' }} />
+                          : <ContentCopyIcon sx={{ fontSize: 16 }} />
+                        }
+                      </IconButton>
+                    </Tooltip>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Typography fontSize={11} color="#9ca3af" mt={0.75}>
+              Link valid for 2 hours. Generate a new one when needed.
+            </Typography>
+          </Box>
+        )}
+      </Box>
 
       <PlanGateModal open={gateOpen} onClose={closeGate} feature="connect channels" />
 
