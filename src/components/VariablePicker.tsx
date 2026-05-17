@@ -13,6 +13,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { contactAttributeService, ContactAttribute } from "service/contactAttribute.service";
 
+const FORMAT_BUTTONS = [
+  { key: "bold",    title: "Bold (*text*)",          marker: "*",   display: "B",  sx: { fontWeight: 800, fontSize: 13 } },
+  { key: "italic",  title: "Italic (_text_)",         marker: "_",   display: "I",  sx: { fontStyle: "italic", fontSize: 13 } },
+  { key: "strike",  title: "Strikethrough (~text~)",  marker: "~",   display: "S",  sx: { textDecoration: "line-through", fontSize: 13 } },
+  { key: "mono",    title: "Monospace (```text```)",  marker: "```", display: "</>",sx: { fontFamily: "monospace", fontSize: 11, letterSpacing: -0.3 } },
+];
+
 const SYSTEM_VARS: { label: string; value: string; color: string; bg: string }[] = [
   { label: "contact.name",  value: "{{contact.name}}",  color: "#16a34a", bg: "#f0fdf4" },
   { label: "contact.phone", value: "{{contact.phone}}", color: "#16a34a", bg: "#f0fdf4" },
@@ -53,6 +60,30 @@ const VariablePicker = ({
     staleTime: 60_000,
   });
 
+  const applyFormat = (marker: string) => {
+    const el = inputRef.current;
+    if (!el) return;
+    const start = el.selectionStart ?? 0;
+    const end   = el.selectionEnd   ?? 0;
+    const selected = value.slice(start, end);
+    if (selected) {
+      const next = value.slice(0, start) + marker + selected + marker + value.slice(end);
+      onChange(next);
+      setTimeout(() => {
+        el.focus();
+        el.setSelectionRange(start + marker.length, end + marker.length);
+      }, 0);
+    } else {
+      const next = value.slice(0, start) + marker + marker + value.slice(start);
+      onChange(next);
+      setTimeout(() => {
+        el.focus();
+        const pos = start + marker.length;
+        el.setSelectionRange(pos, pos);
+      }, 0);
+    }
+  };
+
   const insertVar = (variable: string) => {
     const el = inputRef.current;
     if (!el) {
@@ -74,6 +105,43 @@ const VariablePicker = ({
 
   return (
     <Box sx={{ position: "relative" }}>
+      {/* ── Formatting toolbar (multiline only) ── */}
+      {multiline && (
+        <Box
+          sx={{
+            display: "flex", alignItems: "center", gap: 0.25,
+            mb: 0.5, px: 0.5,
+          }}
+        >
+          {FORMAT_BUTTONS.map((btn) => (
+            <Tooltip key={btn.key} title={btn.title} placement="top">
+              <IconButton
+                size="small"
+                onMouseDown={(e) => {
+                  e.preventDefault(); // keep textarea focus + selection intact
+                  applyFormat(btn.marker);
+                }}
+                sx={{
+                  width: 28, height: 28, borderRadius: "6px",
+                  color: "#6b7280",
+                  "&:hover": { bgcolor: "#f3f4f6", color: "#111827" },
+                }}
+              >
+                <Typography component="span" sx={{ lineHeight: 1, userSelect: "none", ...btn.sx }}>
+                  {btn.display}
+                </Typography>
+              </IconButton>
+            </Tooltip>
+          ))}
+          <Box sx={{ width: "1px", height: 16, bgcolor: "#e5e7eb", mx: 0.5 }} />
+          <Tooltip title="WhatsApp formatting: *bold* _italic_ ~strike~ ```mono```" placement="top">
+            <Typography sx={{ fontSize: 10, color: "#9ca3af", cursor: "default", userSelect: "none" }}>
+              WA format
+            </Typography>
+          </Tooltip>
+        </Box>
+      )}
+
       <TextField
         fullWidth={fullWidth}
         multiline={multiline}
