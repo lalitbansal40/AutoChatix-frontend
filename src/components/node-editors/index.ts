@@ -10,9 +10,11 @@ import AiResponseEditor from "./AiResponseEditor";
 import WhatsAppNotificationEditor from "./WhatsAppNotificationEditor";
 import ConditionRouterEditor from "./ConditionRouterEditor";
 import EvalNodeEditor from "./EvalNodeEditor";
+import DelayNodeEditor from "./DelayNodeEditor";
 
 export const NODE_EDITORS: any = {
   eval: EvalNodeEditor,
+  delay: DelayNodeEditor,
   condition_router: ConditionRouterEditor,
   auto_reply: AutoReplyEditor,
   list: AutoReplyEditor,

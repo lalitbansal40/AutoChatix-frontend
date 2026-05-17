@@ -287,6 +287,10 @@ const NODE_CONFIG: any = {
   eval: {
     code: "// Write JavaScript here.\n// Available: vars, setVar(key, val), getVar(key)\n// send.text(msg)  send.buttons(msg, [{id,title}])\n// send.list(body, btnText, sections)  send.image(url, caption)\n// fetch(url)  goto(nodeId)  Math  JSON\n",
   },
+
+  delay: {
+    delay_duration: { value: 1, unit: "hours" },
+  },
 };
 
 /* =========================
@@ -343,6 +347,7 @@ const NODE_STYLE: Record<string, { color: string; bg: string; icon: string; labe
   product_list:       { color: "#db2777", bg: "#fdf2f8", icon: "🛍️", label: "Product List" },
   condition_router:   { color: "#d97706", bg: "#fffbeb", icon: "🔀", label: "Condition Router" },
   eval:               { color: "#7c3aed", bg: "#f5f3ff", icon: "⚡️", label: "Eval (Code)" },
+  delay:              { color: "#0891b2", bg: "#ecfeff", icon: "⏱️", label: "Delay" },
 };
 const DEFAULT_STYLE = { color: "#6b7280", bg: "#f9fafb", icon: "⚙️", label: "Node" };
 
@@ -469,6 +474,16 @@ const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
               }}
             >
               {(data.code || "// empty").split("\n").filter((l: string) => l.trim() && !l.trim().startsWith("//"))[0] || "// empty"}
+            </Typography>
+          </Box>
+        )}
+
+        {/* DELAY */}
+        {data.type === "delay" && (
+          <Box sx={{ bgcolor: "#ecfeff", border: "1px solid #a5f3fc", borderRadius: 1.5, px: 1, py: 0.75, textAlign: "center" }}>
+            <Typography fontSize={20} lineHeight={1}>⏱️</Typography>
+            <Typography fontSize={12} color="#0e7490" fontWeight={700} sx={{ mt: 0.25 }}>
+              {data.delay_duration?.value ?? "?"} {data.delay_duration?.unit ?? ""}
             </Typography>
           </Box>
         )}
