@@ -2,6 +2,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Dialog,
   IconButton,
   Stack,
@@ -11,6 +12,7 @@ import {
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CloseIcon from "@mui/icons-material/Close";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -34,6 +36,7 @@ const AutomationCard = ({ automation, onRefresh }: Props) => {
   const navigate = useNavigate();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [cloning, setCloning] = useState(false);
 
   const isActive = automation.status === "active";
   const triggerMeta = TRIGGER_META[automation.trigger as string] || { icon: "⚡", label: automation.trigger || "Unknown" };
@@ -41,6 +44,18 @@ const AutomationCard = ({ automation, onRefresh }: Props) => {
   const handleToggle = async () => {
     await automationService.toggleAutomation(automation._id);
     onRefresh();
+  };
+
+  const handleClone = async () => {
+    try {
+      setCloning(true);
+      await automationService.cloneAutomation(automation._id);
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCloning(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -143,6 +158,22 @@ const AutomationCard = ({ automation, onRefresh }: Props) => {
                 }}
               >
                 {isActive ? <PauseIcon sx={{ fontSize: 15 }} /> : <PlayArrowIcon sx={{ fontSize: 15 }} />}
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Clone automation" arrow>
+              <IconButton
+                size="small"
+                onClick={handleClone}
+                disabled={cloning}
+                sx={{
+                  color: "#6366f1", bgcolor: "#eef2ff", border: "1px solid #c7d2fe",
+                  p: 0.75,
+                  "&:hover": { opacity: 0.8, transform: "scale(1.05)" },
+                  transition: "all 0.15s",
+                }}
+              >
+                {cloning ? <CircularProgress size={12} sx={{ color: "#6366f1" }} /> : <ContentCopyIcon sx={{ fontSize: 15 }} />}
               </IconButton>
             </Tooltip>
 

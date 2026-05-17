@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -12,6 +12,10 @@ import {
 } from "@mui/material";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import SaveIcon from "@mui/icons-material/Save";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
+import FileUploadIcon from "@mui/icons-material/FileUpload";
+import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ReactFlow, {
   Background,
   Controls,
@@ -29,13 +33,22 @@ import { contactAttributeService, ContactAttribute } from "service/contactAttrib
 import * as dagre from "dagre";
 import NodeOpenPopup from "components/NodeOpenPopup";
 import { MarkerType } from "reactflow";
-import { Dialog, DialogContent, TextField, Avatar, Divider } from "@mui/material";
+import {
+  Dialog, DialogContent, DialogTitle, DialogActions,
+  TextField, Avatar, Divider, Select, FormControl, InputLabel,
+} from "@mui/material";
 import CustomEdge from "components/customedge";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import CloseIcon from "@mui/icons-material/Close";
-import { IconButton, Menu, MenuItem } from "@mui/material";
+import { IconButton, ListItemIcon, ListItemText, Menu, MenuItem } from "@mui/material";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { useIntegrationCatalog } from "hooks/useIntegrationCatalog";
 import { IntegrationDefinition } from "types/integration";
+import ImportAutomationModal from "components/ImportAutomationModal";
+import automationLibraryService from "service/automationLibrary.service";
+import useAuth from "hooks/useAuth";
+import { cloneReactFlowNodes } from "utils/automationIdRemapper";
 
 
 type CustomNodeData = {
@@ -720,6 +733,17 @@ const AutomationBuilder = () => {
   const [input, setInput] = useState("");
   const [webhookMappings, setWebhookMappings] = useState<WebhookMapping[]>([]);
 
+  const { user } = useAuth();
+  const isSuperAdmin = (user as any)?.role === "superadmin";
+
+  // Import / Export / Save-to-Library state
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [saveToLibOpen, setSaveToLibOpen] = useState(false);
+  const [saveToLibForm, setSaveToLibForm] = useState({
+    title: "", description: "", category: "general", tags: "", preview_message: "",
+  });
+  const [savingToLib, setSavingToLib] = useState(false);
+
   const connectingNodeRef = useRef<{ nodeId: string | null; handleId: string | null }>({ nodeId: null, handleId: null });
   const pendingEdgeRef = useRef<{ sourceNodeId: string; sourceHandleId: string | null } | null>(null);
   const suppressNextClickRef = useRef(false);
@@ -738,6 +762,157 @@ const AutomationBuilder = () => {
     );
   };
 
+  /* ── Load template nodes/edges into builder (replaces current state) ── */
+  const loadFromTemplate = useCallback(
+    (templateNodes: any[], templateEdges: any[], triggerConfig?: any) => {
+      const flowNodes: Node<CustomNodeData>[] = templateNodes.map((node: any) => {
+        let list: any[] = [];
+        if (node.type === "list" && node.sections?.length) {
+          list = node.sections.flatMap((section: any) =>
+            section.rows.map((row: any) => ({
+              id: row.id, title: row.title, description: row.description,
+            }))
+          );
+        }
+        const isTriggerNode = node.type === "trigger";
+        const triggerMeta =
+          isTriggerNode && triggerConfig?.slug
+            ? { slug: triggerConfig.slug, trigger_key: triggerConfig.trigger_key }
+            : undefined;
+
+        return {
+          id: node.id,
+          type: "custom",
+          position: node.position || { x: 0, y: 0 },
+          data: {
+            ...node,
+            list,
+            label: node.type,
+            attribute_name: node.config?.key || "",
+            attribute_value: node.config?.value || "",
+            ...(triggerMeta && { trigger_meta: triggerMeta }),
+            disconnectRow,
+            setMenuAnchor: (el: HTMLElement) => {
+              setSelectedNode({ id: node.id, type: "custom", position: node.position || { x: 0, y: 0 }, data: node } as any);
+              setAnchorEl(el);
+            },
+          },
+        };
+      });
+
+      const flowEdges: Edge[] = templateEdges.map((edge: any, i: number) => ({
+        id: `${edge.from}-${edge.to}-${i}`,
+        source: edge.from,
+        target: edge.to,
+        label: edge.condition || "",
+        sourceHandle: edge.condition || "",
+        type: "custom" as any,
+        animated: true,
+        style: { stroke: "#25D366", strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed },
+      }));
+
+      const hasSavedPositions = flowNodes.some(
+        (n) => n.position && (n.position.x !== 0 || n.position.y !== 0)
+      );
+      if (hasSavedPositions) {
+        setNodes(flowNodes);
+        setEdges(flowEdges);
+      } else {
+        const { nodes: ln, edges: le } = getLayoutedElements(flowNodes, flowEdges);
+        setNodes(ln);
+        setEdges(le);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [disconnectRow]
+  );
+
+  /* ── Export current automation as JSON file ── */
+  const handleExport = () => {
+    const exportData = {
+      _autochatix_export: "1.0",
+      name: automation?.name || "Automation Export",
+      trigger: automation?.trigger || "new_message_received",
+      trigger_config: automation?.trigger_config,
+      keywords: automation?.keywords || [],
+      nodes: nodes.map((n) => {
+        // Strip React Flow / UI-only fields
+        const {
+          disconnectRow: _dr, setMenuAnchor: _sma, label: _lbl,
+          list: _list, attribute_name: _an, attribute_value: _av,
+          trigger_meta: _tm, _updatedAt: _ua,
+          ...rest
+        } = n.data as any;
+        return rest;
+      }),
+      edges: edges.map((e) => ({
+        from: e.source,
+        to: e.target,
+        condition: typeof e.label === "string" ? e.label : (e as any).sourceHandle || "",
+      })),
+    };
+    const json = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(automation?.name || "automation").replace(/\s+/g, "_")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  /* ── Clone selected nodes (with all IDs remapped to avoid collisions) ── */
+  const handleCloneNodes = useCallback(() => {
+    const selected = nodes.filter((n) => n.selected);
+    if (selected.length === 0) return;
+    const { nodes: cloned, edges: clonedEdges } = cloneReactFlowNodes(selected, edges);
+    setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), ...cloned]);
+    setEdges((prev) => [...prev, ...clonedEdges]);
+  }, [nodes, edges, setNodes, setEdges]);
+
+  /* ── Save current automation to the library (SuperAdmin only) ── */
+  const handleSaveToLibrary = async () => {
+    try {
+      setSavingToLib(true);
+      const formattedNodes = nodes.map((n) => {
+        const {
+          disconnectRow: _dr, setMenuAnchor: _sma, label: _lbl,
+          list: _list, attribute_name: _an, attribute_value: _av,
+          trigger_meta: _tm, _updatedAt: _ua,
+          ...rest
+        } = n.data as any;
+        return rest;
+      });
+      const formattedEdges = edges.map((e) => ({
+        from: e.source,
+        to: e.target,
+        condition: typeof e.label === "string" ? e.label : (e as any).sourceHandle || "",
+      }));
+
+      await automationLibraryService.create({
+        title: saveToLibForm.title || automation?.name || "Untitled",
+        description: saveToLibForm.description,
+        category: saveToLibForm.category as any,
+        tags: saveToLibForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
+        preview_message: saveToLibForm.preview_message,
+        trigger: automation?.trigger || "new_message_received",
+        trigger_config: automation?.trigger_config,
+        keywords: automation?.keywords || [],
+        nodes: formattedNodes,
+        edges: formattedEdges,
+        is_active: true,
+      });
+
+      setSaveToLibOpen(false);
+      setSaveToLibForm({ title: "", description: "", category: "general", tags: "", preview_message: "" });
+      alert("✅ Automation saved to library!");
+    } catch (err: any) {
+      alert(err?.response?.data?.message || "Failed to save to library");
+    } finally {
+      setSavingToLib(false);
+    }
+  };
 
   useEffect(() => {
     if (selectedNode?.data?.keywords) {
@@ -1515,24 +1690,102 @@ const AutomationBuilder = () => {
         </Stack>
 
         {/* RIGHT */}
-        <Button
-          variant="contained"
-          startIcon={saving ? undefined : <SaveIcon sx={{ fontSize: 16 }} />}
-          onClick={saveAutomation}
-          disabled={saving}
-          sx={{
-            borderRadius: "8px",
-            px: 2.5,
-            py: 0.75,
-            fontWeight: 600,
-            fontSize: 13,
-            bgcolor: "#16a34a",
-            "&:hover": { bgcolor: "#15803d" },
-            boxShadow: "0 1px 4px rgba(22,163,74,0.3)",
-          }}
-        >
-          {saving ? "Saving..." : "Save"}
-        </Button>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          {/* Import */}
+          <Tooltip title="Import from Library or JSON">
+            <Button
+              size="small"
+              startIcon={<FileUploadIcon sx={{ fontSize: 15 }} />}
+              onClick={() => setImportModalOpen(true)}
+              sx={{
+                color: "#4b5563", fontSize: 12, px: 1.5, py: 0.5, borderRadius: "7px",
+                border: "1px solid #e5e7eb", bgcolor: "#fff",
+                "&:hover": { bgcolor: "#f3f4f6", borderColor: "#d1d5db" },
+              }}
+            >
+              Import
+            </Button>
+          </Tooltip>
+
+          {/* Export */}
+          <Tooltip title="Export as JSON file">
+            <Button
+              size="small"
+              startIcon={<FileDownloadIcon sx={{ fontSize: 15 }} />}
+              onClick={handleExport}
+              sx={{
+                color: "#4b5563", fontSize: 12, px: 1.5, py: 0.5, borderRadius: "7px",
+                border: "1px solid #e5e7eb", bgcolor: "#fff",
+                "&:hover": { bgcolor: "#f3f4f6", borderColor: "#d1d5db" },
+              }}
+            >
+              Export
+            </Button>
+          </Tooltip>
+
+          {/* Clone Selected Nodes */}
+          <Tooltip title={nodes.some(n => n.selected) ? "Clone selected nodes (IDs remapped)" : "Select nodes on canvas to clone"}>
+            <span>
+              <Button
+                size="small"
+                startIcon={<ContentCopyIcon sx={{ fontSize: 15 }} />}
+                onClick={handleCloneNodes}
+                disabled={!nodes.some(n => n.selected)}
+                sx={{
+                  color: "#6366f1", fontSize: 12, px: 1.5, py: 0.5, borderRadius: "7px",
+                  border: "1px solid #c7d2fe", bgcolor: "#eef2ff",
+                  "&:hover": { bgcolor: "#e0e7ff", borderColor: "#a5b4fc" },
+                  "&:disabled": { opacity: 0.45 },
+                }}
+              >
+                Clone Nodes
+              </Button>
+            </span>
+          </Tooltip>
+
+          {/* Save to Library (SuperAdmin only) */}
+          {isSuperAdmin && (
+            <Tooltip title="Save to Automation Library">
+              <Button
+                size="small"
+                startIcon={<LibraryBooksIcon sx={{ fontSize: 15 }} />}
+                onClick={() => {
+                  setSaveToLibForm(f => ({ ...f, title: automation?.name || "" }));
+                  setSaveToLibOpen(true);
+                }}
+                sx={{
+                  color: "#1d4ed8", fontSize: 12, px: 1.5, py: 0.5, borderRadius: "7px",
+                  border: "1px solid #bfdbfe", bgcolor: "#eff6ff",
+                  "&:hover": { bgcolor: "#dbeafe", borderColor: "#93c5fd" },
+                }}
+              >
+                Save to Library
+              </Button>
+            </Tooltip>
+          )}
+
+          <Box sx={{ width: "1px", height: 20, bgcolor: "#e5e7eb" }} />
+
+          {/* Save */}
+          <Button
+            variant="contained"
+            startIcon={saving ? undefined : <SaveIcon sx={{ fontSize: 16 }} />}
+            onClick={saveAutomation}
+            disabled={saving}
+            sx={{
+              borderRadius: "8px",
+              px: 2.5,
+              py: 0.75,
+              fontWeight: 600,
+              fontSize: 13,
+              bgcolor: "#16a34a",
+              "&:hover": { bgcolor: "#15803d" },
+              boxShadow: "0 1px 4px rgba(22,163,74,0.3)",
+            }}
+          >
+            {saving ? "Saving..." : "Save"}
+          </Button>
+        </Stack>
       </Box>
 
       {/* FLOW */}
@@ -1627,39 +1880,85 @@ const AutomationBuilder = () => {
           open={!!anchorEl}
           onClose={closeMenu}
           onClick={(e) => e.stopPropagation()}
+          PaperProps={{
+            elevation: 0,
+            sx: {
+              minWidth: 168,
+              borderRadius: "10px",
+              border: "1px solid #e5e7eb",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
+              py: 0.5,
+              overflow: "visible",
+              "& .MuiMenuItem-root": {
+                mx: 0.5,
+                borderRadius: "6px",
+                fontSize: 13,
+                fontWeight: 500,
+                py: 0.9,
+                px: 1.25,
+                gap: 1,
+                transition: "background 0.12s",
+              },
+            },
+          }}
+          transformOrigin={{ horizontal: "right", vertical: "top" }}
+          anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
         >
+          {/* Edit */}
           <MenuItem
             onClick={() => {
               closeMenu();
-              if (selectedNode) {
-                setAnchorEl(null); // menu close
-                setSelectedNode(selectedNode); // popup open already handled
-              }
+              if (selectedNode) setSelectedNode(selectedNode);
             }}
+            sx={{ color: "#374151", "&:hover": { bgcolor: "#f3f4f6" } }}
           >
-            ✏️ Edit
+            <ListItemIcon sx={{ minWidth: 28 }}>
+              <EditOutlinedIcon sx={{ fontSize: 16, color: "#6b7280" }} />
+            </ListItemIcon>
+            <ListItemText primaryTypographyProps={{ fontSize: 13, fontWeight: 500 }}>
+              Edit Node
+            </ListItemText>
           </MenuItem>
 
+          {/* Clone */}
+          <MenuItem
+            onClick={() => {
+              if (!selectedNode) return;
+              const { nodes: cloned, edges: clonedEdges } = cloneReactFlowNodes([selectedNode], edges);
+              setNodes((prev) => [...prev.map((n) => ({ ...n, selected: false })), ...cloned]);
+              setEdges((prev) => [...prev, ...clonedEdges]);
+              closeMenu();
+            }}
+            sx={{ color: "#374151", "&:hover": { bgcolor: "#f3f4f6" } }}
+          >
+            <ListItemIcon sx={{ minWidth: 28 }}>
+              <ContentCopyIcon sx={{ fontSize: 16, color: "#6366f1" }} />
+            </ListItemIcon>
+            <ListItemText primaryTypographyProps={{ fontSize: 13, fontWeight: 500 }}>
+              Clone Node
+            </ListItemText>
+          </MenuItem>
+
+          <Divider sx={{ my: 0.5, mx: 1 }} />
+
+          {/* Delete */}
           <MenuItem
             onClick={() => {
               if (!selectedNode) return;
               const id = selectedNode.id;
-
-              setNodes((nds) =>
-                nds.filter((n) => n.id !== id)
-              );
-
-              setEdges((eds) =>
-                eds.filter(
-                  (e) => e.source !== id && e.target !== id
-                )
-              );
-
+              setNodes((nds) => nds.filter((n) => n.id !== id));
+              setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
               setSelectedNode(null);
               closeMenu();
             }}
+            sx={{ color: "#ef4444", "&:hover": { bgcolor: "#fef2f2" } }}
           >
-            🗑 Delete
+            <ListItemIcon sx={{ minWidth: 28 }}>
+              <DeleteOutlineIcon sx={{ fontSize: 16, color: "#ef4444" }} />
+            </ListItemIcon>
+            <ListItemText primaryTypographyProps={{ fontSize: 13, fontWeight: 500, color: "#ef4444" }}>
+              Delete Node
+            </ListItemText>
           </MenuItem>
         </Menu>
       </Box>
@@ -2293,6 +2592,91 @@ const AutomationBuilder = () => {
           </Button>
         </Box>
       </Dialog>
+
+      {/* ── IMPORT AUTOMATION MODAL ── */}
+      <ImportAutomationModal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        isSuperAdmin={isSuperAdmin}
+        onImport={({ nodes: tplNodes, edges: tplEdges, trigger_config }) => {
+          loadFromTemplate(tplNodes, tplEdges, trigger_config);
+        }}
+      />
+
+      {/* ── SAVE TO LIBRARY DIALOG (SuperAdmin only) ── */}
+      {isSuperAdmin && (
+        <Dialog open={saveToLibOpen} onClose={() => setSaveToLibOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle sx={{ fontWeight: 700, fontSize: 16, display: "flex", alignItems: "center", gap: 1 }}>
+            <LibraryBooksIcon sx={{ color: "#1d4ed8", fontSize: 20 }} />
+            Save to Automation Library
+          </DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={2.5} mt={0.5}>
+              <TextField
+                label="Template Title *"
+                value={saveToLibForm.title}
+                onChange={e => setSaveToLibForm(f => ({ ...f, title: e.target.value }))}
+                size="small" fullWidth autoFocus
+                helperText="Name displayed in the library"
+              />
+              <TextField
+                label="Description"
+                value={saveToLibForm.description}
+                onChange={e => setSaveToLibForm(f => ({ ...f, description: e.target.value }))}
+                size="small" fullWidth multiline rows={2}
+              />
+              <TextField
+                label="Preview Message (shown on card)"
+                value={saveToLibForm.preview_message}
+                onChange={e => setSaveToLibForm(f => ({ ...f, preview_message: e.target.value }))}
+                size="small" fullWidth
+              />
+              <FormControl size="small" fullWidth>
+                <InputLabel>Category</InputLabel>
+                <Select
+                  value={saveToLibForm.category}
+                  label="Category"
+                  onChange={e => setSaveToLibForm(f => ({ ...f, category: e.target.value }))}
+                >
+                  {[
+                    { value: "hotel_hospitality", label: "🏨 Hotel & Hospitality" },
+                    { value: "tours_travel", label: "✈️ Tours & Travel" },
+                    { value: "ecommerce", label: "🛍️ E-Commerce & Orders" },
+                    { value: "real_estate", label: "🏠 Real Estate" },
+                    { value: "salon_spa", label: "💅 Salon & Spa" },
+                    { value: "clinic_healthcare", label: "🏥 Clinic & Healthcare" },
+                    { value: "whatsapp_forms", label: "📝 WhatsApp Forms" },
+                    { value: "education", label: "📚 Education" },
+                    { value: "restaurant", label: "🍽️ Restaurant & Food" },
+                    { value: "general", label: "⚙️ General" },
+                  ].map(c => (
+                    <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Tags (comma separated)"
+                value={saveToLibForm.tags}
+                onChange={e => setSaveToLibForm(f => ({ ...f, tags: e.target.value }))}
+                size="small" fullWidth
+                helperText="e.g. demo, booking, hotel"
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setSaveToLibOpen(false)} disabled={savingToLib}>Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={handleSaveToLibrary}
+              disabled={savingToLib || !saveToLibForm.title.trim()}
+              sx={{ bgcolor: "#1d4ed8", "&:hover": { bgcolor: "#1e40af" } }}
+            >
+              {savingToLib ? <CircularProgress size={14} sx={{ mr: 1, color: "#fff" }} /> : null}
+              Save to Library
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Box>
   );
 };

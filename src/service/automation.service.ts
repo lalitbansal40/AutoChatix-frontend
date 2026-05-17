@@ -142,6 +142,16 @@ class AutomationService {
     }
   }
 
+  async cloneAutomation(id: string) {
+    try {
+      const response = await axiosServices.post(`/automations/${id}/clone`);
+      return response.data.data;
+    } catch (error) {
+      console.error("❌ cloneAutomation error:", error);
+      throw error;
+    }
+  }
+
   async getWebhookLogs(id: string) {
     try {
       const response = await axiosServices.get(`/automations/${id}/webhook-logs`);
