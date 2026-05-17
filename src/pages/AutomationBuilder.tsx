@@ -87,6 +87,11 @@ const getCarouselButtonHandles = (data: any) => {
   );
 };
 
+const getConditionBranchHandles = (data: any) => {
+  if (data?.type !== "condition_router" || !Array.isArray(data.branches)) return [];
+  return data.branches;
+};
+
 const getPaymentStatusHandles = (data: any) => {
   if (data?.type !== "whatsapp_payment") return [];
   return [
@@ -105,6 +110,13 @@ const NODE_CONFIG: any = {
       keywords: [],
     },
   },
+  condition_router: {
+    branches: [
+      { id: "branch_if_1", label: "Branch 1", logic: "AND", is_default: false, conditions: [{ variable: "", operator: "==", value: "" }] },
+      { id: "branch_else", label: "Else",     logic: "AND", is_default: true,  conditions: [] },
+    ],
+  },
+
   set_contact_attribute: {
     attribute_name: "",
     attribute_value: "",
@@ -312,6 +324,7 @@ const NODE_STYLE: Record<string, { color: string; bg: string; icon: string; labe
   broadcast_message: { color: "#0f766e", bg: "#f0fdfa", icon: "📣", label: "Send WhatsApp Notification" },
   single_product:     { color: "#db2777", bg: "#fdf2f8", icon: "🛒", label: "Single Product" },
   product_list:       { color: "#db2777", bg: "#fdf2f8", icon: "🛍️", label: "Product List" },
+  condition_router:   { color: "#d97706", bg: "#fffbeb", icon: "🔀", label: "Condition Router" },
 };
 const DEFAULT_STYLE = { color: "#6b7280", bg: "#f9fafb", icon: "⚙️", label: "Node" };
 
@@ -324,6 +337,8 @@ const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
   const ns = NODE_STYLE[data.type] || DEFAULT_STYLE;
   const carouselButtons = getCarouselButtonHandles(data);
   const paymentStatusHandles = getPaymentStatusHandles(data);
+  const conditionBranches = getConditionBranchHandles(data);
+  const BRANCH_COLORS = ["#3b82f6", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444", "#0ea5e9"];
 
   return (
     <Box
@@ -571,6 +586,52 @@ const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
           </Box>
         )}
 
+        {/* CONDITION BRANCHES */}
+        {conditionBranches.length > 0 && (
+          <Box sx={{ mt: 0.75 }}>
+            <Typography fontSize={10} color="#6b7280" sx={{ mb: 0.5 }}>Branches</Typography>
+            {conditionBranches.map((branch: any, idx: number) => {
+              const color = branch.is_default ? "#6b7280" : BRANCH_COLORS[idx % BRANCH_COLORS.length];
+              const bg    = branch.is_default ? "#f9fafb" : `${color}11`;
+              return (
+                <Box
+                  key={branch.id}
+                  onClick={(e) => { e.stopPropagation(); disconnectRow?.(id, branch.id); }}
+                  sx={{
+                    mt: 0.75, px: 1.25, py: 0.75, borderRadius: "8px",
+                    background: bg, border: `1.5px solid ${color}44`,
+                    position: "relative", cursor: "pointer",
+                    "&:hover": { borderColor: color },
+                  }}
+                >
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <Box sx={{ px: 0.75, py: 0.1, borderRadius: "4px", bgcolor: color, flexShrink: 0 }}>
+                      <Typography sx={{ fontSize: 9, color: "#fff", fontWeight: 700, lineHeight: 1.4 }}>
+                        {branch.is_default ? "ELSE" : `IF ${idx + 1}`}
+                      </Typography>
+                    </Box>
+                    <Typography fontSize={11} fontWeight={600} color={color} noWrap sx={{ flex: 1 }}>
+                      {branch.label || (branch.is_default ? "Else" : `Branch ${idx + 1}`)}
+                    </Typography>
+                  </Stack>
+                  {!branch.is_default && (branch.conditions || []).length > 0 && (
+                    <Typography fontSize={9.5} color="#6b7280" noWrap sx={{ pl: 3.5, mt: 0.1 }}>
+                      {branch.conditions.slice(0, 2).map((c: any) =>
+                        `${c.variable} ${c.operator}${c.value ? ` ${c.value}` : ""}`
+                      ).join(` ${branch.logic} `)}
+                      {branch.conditions.length > 2 ? " …" : ""}
+                    </Typography>
+                  )}
+                  <Handle
+                    type="source" position={Position.Right} id={branch.id}
+                    style={{ width: 10, height: 10, background: color, borderRadius: "50%", position: "absolute", right: -6, top: "50%", transform: "translateY(-50%)" }}
+                  />
+                </Box>
+              );
+            })}
+          </Box>
+        )}
+
         {/* LIST ITEMS */}
         {Array.isArray(data.list) && data.list.length > 0 &&
           data.list.map((item: any, index: number) => {
@@ -624,7 +685,8 @@ const CustomNode = React.memo(({ data, id }: NodeProps<CustomNodeData>) => {
         (!Array.isArray(data.buttons) || data.buttons.length === 0) &&
         (!Array.isArray(data.list) || data.list.length === 0) &&
         paymentStatusHandles.length === 0 &&
-        carouselButtons.length === 0 && (
+        carouselButtons.length === 0 &&
+        conditionBranches.length === 0 && (
           <Handle type="source" position={Position.Right}
             style={{
               width: 10, height: 10,

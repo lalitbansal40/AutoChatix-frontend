@@ -8,8 +8,10 @@ import ProductNodeEditor from "./ProductNodeEditor";
 import ApiRequestEditor from "./ApiRequestEditor";
 import AiResponseEditor from "./AiResponseEditor";
 import WhatsAppNotificationEditor from "./WhatsAppNotificationEditor";
+import ConditionRouterEditor from "./ConditionRouterEditor";
 
 export const NODE_EDITORS: any = {
+  condition_router: ConditionRouterEditor,
   auto_reply: AutoReplyEditor,
   list: AutoReplyEditor,
   carousel: AutoReplyEditor,
