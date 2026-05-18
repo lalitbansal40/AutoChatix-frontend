@@ -1,25 +1,46 @@
 import { useState, useRef } from 'react';
-import { Box, Button, Chip, CircularProgress, IconButton, InputBase, Tooltip, Typography } from '@mui/material';
+import { Box, Button, Chip, CircularProgress, IconButton, InputBase, Stack, Tooltip, Typography } from '@mui/material';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import PhoneIcon from '@mui/icons-material/Phone';
 import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
 import EditIcon from '@mui/icons-material/EditOutlined';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import SyncIcon from '@mui/icons-material/Sync';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChannelT } from 'types/channels';
 import { channelService } from 'service/channel.service';
+import useAuth from 'hooks/useAuth';
 
 const ChannelCard = ({ channel }: { channel: ChannelT }) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user, isImpersonating } = useAuth() as any;
+  const isSuperAdmin = user?.role === 'superadmin' || isImpersonating;
 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(channel.channel_name);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
+
+  const handleSyncHistory = async () => {
+    setSyncing(true);
+    setSyncMsg('');
+    try {
+      const res = await channelService.syncHistory(channel._id);
+      setSyncMsg(res.message || 'Triggered!');
+    } catch (e: any) {
+      setSyncMsg(e?.response?.data?.message || 'Failed');
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncMsg(''), 4000);
+    }
+  };
 
   const startEdit = () => {
     setName(channel.channel_name);
@@ -185,28 +206,69 @@ const ChannelCard = ({ channel }: { channel: ChannelT }) => {
         </Box>
 
         {/* Action */}
-        <Button
-          fullWidth
-          variant="outlined"
-          size="small"
-          onClick={() => navigate(`/channels/${channel._id}`)}
-          sx={{
-            borderRadius: '8px',
-            fontSize: 12.5,
-            fontWeight: 700,
-            textTransform: 'none',
-            borderColor: '#25D366',
-            color: '#25D366',
-            py: 0.9,
-            '&:hover': {
-              bgcolor: '#f0fdf4',
-              borderColor: '#1db954',
-              color: '#1db954',
-            },
-          }}
-        >
-          Manage Templates
-        </Button>
+        <Stack gap={1}>
+          <Button
+            fullWidth
+            variant="outlined"
+            size="small"
+            onClick={() => navigate(`/channels/${channel._id}`)}
+            sx={{
+              borderRadius: '8px',
+              fontSize: 12.5,
+              fontWeight: 700,
+              textTransform: 'none',
+              borderColor: '#25D366',
+              color: '#25D366',
+              py: 0.9,
+              '&:hover': {
+                bgcolor: '#f0fdf4',
+                borderColor: '#1db954',
+                color: '#1db954',
+              },
+            }}
+          >
+            Manage Templates
+          </Button>
+
+          {isSuperAdmin && (
+            <>
+              <Button
+                fullWidth
+                variant="outlined"
+                size="small"
+                disabled={syncing}
+                onClick={handleSyncHistory}
+                startIcon={
+                  <SyncIcon
+                    sx={{
+                      fontSize: '15px !important',
+                      animation: syncing ? 'spin 1s linear infinite' : 'none',
+                      '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } },
+                    }}
+                  />
+                }
+                sx={{
+                  borderRadius: '8px',
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  borderColor: '#6366f1',
+                  color: '#6366f1',
+                  py: 0.9,
+                  '&:hover': { bgcolor: '#eef2ff', borderColor: '#4f46e5', color: '#4f46e5' },
+                  '&.Mui-disabled': { borderColor: '#c7d2fe', color: '#a5b4fc' },
+                }}
+              >
+                {syncing ? 'Syncing…' : 'Sync History'}
+              </Button>
+              {syncMsg && (
+                <Typography sx={{ fontSize: 11, textAlign: 'center', color: syncMsg === 'Failed' ? '#ef4444' : '#16a34a' }}>
+                  {syncMsg}
+                </Typography>
+              )}
+            </>
+          )}
+        </Stack>
       </Box>
     </Box>
   );

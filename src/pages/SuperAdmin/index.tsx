@@ -11,6 +11,7 @@ import {
   DialogTitle,
   Divider,
   FormControlLabel,
+  IconButton,
   InputAdornment,
   InputLabel,
   MenuItem,
@@ -32,6 +33,8 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
 import SearchIcon from '@mui/icons-material/Search';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'utils/axios';
@@ -142,6 +145,20 @@ const ManageDialog = ({
     mutationFn: (val: number | null) => axios.patch(`/superadmin/accounts/${acc._id}/flow-limit`, { wa_flow_limit: val }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['sa-accounts'] }); showToast('Flow limit updated'); },
     onError: () => showToast('Failed to update flow limit', 'error'),
+  });
+
+  // Channel + User limit overrides
+  const [channelLimitInput, setChannelLimitInput] = useState<string>(
+    acc.channel_limit_override != null ? String(acc.channel_limit_override) : ''
+  );
+  const [userLimitInput, setUserLimitInput] = useState<string>(
+    acc.user_limit_override != null ? String(acc.user_limit_override) : ''
+  );
+  const saveLimits = useMutation({
+    mutationFn: (payload: { channel_limit?: number | null; user_limit?: number | null }) =>
+      axios.patch(`/superadmin/accounts/${acc._id}/limits`, payload),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sa-accounts'] }); showToast('Limits updated'); },
+    onError: () => showToast('Failed to update limits', 'error'),
   });
 
   const handleExtend = (days: number) => {
@@ -357,6 +374,111 @@ const ManageDialog = ({
                 Current end date: <b>{new Date(acc.subscription.payment_end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</b>
               </Alert>
             )}
+
+            <Divider>Channel & User Limits</Divider>
+            <Stack direction="row" spacing={2}>
+              {/* Channels */}
+              {(() => {
+                const planDefault = acc.channel_limit_override != null ? null : acc.limits?.channels;
+                const effectiveLimit = acc.channel_limit_override != null ? acc.channel_limit_override : (acc.limits?.channels ?? 1);
+                const used = acc.stats?.channels ?? 0;
+                const isCustom = acc.channel_limit_override != null;
+                const currentVal = Number(channelLimitInput !== '' ? channelLimitInput : effectiveLimit);
+                return (
+                  <Box sx={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 2, p: 1.5 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                      <Typography fontSize={12} fontWeight={700} color="#475569">📱 Channels</Typography>
+                      {isCustom && <Chip label="Custom" size="small" sx={{ fontSize: 9, height: 16, bgcolor: '#dbeafe', color: '#1d4ed8', fontWeight: 700 }} />}
+                    </Stack>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
+                      <Typography fontSize={11} color="#94a3b8">Used: <b style={{ color: '#1e293b' }}>{used}</b></Typography>
+                      <Typography fontSize={11} color="#94a3b8">Limit: <b style={{ color: currentVal === -1 ? '#16a34a' : '#1e293b' }}>{currentVal === -1 ? '∞' : currentVal}</b></Typography>
+                    </Stack>
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <IconButton size="small" disabled={saveLimits.isPending || currentVal <= 1}
+                        onClick={() => {
+                          const next = currentVal - 1;
+                          setChannelLimitInput(String(next));
+                          saveLimits.mutate({ channel_limit: next });
+                        }}
+                        sx={{ border: '1px solid #e2e8f0', borderRadius: '6px', p: 0.4, '&:hover': { bgcolor: '#fee2e2', borderColor: '#fca5a5' } }}>
+                        <RemoveIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                      <Box sx={{ flex: 1, textAlign: 'center', px: 1, py: 0.5, border: '1px solid #e2e8f0', borderRadius: '6px', bgcolor: '#f8fafc' }}>
+                        <Typography fontSize={15} fontWeight={800} color="#1e293b">{currentVal === -1 ? '∞' : currentVal}</Typography>
+                      </Box>
+                      <IconButton size="small" disabled={saveLimits.isPending}
+                        onClick={() => {
+                          const next = currentVal + 1;
+                          setChannelLimitInput(String(next));
+                          saveLimits.mutate({ channel_limit: next });
+                        }}
+                        sx={{ border: '1px solid #e2e8f0', borderRadius: '6px', p: 0.4, '&:hover': { bgcolor: '#dcfce7', borderColor: '#86efac' } }}>
+                        <AddIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    </Stack>
+                    {isCustom && (
+                      <Button fullWidth size="small" color="error" variant="text" disabled={saveLimits.isPending}
+                        onClick={() => { setChannelLimitInput(''); saveLimits.mutate({ channel_limit: null }); }}
+                        sx={{ mt: 0.75, fontSize: 10, py: 0.25 }}>
+                        Reset to plan default ({planDefault === -1 ? '∞' : planDefault})
+                      </Button>
+                    )}
+                  </Box>
+                );
+              })()}
+
+              {/* Users */}
+              {(() => {
+                const planDefault = acc.user_limit_override != null ? null : acc.limits?.users;
+                const effectiveLimit = acc.user_limit_override != null ? acc.user_limit_override : (acc.limits?.users ?? 2);
+                const used = acc.stats?.users ?? 0;
+                const isCustom = acc.user_limit_override != null;
+                const currentVal = Number(userLimitInput !== '' ? userLimitInput : effectiveLimit);
+                return (
+                  <Box sx={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 2, p: 1.5 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                      <Typography fontSize={12} fontWeight={700} color="#475569">👤 Users</Typography>
+                      {isCustom && <Chip label="Custom" size="small" sx={{ fontSize: 9, height: 16, bgcolor: '#dbeafe', color: '#1d4ed8', fontWeight: 700 }} />}
+                    </Stack>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
+                      <Typography fontSize={11} color="#94a3b8">Used: <b style={{ color: '#1e293b' }}>{used}</b></Typography>
+                      <Typography fontSize={11} color="#94a3b8">Limit: <b style={{ color: currentVal === -1 ? '#16a34a' : '#1e293b' }}>{currentVal === -1 ? '∞' : currentVal}</b></Typography>
+                    </Stack>
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      <IconButton size="small" disabled={saveLimits.isPending || currentVal <= 1}
+                        onClick={() => {
+                          const next = currentVal - 1;
+                          setUserLimitInput(String(next));
+                          saveLimits.mutate({ user_limit: next });
+                        }}
+                        sx={{ border: '1px solid #e2e8f0', borderRadius: '6px', p: 0.4, '&:hover': { bgcolor: '#fee2e2', borderColor: '#fca5a5' } }}>
+                        <RemoveIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                      <Box sx={{ flex: 1, textAlign: 'center', px: 1, py: 0.5, border: '1px solid #e2e8f0', borderRadius: '6px', bgcolor: '#f8fafc' }}>
+                        <Typography fontSize={15} fontWeight={800} color="#1e293b">{currentVal === -1 ? '∞' : currentVal}</Typography>
+                      </Box>
+                      <IconButton size="small" disabled={saveLimits.isPending}
+                        onClick={() => {
+                          const next = currentVal + 1;
+                          setUserLimitInput(String(next));
+                          saveLimits.mutate({ user_limit: next });
+                        }}
+                        sx={{ border: '1px solid #e2e8f0', borderRadius: '6px', p: 0.4, '&:hover': { bgcolor: '#dcfce7', borderColor: '#86efac' } }}>
+                        <AddIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    </Stack>
+                    {isCustom && (
+                      <Button fullWidth size="small" color="error" variant="text" disabled={saveLimits.isPending}
+                        onClick={() => { setUserLimitInput(''); saveLimits.mutate({ user_limit: null }); }}
+                        sx={{ mt: 0.75, fontSize: 10, py: 0.25 }}>
+                        Reset to plan default ({planDefault === -1 ? '∞' : planDefault})
+                      </Button>
+                    )}
+                  </Box>
+                );
+              })()}
+            </Stack>
 
             <Divider>WhatsApp Flows Limit</Divider>
             <Box>

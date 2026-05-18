@@ -51,6 +51,17 @@ class ChannelService {
     const response = await axiosServices.patch(`channel/${channelId}`, { channel_name });
     return response.data;
   }
+
+  async syncHistory(channelId: string) {
+    const response = await axiosServices.post(`channel/${channelId}/sync-history`);
+    return response.data;
+  }
+
+  async getAllChannels(accountId?: string) {
+    const params = accountId ? { account_id: accountId } : {};
+    const response = await axiosServices.get(`superadmin/channels`, { params });
+    return response.data;
+  }
 }
 
 export const channelService = new ChannelService();
