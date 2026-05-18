@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Autocomplete,
   Box,
@@ -10,7 +10,7 @@ import {
   Typography,
   IconButton,
 } from '@mui/material';
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
@@ -33,6 +33,13 @@ function ChatDrawer({ setUser, selectedUserId }: ChatDrawerProps) {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [channelId, setChannelId] = useState<string>('');
   const { subscribe } = useWebSocketChat();
+  const queryClient = useQueryClient();
+
+  // Refs so WS handler always sees latest values without re-subscribing
+  const debouncedSearchRef = useRef(debouncedSearch);
+  const channelIdRef = useRef(channelId);
+  useEffect(() => { debouncedSearchRef.current = debouncedSearch; }, [debouncedSearch]);
+  useEffect(() => { channelIdRef.current = channelId; }, [channelId]);
 
   const { data } = useQuery({
     queryKey: ['channels'],
@@ -82,15 +89,44 @@ function ChatDrawer({ setUser, selectedUserId }: ChatDrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUserId, contactData]);
 
-  // Refresh contact list when a new message arrives (to update last message & ordering)
+  // Real-time contact reordering: backend-driven, background refetch on new message
   useEffect(() => {
     const unsubscribe = subscribe((msg) => {
       if (msg.type === 'new_message') {
-        contactRefetch();
+        // Skip events for a different channel
+        if (String(msg.channel_id) !== String(channelIdRef.current)) return;
+
+        // Invalidate — React Query refetches all loaded pages in the background.
+        // Backend returns contacts sorted by last_message_at DESC, so ordering
+        // is always authoritative. Stale data is shown during fetch (no flicker).
+        queryClient.invalidateQueries({
+          queryKey: ['contacts', debouncedSearchRef.current, channelIdRef.current],
+          refetchType: 'active',
+        });
+      }
+
+      // Tick status update: update in-place — no need for a full refetch
+      if (msg.type === 'message_status') {
+        const qKey = ['contacts', debouncedSearchRef.current, channelIdRef.current];
+        queryClient.setQueryData(qKey, (old: any) => {
+          if (!old?.pages) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page: any) => ({
+              ...page,
+              data: page.data.map((c: any) => {
+                if (c._id !== msg.contact_id) return c;
+                const lastMsg = c.last_message_id;
+                if (!lastMsg || lastMsg.wa_message_id !== (msg as any).wa_message_id) return c;
+                return { ...c, last_message_id: { ...lastMsg, status: (msg as any).status } };
+              }),
+            })),
+          };
+        });
       }
     });
     return unsubscribe;
-  }, [subscribe, contactRefetch]);
+  }, [subscribe, queryClient]);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', bgcolor: '#fff' }}>

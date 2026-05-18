@@ -6,9 +6,6 @@ import { Divider, List, ListItemAvatar, ListItemButton, ListItemText, Stack, Typ
 import { CircularProgress, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
-// third-party
-import { Chance } from 'chance';
-
 // project imports
 import UserAvatar from './UserAvatar';
 import { useDispatch } from 'store';
@@ -20,8 +17,6 @@ import { CheckOutlined } from '@ant-design/icons';
 // types
 import { UserProfile } from 'types/user-profile';
 import { contactService } from 'service/contact.service';
-
-const chance = new Chance();
 
 interface UserListProps {
   setUser: (u: UserProfile) => void;
@@ -196,15 +191,15 @@ function UserList({ setUser, data, isLoading, refetch, selectedUserId }: UserLis
                       >
                         {user.unread_count}
                       </Box>
-                    ) : (
+                    ) : user?.last_message_id?.direction === 'OUT' ? (
                       <CheckOutlined
                         style={{
-                          color: chance.bool()
-                            ? theme.palette.grey[400]
-                            : theme.palette.primary.main
+                          color: user.last_message_id?.status === 'READ'
+                            ? theme.palette.primary.main
+                            : theme.palette.grey[400]
                         }}
                       />
-                    )}
+                    ) : null}
                   </Stack>
                 }
               />
