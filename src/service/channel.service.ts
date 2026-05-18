@@ -46,6 +46,11 @@ class ChannelService {
     const response = await axiosServices.post(`channel/oauth-callback`, payload);
     return response.data;
   }
+
+  async updateChannelName(channelId: string, channel_name: string) {
+    const response = await axiosServices.patch(`channel/${channelId}`, { channel_name });
+    return response.data;
+  }
 }
 
 export const channelService = new ChannelService();

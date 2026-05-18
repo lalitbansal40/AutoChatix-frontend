@@ -21,8 +21,8 @@ declare global {
   }
 }
 
-const META_APP_ID = '955625287255039';
-const META_CONFIG_ID = '1917533792228152';
+const META_APP_ID = process.env.REACT_APP_META_APP_ID || '955625287255039';
+const META_CONFIG_ID = process.env.REACT_APP_META_CONFIG_ID || '1917533792228152';
 
 const Channels = () => {
   const queryClient = useQueryClient();

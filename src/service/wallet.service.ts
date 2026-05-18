@@ -11,8 +11,26 @@ class WalletService {
     return response.data.data;
   }
 
-  async topup(amount: number): Promise<{ payment_url: string; amount: number }> {
+  async topup(amount: number): Promise<{
+    payment_url: string;
+    base_amount: number;
+    tax_amount: number;
+    tax_rate: number;
+    tax_label: string;
+    total_amount: number;
+  }> {
     const response = await axiosServices.post('/wallet/topup', { amount });
+    return response.data;
+  }
+
+  async getTopupPreview(amount: number): Promise<{
+    base_amount: number;
+    tax_amount: number;
+    tax_rate: number;
+    tax_label: string;
+    total_amount: number;
+  }> {
+    const response = await axiosServices.get('/wallet/topup-preview', { params: { amount } });
     return response.data;
   }
 

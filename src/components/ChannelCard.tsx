@@ -1,12 +1,55 @@
-import { Box, Button, Chip, Typography } from '@mui/material';
+import { useState, useRef } from 'react';
+import { Box, Button, Chip, CircularProgress, IconButton, InputBase, Tooltip, Typography } from '@mui/material';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import PhoneIcon from '@mui/icons-material/Phone';
 import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
+import EditIcon from '@mui/icons-material/EditOutlined';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { ChannelT } from 'types/channels';
+import { channelService } from 'service/channel.service';
 
 const ChannelCard = ({ channel }: { channel: ChannelT }) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(channel.channel_name);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startEdit = () => {
+    setName(channel.channel_name);
+    setError('');
+    setEditing(true);
+    setTimeout(() => inputRef.current?.select(), 0);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setName(channel.channel_name);
+    setError('');
+  };
+
+  const save = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) { setError('Name cannot be empty'); return; }
+    if (trimmed === channel.channel_name) { setEditing(false); return; }
+
+    setSaving(true);
+    try {
+      await channelService.updateChannelName(channel._id, trimmed);
+      await queryClient.invalidateQueries({ queryKey: ['channels'] });
+      setEditing(false);
+    } catch {
+      setError('Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Box
@@ -30,7 +73,7 @@ const ChannelCard = ({ channel }: { channel: ChannelT }) => {
 
         {/* Header: icon + name + status */}
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1, mr: 1 }}>
             <Box
               sx={{
                 width: 44,
@@ -46,13 +89,63 @@ const ChannelCard = ({ channel }: { channel: ChannelT }) => {
             >
               <WhatsAppIcon sx={{ color: '#25D366', fontSize: 24 }} />
             </Box>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography
-                sx={{ fontSize: 14.5, fontWeight: 700, color: '#111827', lineHeight: 1.3 }}
-                noWrap
-              >
-                {channel.channel_name}
-              </Typography>
+
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              {editing ? (
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <InputBase
+                      inputRef={inputRef}
+                      value={name}
+                      onChange={(e) => { setName(e.target.value); setError(''); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancelEdit(); }}
+                      sx={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: '#111827',
+                        flex: 1,
+                        border: '1px solid #25D366',
+                        borderRadius: '6px',
+                        px: 1,
+                        py: 0.25,
+                        '& input': { p: 0 },
+                      }}
+                      autoFocus
+                    />
+                    {saving ? (
+                      <CircularProgress size={16} sx={{ color: '#25D366', mx: 0.5 }} />
+                    ) : (
+                      <>
+                        <Tooltip title="Save">
+                          <IconButton size="small" onClick={save} sx={{ color: '#25D366', p: 0.4 }}>
+                            <CheckIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Cancel">
+                          <IconButton size="small" onClick={cancelEdit} sx={{ color: '#9ca3af', p: 0.4 }}>
+                            <CloseIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                      </>
+                    )}
+                  </Box>
+                  {error && <Typography sx={{ fontSize: 10.5, color: '#ef4444', mt: 0.25 }}>{error}</Typography>}
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Typography
+                    sx={{ fontSize: 14.5, fontWeight: 700, color: '#111827', lineHeight: 1.3 }}
+                    noWrap
+                  >
+                    {channel.channel_name}
+                  </Typography>
+                  <Tooltip title="Edit name">
+                    <IconButton size="small" onClick={startEdit} sx={{ color: '#9ca3af', p: 0.3, opacity: 0, '.MuiBox-root:hover &': { opacity: 1 }, '&:hover': { color: '#25D366' } }}>
+                      <EditIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              )}
               <Typography sx={{ fontSize: 11.5, color: '#6b7280', mt: 0.25 }} noWrap>
                 WhatsApp Business
               </Typography>

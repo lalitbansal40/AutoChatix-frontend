@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import {
   Box, Button, Chip, CircularProgress, Dialog, DialogActions,
-  DialogContent, DialogTitle, MenuItem, Paper,
+  DialogContent, DialogTitle, Divider, MenuItem, Paper,
   Select, Stack, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, TextField, Typography
 } from '@mui/material';
@@ -23,14 +23,50 @@ const formatMoney = (amount: number, currency = 'INR') => {
 
 const PRESET_AMOUNTS = [100, 500, 1000, 2000, 5000];
 
+interface TaxPreview {
+  base_amount: number;
+  tax_amount: number;
+  tax_rate: number;
+  tax_label: string;
+  total_amount: number;
+}
+
 const TopupModal = ({ open, onClose, currency }: { open: boolean; onClose: () => void; currency: string }) => {
+  const sym = CURRENCY_SYMBOLS[currency] || currency + ' ';
   const [amount, setAmount] = useState<number | ''>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [taxPreview, setTaxPreview] = useState<TaxPreview | null>(null);
+  const [taxLoading, setTaxLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced tax preview fetch
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const amt = Number(amount);
+    if (!amt || amt < 100) { setTaxPreview(null); return; }
+
+    debounceRef.current = setTimeout(async () => {
+      setTaxLoading(true);
+      try {
+        const preview = await walletService.getTopupPreview(amt);
+        setTaxPreview(preview);
+      } catch {
+        setTaxPreview(null);
+      } finally {
+        setTaxLoading(false);
+      }
+    }, 500);
+  }, [amount]);
+
+  // Reset on close
+  useEffect(() => {
+    if (!open) { setAmount(''); setTaxPreview(null); setError(''); }
+  }, [open]);
 
   const handleTopup = async () => {
     const amt = Number(amount);
-    if (!amt || amt < 100) { setError('Minimum top-up is ₹100 (or equivalent)'); return; }
+    if (!amt || amt < 100) { setError(`Minimum top-up is ${sym}100`); return; }
     setLoading(true);
     setError('');
     try {
@@ -41,6 +77,8 @@ const TopupModal = ({ open, onClose, currency }: { open: boolean; onClose: () =>
       setLoading(false);
     }
   };
+
+  const hasTax = taxPreview && taxPreview.tax_amount > 0;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
@@ -53,7 +91,7 @@ const TopupModal = ({ open, onClose, currency }: { open: boolean; onClose: () =>
           {PRESET_AMOUNTS.map((p) => (
             <Chip
               key={p}
-              label={`${CURRENCY_SYMBOLS[currency] || ''}${p}`}
+              label={`${sym}${p}`}
               onClick={() => setAmount(p)}
               variant={amount === p ? 'filled' : 'outlined'}
               color={amount === p ? 'primary' : 'default'}
@@ -63,19 +101,49 @@ const TopupModal = ({ open, onClose, currency }: { open: boolean; onClose: () =>
         </Stack>
         <TextField
           fullWidth
-          label="Custom amount"
+          label="Wallet amount"
           type="number"
           value={amount}
           onChange={(e) => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
           inputProps={{ min: 100 }}
           placeholder="Enter amount"
         />
+
+        {/* Tax breakdown */}
+        {taxLoading && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5 }}>
+            <CircularProgress size={12} />
+            <Typography variant="caption" color="text.secondary">Calculating tax...</Typography>
+          </Box>
+        )}
+        {taxPreview && !taxLoading && (
+          <Box sx={{ mt: 1.5, bgcolor: '#f9fafb', borderRadius: '8px', p: 1.5 }}>
+            <Stack spacing={0.5}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" color="text.secondary">Wallet credit</Typography>
+                <Typography variant="caption" fontWeight={600}>{sym}{taxPreview.base_amount.toLocaleString('en-IN')}</Typography>
+              </Box>
+              {hasTax && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="caption" color="text.secondary">{taxPreview.tax_label}</Typography>
+                  <Typography variant="caption" fontWeight={600} color="warning.main">+{sym}{taxPreview.tax_amount.toFixed(2)}</Typography>
+                </Box>
+              )}
+              <Divider sx={{ my: 0.5 }} />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="caption" fontWeight={700}>Total charged</Typography>
+                <Typography variant="caption" fontWeight={700} color="primary.main">{sym}{taxPreview.total_amount.toFixed(2)}</Typography>
+              </Box>
+            </Stack>
+          </Box>
+        )}
+
         {error && <Typography color="error" variant="caption" sx={{ mt: 1, display: 'block' }}>{error}</Typography>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} disabled={loading}>Cancel</Button>
         <Button variant="contained" onClick={handleTopup} disabled={loading || !amount}>
-          {loading ? <CircularProgress size={18} /> : 'Proceed to Pay'}
+          {loading ? <CircularProgress size={18} /> : `Pay ${taxPreview ? sym + taxPreview.total_amount.toFixed(2) : ''}`}
         </Button>
       </DialogActions>
     </Dialog>
