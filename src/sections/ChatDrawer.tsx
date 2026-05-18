@@ -108,12 +108,13 @@ function ChatDrawer({ setUser, selectedUserId }: ChatDrawerProps) {
               >
                 <FileUploadOutlinedIcon sx={{ fontSize: 18 }} />
                 <input
-                  type="file" hidden accept=".csv,.xlsx"
+                  type="file" hidden accept=".csv,.xlsx,.xls,.vcf,.vcard"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file || !channelId) return;
                     await contactService.importContacts(channelId, file);
                     contactRefetch();
+                    e.target.value = '';
                   }}
                 />
               </IconButton>

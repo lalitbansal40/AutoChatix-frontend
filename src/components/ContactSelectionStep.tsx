@@ -64,10 +64,11 @@ const ContactSelectionStep = ({ channelId, templateData, onSend }: any) => {
         e.preventDefault();
         setDragging(false);
         const dropped = e.dataTransfer.files[0];
-        if (dropped && (dropped.name.endsWith(".csv") || dropped.name.endsWith(".xlsx"))) {
+        const allowed = [".csv", ".xlsx", ".xls", ".vcf", ".vcard"];
+        if (dropped && allowed.some(ext => dropped.name.toLowerCase().endsWith(ext))) {
             setFile(dropped);
         } else {
-            enqueueSnackbar("Only .csv or .xlsx files are supported", { variant: "error" });
+            enqueueSnackbar("Supported formats: .csv, .xlsx, .vcf", { variant: "error" });
         }
     };
 
@@ -108,7 +109,7 @@ const ContactSelectionStep = ({ channelId, templateData, onSend }: any) => {
             {/* ===== FILE UPLOAD ZONE ===== */}
             <Box>
                 <Typography variant="subtitle2" mb={1}>
-                    Upload Contacts File <Typography component="span" variant="caption" color="text.secondary">(CSV / XLSX)</Typography>
+                    Upload Contacts File <Typography component="span" variant="caption" color="text.secondary">(CSV / XLSX / VCF)</Typography>
                 </Typography>
 
                 {file ? (
@@ -172,13 +173,13 @@ const ContactSelectionStep = ({ channelId, templateData, onSend }: any) => {
                         <Typography variant="body2" color="text.secondary">
                             Drag & drop or <Typography component="span" color="primary" fontWeight={600}>browse</Typography> to upload
                         </Typography>
-                        <Typography variant="caption" color="text.disabled">Supports .csv, .xlsx</Typography>
+                        <Typography variant="caption" color="text.disabled">Supports .csv, .xlsx, .vcf</Typography>
                         <input
                             ref={fileInputRef}
                             hidden
                             type="file"
-                            accept=".csv,.xlsx"
-                            onChange={(e) => setFile(e.target.files?.[0] || null)}
+                            accept=".csv,.xlsx,.xls,.vcf,.vcard"
+                            onChange={(e) => { setFile(e.target.files?.[0] || null); if (e.target) e.target.value = ''; }}
                         />
                     </Paper>
                 )}
