@@ -24,17 +24,14 @@ import IconButton from 'components/@extended/IconButton';
 import AnimateButton from 'components/@extended/AnimateButton';
 import axios from 'utils/axios';
 
-import { dispatch } from 'store';
 import { strengthColor, strengthIndicator } from 'utils/password-strength';
-import { openSnackbar } from 'store/reducers/snackbar';
-
 import { StringColorProps } from 'types/password';
 
 import { EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
 
-// ============================|| AUTH - RESET PASSWORD ||============================ //
+// ============================|| AUTH - ACCEPT INVITE ||============================ //
 
-const AuthResetPassword = () => {
+const AuthAcceptInvite = () => {
   const scriptedRef = useScriptRef();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -57,7 +54,7 @@ const AuthResetPassword = () => {
   if (!token) {
     return (
       <Alert severity="error">
-        Invalid or missing reset link. Please request a new password reset email.
+        Invalid invite link. Please ask your admin to resend the invitation.
       </Alert>
     );
   }
@@ -73,25 +70,22 @@ const AuthResetPassword = () => {
       })}
       onSubmit={async (values, { setErrors, setStatus, setSubmitting }) => {
         try {
-          await axios.post('/auth/reset-password', { token, password: values.password });
+          const response = await axios.post('/auth/accept-invite', { token, password: values.password });
+          const { token: sessionToken } = response.data;
+
+          localStorage.setItem('serviceToken', sessionToken);
+          axios.defaults.headers.common.Authorization = `Bearer ${sessionToken}`;
+
           if (scriptedRef.current) {
             setStatus({ success: true });
             setSubmitting(false);
-            dispatch(
-              openSnackbar({
-                open: true,
-                message: 'Password reset successfully. Please sign in.',
-                variant: 'alert',
-                alert: { color: 'success' },
-                close: false,
-              })
-            );
-            setTimeout(() => navigate('/login', { replace: true }), 1500);
           }
+
+          navigate('/chats', { replace: true });
         } catch (err: any) {
           if (scriptedRef.current) {
             setStatus({ success: false });
-            setErrors({ submit: err?.response?.data?.message || 'Failed to reset password. The link may have expired.' });
+            setErrors({ submit: err?.response?.data?.message || 'Invalid or expired invite link.' });
             setSubmitting(false);
           }
         }
@@ -102,11 +96,11 @@ const AuthResetPassword = () => {
           <Grid container spacing={3}>
             <Grid item xs={12}>
               <Stack spacing={1}>
-                <InputLabel htmlFor="password-reset">New Password</InputLabel>
+                <InputLabel htmlFor="password-invite">Create Password</InputLabel>
                 <OutlinedInput
                   fullWidth
                   error={Boolean(touched.password && errors.password)}
-                  id="password-reset"
+                  id="password-invite"
                   type={showPassword ? 'text' : 'password'}
                   value={values.password}
                   name="password"
@@ -128,7 +122,7 @@ const AuthResetPassword = () => {
                       </IconButton>
                     </InputAdornment>
                   }
-                  placeholder="Enter new password"
+                  placeholder="Choose a strong password"
                 />
                 {touched.password && errors.password && (
                   <FormHelperText error>{errors.password}</FormHelperText>
@@ -148,17 +142,17 @@ const AuthResetPassword = () => {
 
             <Grid item xs={12}>
               <Stack spacing={1}>
-                <InputLabel htmlFor="confirm-password-reset">Confirm Password</InputLabel>
+                <InputLabel htmlFor="confirm-password-invite">Confirm Password</InputLabel>
                 <OutlinedInput
                   fullWidth
                   error={Boolean(touched.confirmPassword && errors.confirmPassword)}
-                  id="confirm-password-reset"
+                  id="confirm-password-invite"
                   type="password"
                   value={values.confirmPassword}
                   name="confirmPassword"
                   onBlur={handleBlur}
                   onChange={handleChange}
-                  placeholder="Confirm new password"
+                  placeholder="Confirm your password"
                 />
                 {touched.confirmPassword && errors.confirmPassword && (
                   <FormHelperText error>{errors.confirmPassword}</FormHelperText>
@@ -184,7 +178,7 @@ const AuthResetPassword = () => {
                   color="primary"
                   startIcon={isSubmitting ? <CircularProgress size={16} color="inherit" /> : null}
                 >
-                  {isSubmitting ? 'Resetting…' : 'Reset Password'}
+                  {isSubmitting ? 'Activating Account…' : 'Activate Account'}
                 </Button>
               </AnimateButton>
             </Grid>
@@ -195,4 +189,4 @@ const AuthResetPassword = () => {
   );
 };
 
-export default AuthResetPassword;
+export default AuthAcceptInvite;

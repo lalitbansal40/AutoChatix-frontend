@@ -39,7 +39,7 @@ const fetchLimits = async () => {
   return res.data;
 };
 
-const emptyForm = { name: '', email: '', phone: '', password: '' };
+const emptyForm = { name: '', email: '' };
 
 const UsersPage = () => {
   const qc = useQueryClient();
@@ -59,14 +59,14 @@ const UsersPage = () => {
 
   const addUser = useMutation({
     mutationFn: (data: typeof form) => axios.post('/team/', data),
-    onSuccess: () => {
+    onSuccess: (_res: any, variables: typeof emptyForm) => {
       qc.invalidateQueries({ queryKey: ['team'] });
       qc.invalidateQueries({ queryKey: ['account-limits'] });
       setAddOpen(false);
       setForm(emptyForm);
-      showToast('User added successfully');
+      showToast(`Invitation sent to ${variables.email}`);
     },
-    onError: (err: any) => showToast(err?.response?.data?.message || 'Failed to add user', 'error'),
+    onError: (err: any) => showToast(err?.response?.data?.message || 'Failed to send invite', 'error'),
   });
 
   const toggleActive = useMutation({
@@ -158,12 +158,17 @@ const UsersPage = () => {
                       <Avatar sx={{ width: 32, height: 32, fontSize: 14 }}>{m.name?.[0]}</Avatar>
                       <Box>
                         <Typography>{m.name}</Typography>
-                        <Chip
-                          label={m.role}
-                          size="small"
-                          color={m.role === 'owner' ? 'primary' : 'default'}
-                          sx={{ height: 16, fontSize: 10 }}
-                        />
+                        <Stack direction="row" spacing={0.5}>
+                          <Chip
+                            label={m.role}
+                            size="small"
+                            color={m.role === 'owner' ? 'primary' : 'default'}
+                            sx={{ height: 16, fontSize: 10 }}
+                          />
+                          {m.invite_pending && (
+                            <Chip label="Pending" size="small" color="warning" sx={{ height: 16, fontSize: 10 }} />
+                          )}
+                        </Stack>
                       </Box>
                     </Stack>
                   </TableCell>
@@ -221,11 +226,11 @@ const UsersPage = () => {
         </TableContainer>
       )}
 
-      {/* Add User Dialog */}
+      {/* Invite User Dialog */}
       <Dialog open={addOpen} onClose={() => { setAddOpen(false); setForm(emptyForm); }} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
         <DialogTitle sx={{ pb: 0.5 }}>
-          <Typography variant="h5" fontWeight={700}>Add Team Member</Typography>
-          <Typography variant="body2" color="text.secondary">They will be able to log in with these credentials.</Typography>
+          <Typography variant="h5" fontWeight={700}>Invite Team Member</Typography>
+          <Typography variant="body2" color="text.secondary">An invitation email will be sent. They'll set their own password.</Typography>
         </DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={2}>
@@ -235,23 +240,10 @@ const UsersPage = () => {
               fullWidth required placeholder="e.g. Rahul Sharma"
               size="small"
             />
-            <Stack direction="row" spacing={1.5}>
-              <TextField
-                label="Email" type="email" value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                fullWidth required size="small"
-              />
-              <TextField
-                label="Phone" value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                fullWidth required size="small" placeholder="+91..."
-              />
-            </Stack>
             <TextField
-              label="Password" type="password" value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              fullWidth required size="small"
-              helperText="Minimum 8 characters recommended"
+              label="Email" type="email" value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              fullWidth required size="small" placeholder="rahul@company.com"
             />
           </Stack>
         </DialogContent>
@@ -259,10 +251,10 @@ const UsersPage = () => {
           <Button onClick={() => { setAddOpen(false); setForm(emptyForm); }} color="inherit">Cancel</Button>
           <Button
             variant="contained"
-            disabled={addUser.isPending || !form.name || !form.email || !form.phone || !form.password}
+            disabled={addUser.isPending || !form.name || !form.email}
             onClick={() => addUser.mutate(form)}
           >
-            {addUser.isPending ? 'Adding…' : 'Add Member'}
+            {addUser.isPending ? 'Sending…' : 'Send Invite'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -65,9 +65,23 @@ export const JWTProvider = ({ children }: { children: React.ReactElement }) => {
     init();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  // Returns {require_otp, email} when OTP is needed, or undefined when logged in directly
+  const login = async (email: string, password: string): Promise<{ require_otp: true; email: string } | undefined> => {
     const response = await axios.post('/auth/login', { email, password });
+    const data = response.data;
+    if (data.require_otp) {
+      sessionStorage.setItem('otp_email', data.email);
+      return { require_otp: true, email: data.email };
+    }
+    setSession(data.token);
+    dispatch({ type: LOGIN, payload: { isLoggedIn: true, user: data.user } });
+    return undefined;
+  };
+
+  const verifyOTP = async (email: string, otp: string) => {
+    const response = await axios.post('/auth/verify-otp', { email, otp });
     const { token, user } = response.data;
+    sessionStorage.removeItem('otp_email');
     setSession(token);
     dispatch({ type: LOGIN, payload: { isLoggedIn: true, user } });
   };
@@ -108,7 +122,10 @@ export const JWTProvider = ({ children }: { children: React.ReactElement }) => {
     window.location.reload();
   };
 
-  const resetPassword = async (_email: string) => {};
+  const resetPassword = async (email: string) => {
+    await axios.post('/auth/forgot-password', { email });
+  };
+
   const updateProfile = () => {};
 
   const isImpersonating = Boolean(state.originalToken || localStorage.getItem('originalToken'));
@@ -119,7 +136,7 @@ export const JWTProvider = ({ children }: { children: React.ReactElement }) => {
 
   return (
     <JWTContext.Provider
-      value={{ ...state, isImpersonating, login, logout, register, resetPassword, updateProfile, impersonate, exitImpersonation }}
+      value={{ ...state, isImpersonating, login, verifyOTP, logout, register, resetPassword, updateProfile, impersonate, exitImpersonation }}
     >
       {children}
     </JWTContext.Provider>

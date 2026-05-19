@@ -1,57 +1,81 @@
 import { Link } from 'react-router-dom';
-
-// material-ui
-import { useTheme } from '@mui/material/styles';
-import { Box, Button, Grid, Divider, Typography, useMediaQuery } from '@mui/material';
-
-// project import
-import useAuth from 'hooks/useAuth';
+import { Box, Button, Stack, Typography } from '@mui/material';
+import { MailOutlined } from '@ant-design/icons';
 import AnimateButton from 'components/@extended/AnimateButton';
-import AuthWrapper from 'sections/auth/AuthWrapper';
+import AuthSplitWrapper from 'sections/auth/AuthSplitWrapper';
 
 // ================================|| CHECK MAIL ||================================ //
 
-const CheckMail = () => {
-  const theme = useTheme();
-  const matchDownSM = useMediaQuery(theme.breakpoints.down('sm'));
+const CheckMail = () => (
+  <AuthSplitWrapper
+    title="Check your inbox"
+    subtitle="A password reset link is on its way to your email address."
+  >
+    <Box
+      sx={{
+        bgcolor: 'background.paper',
+        borderRadius: 3,
+        p: { xs: 3, md: 4 },
+        boxShadow: '0 2px 24px rgba(0,0,0,0.07)',
+        border: '1px solid',
+        borderColor: 'divider',
+        textAlign: 'center',
+      }}
+    >
+      <Box
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 72,
+          height: 72,
+          borderRadius: '50%',
+          bgcolor: 'primary.lighter',
+          color: 'primary.main',
+          fontSize: 32,
+          mb: 2.5,
+        }}
+      >
+        <MailOutlined />
+      </Box>
 
-  const { isLoggedIn } = useAuth();
+      <Typography variant="h4" fontWeight={800} sx={{ mb: 1 }}>
+        Email Sent!
+      </Typography>
+      <Typography color="text.secondary" variant="body2" sx={{ mb: 3, lineHeight: 1.7 }}>
+        We've sent password reset instructions to your email address.
+        Check your inbox — and spam folder, just in case.
+      </Typography>
 
-  return (
-    <AuthWrapper>
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-          <Box sx={{ mb: { xs: -0.5, sm: 0.5 } }}>
-            <Typography variant="h3">Hi, Check Your Mail</Typography>
-            <Typography color="secondary" sx={{ mb: 0.5, mt: 1.25 }}>
-              We have sent a password recover instructions to your email.
-            </Typography>
+      <AnimateButton>
+        <Button
+          component={Link}
+          to="/login"
+          disableElevation
+          fullWidth
+          size="large"
+          variant="contained"
+          color="primary"
+          sx={{ py: 1.4, fontWeight: 700, borderRadius: 2 }}
+        >
+          Back to Sign In
+        </Button>
+      </AnimateButton>
+
+      <Stack direction="row" justifyContent="center" sx={{ mt: 2.5 }}>
+        <Typography variant="caption" color="text.disabled">
+          Didn't receive it?{' '}
+          <Box
+            component={Link}
+            to="/forgot-password"
+            sx={{ color: 'primary.main', fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+          >
+            Try again
           </Box>
-        </Grid>
-        <Grid item xs={12}>
-          <AnimateButton>
-            <Button
-              component={Link}
-              to={isLoggedIn ? '/auth/login' : '/login'}
-              disableElevation
-              fullWidth
-              size="large"
-              type="submit"
-              variant="contained"
-              color="primary"
-            >
-              Sign in
-            </Button>
-          </AnimateButton>
-        </Grid>
-        <Grid item xs={12}>
-          <Divider>
-            <Typography variant={matchDownSM ? 'subtitle1' : 'h5'}>Sign up with</Typography>
-          </Divider>
-        </Grid>
-      </Grid>
-    </AuthWrapper>
-  );
-};
+        </Typography>
+      </Stack>
+    </Box>
+  </AuthSplitWrapper>
+);
 
 export default CheckMail;

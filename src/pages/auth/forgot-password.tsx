@@ -1,41 +1,36 @@
 import { Link } from 'react-router-dom';
-
-// material-ui
-import { Grid, Stack, Typography } from '@mui/material';
-
-// project import
-import useAuth from 'hooks/useAuth';
-import AuthWrapper from 'sections/auth/AuthWrapper';
+import { Box, Typography } from '@mui/material';
+import AuthSplitWrapper from 'sections/auth/AuthSplitWrapper';
+import AuthFormCard from 'sections/auth/AuthFormCard';
 import AuthForgotPassword from 'sections/auth/auth-forms/AuthForgotPassword';
 
 // ================================|| FORGOT PASSWORD ||================================ //
 
-const ForgotPassword = () => {
-  const { isLoggedIn } = useAuth();
+const ForgotPassword = () => (
+  <AuthSplitWrapper
+    title="Forgot your password?"
+    subtitle="No worries — enter your email and we'll send you a reset link right away."
+  >
+    <AuthFormCard
+      heading="Reset Password"
+      subheading="We'll email you a secure link to create a new password."
+    >
+      <AuthForgotPassword />
+    </AuthFormCard>
 
-  return (
-    <AuthWrapper>
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-          <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: { xs: -0.5, sm: 0.5 } }}>
-            <Typography variant="h3">Forgot Password</Typography>
-            <Typography
-              component={Link}
-              to={isLoggedIn ? '/auth/login' : '/login'}
-              variant="body1"
-              sx={{ textDecoration: 'none' }}
-              color="primary"
-            >
-              Back to Login
-            </Typography>
-          </Stack>
-        </Grid>
-        <Grid item xs={12}>
-          <AuthForgotPassword />
-        </Grid>
-      </Grid>
-    </AuthWrapper>
-  );
-};
+    <Box sx={{ textAlign: 'center', mt: 2.5 }}>
+      <Typography variant="body2" color="text.secondary">
+        Remember it?{' '}
+        <Box
+          component={Link}
+          to="/login"
+          sx={{ color: 'primary.main', fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+        >
+          Back to sign in
+        </Box>
+      </Typography>
+    </Box>
+  </AuthSplitWrapper>
+);
 
 export default ForgotPassword;

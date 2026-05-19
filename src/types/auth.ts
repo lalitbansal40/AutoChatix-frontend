@@ -46,13 +46,16 @@ export interface JWTDataProps {
   userId: string;
 }
 
+export type OTPRequired = { require_otp: true; email: string };
+
 export type JWTContextType = {
   isLoggedIn: boolean;
   isInitialized?: boolean;
   user?: UserProfile | null | undefined;
   isImpersonating?: boolean;
   logout: () => void;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<OTPRequired | undefined>;
+  verifyOTP: (email: string, otp: string) => Promise<void>;
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateProfile: VoidFunction;

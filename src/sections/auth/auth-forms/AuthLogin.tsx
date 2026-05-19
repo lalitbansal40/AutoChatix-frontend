@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import {
   Alert,
@@ -33,6 +34,7 @@ const AuthLogin = () => {
 
   const { login } = useAuth();
   const scriptedRef = useScriptRef();
+  const navigate = useNavigate();
 
   const handleClickShowPassword = () => setShowPassword(!showPassword);
   const handleMouseDownPassword = (e: React.SyntheticEvent) => e.preventDefault();
@@ -46,15 +48,18 @@ const AuthLogin = () => {
       })}
       onSubmit={async (values, { setErrors, setStatus, setSubmitting }) => {
         try {
-          await login(values.email, values.password);
+          const result = await login(values.email, values.password);
           if (scriptedRef.current) {
             setStatus({ success: true });
             setSubmitting(false);
           }
+          if (result?.require_otp) {
+            navigate('/code-verification');
+          }
         } catch (err: any) {
           if (scriptedRef.current) {
             setStatus({ success: false });
-            setErrors({ submit: err.message });
+            setErrors({ submit: err?.response?.data?.message || err.message });
             setSubmitting(false);
           }
         }
@@ -125,7 +130,7 @@ const AuthLogin = () => {
               )}
             </Stack>
 
-            {/* Remember me */}
+            {/* Remember me + Forgot password */}
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <FormControlLabel
                 control={
@@ -139,6 +144,13 @@ const AuthLogin = () => {
                 }
                 label={<Typography variant="body2">Keep me signed in</Typography>}
               />
+              <Box
+                component="a"
+                href="/forgot-password"
+                sx={{ color: 'primary.main', fontSize: 13, fontWeight: 500, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+              >
+                Forgot password?
+              </Box>
             </Stack>
 
             {/* Error */}
