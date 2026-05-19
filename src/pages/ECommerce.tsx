@@ -36,11 +36,15 @@ import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
 import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import SyncIcon from "@mui/icons-material/Sync";
+import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { channelService } from "service/channel.service";
 import { ecommerceService } from "service/ecommerce.service";
 import { useNavigate } from "react-router-dom";
+
+const META_APP_ID = process.env.REACT_APP_META_APP_ID || "955625287255039";
 
 /* ─── helpers ─── */
 
@@ -640,6 +644,275 @@ const ProductCard = ({ product, channelId, catalogId, onEdit, onDelete }: any) =
   );
 };
 
+/* ─── Facebook Catalog Connect Dialog ─── */
+const FacebookCatalogConnectDialog = ({
+  open,
+  channelId,
+  onClose,
+  onSuccess,
+}: {
+  open: boolean;
+  channelId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) => {
+  const [step, setStep] = useState<"idle" | "authorizing" | "selecting" | "saving">("idle");
+  const [error, setError] = useState("");
+  const [accessToken, setAccessToken] = useState("");
+  const [businesses, setBusinesses] = useState<any[]>([]);
+  const [selectedBusiness, setSelectedBusiness] = useState("");
+  const [selectedCatalog, setSelectedCatalog] = useState("");
+  // manual fallback
+  const [showManual, setShowManual] = useState(false);
+  const [manualToken, setManualToken] = useState("");
+  const [showManualValue, setShowManualValue] = useState(false);
+
+  const catalogsForBusiness = businesses.find((b) => b.id === selectedBusiness)
+    ?.owned_product_catalogs?.data || [];
+
+  const reset = () => {
+    setStep("idle"); setError(""); setAccessToken(""); setBusinesses([]);
+    setSelectedBusiness(""); setSelectedCatalog(""); setShowManual(false);
+    setManualToken(""); setShowManualValue(false);
+  };
+
+  const handleClose = () => { onClose(); reset(); };
+
+  const handleFacebookLogin = () => {
+    if (!window.FB) {
+      setError("Facebook SDK not loaded. Please wait a moment and try again.");
+      return;
+    }
+    setError("");
+    setStep("authorizing");
+
+    window.FB.login(
+      (response: any) => {
+        if (!response.authResponse?.code) {
+          setStep("idle");
+          setError("Facebook authorization was cancelled or failed. Please try again.");
+          return;
+        }
+        ecommerceService
+          .facebookOAuthAuthorize(channelId, response.authResponse.code)
+          .then((data: any) => {
+            setAccessToken(data.access_token);
+            setBusinesses(data.businesses || []);
+            // Auto-select if only one business
+            if (data.businesses?.length === 1) setSelectedBusiness(data.businesses[0].id);
+            setStep("selecting");
+          })
+          .catch((err: any) => {
+            setError(err?.response?.data?.message || "Authorization failed. Please try again.");
+            setStep("idle");
+          });
+      },
+      {
+        scope: "catalog_management,business_management",
+        response_type: "code",
+        override_default_response_type: true,
+      },
+    );
+  };
+
+  const handleSave = () => {
+    if (!selectedCatalog) { setError("Please select a catalog."); return; }
+    setStep("saving");
+    setError("");
+    ecommerceService
+      .facebookOAuthSave(channelId, accessToken, selectedCatalog)
+      .then(() => { onSuccess(); handleClose(); })
+      .catch((err: any) => {
+        setError(err?.response?.data?.message || "Failed to save. Please try again.");
+        setStep("selecting");
+      });
+  };
+
+  const handleManualSave = () => {
+    if (!manualToken.trim()) { setError("Token is required."); return; }
+    setStep("saving");
+    setError("");
+    ecommerceService
+      .saveCatalogToken(channelId, manualToken.trim())
+      .then(() => { onSuccess(); handleClose(); })
+      .catch(() => {
+        setError("Failed to save token.");
+        setStep("idle");
+      });
+  };
+
+  return (
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
+        Connect Facebook Catalog
+        <IconButton onClick={handleClose} sx={{ position: "absolute", right: 8, top: 8, color: "#6b7280" }}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent sx={{ pt: 1 }}>
+        {error && <Alert severity="error" sx={{ mb: 2, fontSize: 12 }}>{error}</Alert>}
+
+        {/* Step 1: Authorize button */}
+        {(step === "idle" || step === "authorizing") && !showManual && (
+          <Stack spacing={2.5} alignItems="center" py={2}>
+            <Box sx={{ textAlign: "center", maxWidth: 400 }}>
+              <Typography fontSize={13.5} color="#374151" fontWeight={600} mb={0.5}>
+                Authorize via Facebook
+              </Typography>
+              <Typography fontSize={12.5} color="#6b7280" lineHeight={1.6}>
+                Click the button below. A Facebook popup will ask you to authorize
+                <strong> catalog_management</strong> &amp; <strong>business_management</strong> permissions.
+                We'll then fetch your business catalogs automatically.
+              </Typography>
+            </Box>
+
+            <Button
+              variant="contained"
+              disabled={step === "authorizing"}
+              onClick={handleFacebookLogin}
+              startIcon={
+                step === "authorizing"
+                  ? <CircularProgress size={16} sx={{ color: "#fff" }} />
+                  : <Box component="img" src="https://upload.wikimedia.org/wikipedia/commons/0/05/Facebook_Logo_%282019%29.png" sx={{ width: 18, height: 18, objectFit: "contain", borderRadius: "3px" }} />
+              }
+              sx={{
+                bgcolor: "#1877F2", color: "#fff", fontWeight: 700, fontSize: 14,
+                borderRadius: "8px", px: 3, py: 1.2, textTransform: "none",
+                "&:hover": { bgcolor: "#1666d8" }, minWidth: 240,
+              }}
+            >
+              {step === "authorizing" ? "Authorizing…" : "Continue with Facebook"}
+            </Button>
+
+            <Button
+              size="small" onClick={() => setShowManual(true)}
+              sx={{ fontSize: 11.5, color: "#6b7280", textTransform: "none" }}
+            >
+              Enter access token manually instead
+            </Button>
+          </Stack>
+        )}
+
+        {/* Step 2: Select business + catalog */}
+        {step === "selecting" && (
+          <Stack spacing={2} pt={1}>
+            <Alert severity="success" sx={{ fontSize: 12 }}>
+              Facebook authorized. Select your business and catalog below.
+            </Alert>
+
+            <FormControl fullWidth size="small">
+              <InputLabel sx={{ fontSize: 12 }}>Business</InputLabel>
+              <Select
+                value={selectedBusiness}
+                onChange={(e) => { setSelectedBusiness(e.target.value); setSelectedCatalog(""); }}
+                label="Business"
+                sx={{ borderRadius: "8px", fontSize: 13 }}
+              >
+                {businesses.map((b: any) => (
+                  <MenuItem key={b.id} value={b.id} sx={{ fontSize: 13 }}>🏢 {b.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {selectedBusiness && (
+              <FormControl fullWidth size="small">
+                <InputLabel sx={{ fontSize: 12 }}>Catalog</InputLabel>
+                <Select
+                  value={selectedCatalog}
+                  onChange={(e) => setSelectedCatalog(e.target.value)}
+                  label="Catalog"
+                  sx={{ borderRadius: "8px", fontSize: 13 }}
+                  displayEmpty
+                >
+                  <MenuItem value="" disabled sx={{ fontSize: 13 }}>
+                    {catalogsForBusiness.length === 0 ? "No catalogs found in this business" : "Select a catalog"}
+                  </MenuItem>
+                  {catalogsForBusiness.map((cat: any) => (
+                    <MenuItem key={cat.id} value={cat.id} sx={{ fontSize: 13 }}>📦 {cat.name}</MenuItem>
+                  ))}
+                </Select>
+                {catalogsForBusiness.length === 0 && (
+                  <Typography fontSize={11} color="#dc2626" mt={0.5}>
+                    No catalogs in this business. Create one in Meta Business Manager → Commerce Manager.
+                  </Typography>
+                )}
+              </FormControl>
+            )}
+
+            {!businesses.length && (
+              <Alert severity="warning" sx={{ fontSize: 12 }}>
+                No businesses found for this account. Make sure you have a Meta Business Manager account.
+              </Alert>
+            )}
+          </Stack>
+        )}
+
+        {/* Manual token entry */}
+        {showManual && (
+          <Stack spacing={2} pt={1}>
+            <Alert severity="info" sx={{ fontSize: 12 }}>
+              Enter a Facebook User or System User access token with <strong>catalog_management</strong> permission.
+              Get it from <strong>Meta Business Suite → System Users → Generate Token</strong>.
+            </Alert>
+            <TextField
+              fullWidth size="small"
+              type={showManualValue ? "text" : "password"}
+              label="Access Token"
+              value={manualToken}
+              onChange={(e) => setManualToken(e.target.value)}
+              placeholder="EAAxxxxx..."
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}
+              InputLabelProps={{ sx: { fontSize: 12 } }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setShowManualValue(!showManualValue)} edge="end">
+                      {showManualValue
+                        ? <VisibilityOffOutlinedIcon sx={{ fontSize: 16 }} />
+                        : <VisibilityOutlinedIcon sx={{ fontSize: 16 }} />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Button size="small" onClick={() => setShowManual(false)}
+              sx={{ fontSize: 11.5, color: "#6b7280", textTransform: "none", alignSelf: "flex-start" }}>
+              ← Back to Facebook login
+            </Button>
+          </Stack>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+        <Button onClick={handleClose} size="small" sx={{ textTransform: "none", color: "#6b7280" }}>
+          Cancel
+        </Button>
+        {step === "selecting" && (
+          <Button
+            variant="contained" size="small"
+            disabled={!selectedCatalog || step === ("saving" as any)}
+            onClick={handleSave}
+            sx={{ textTransform: "none", bgcolor: "#065f46", "&:hover": { bgcolor: "#047857" }, borderRadius: "8px" }}
+          >
+            {step === ("saving" as any) ? "Saving…" : "Connect Catalog"}
+          </Button>
+        )}
+        {showManual && (
+          <Button
+            variant="contained" size="small"
+            disabled={!manualToken.trim() || step === ("saving" as any)}
+            onClick={handleManualSave}
+            sx={{ textTransform: "none", bgcolor: "#065f46", "&:hover": { bgcolor: "#047857" }, borderRadius: "8px" }}
+          >
+            {step === ("saving" as any) ? "Saving…" : "Save Token"}
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 /* ─── Products Tab ─── */
 const ProductsTab = () => {
   const queryClient = useQueryClient();
@@ -650,6 +923,22 @@ const ProductsTab = () => {
   const [editProduct, setEditProduct] = useState<any>(null);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [forceRetry, setForceRetry] = useState(false);
+  const [showFbConnect, setShowFbConnect] = useState(false);
+
+  // Load Facebook JS SDK once (same META_APP_ID as Channels.tsx)
+  useEffect(() => {
+    if (document.getElementById("facebook-jssdk")) return;
+    window.fbAsyncInit = () => {
+      window.FB.init({ appId: META_APP_ID, autoLogAppEvents: true, xfbml: true, version: "v21.0" });
+    };
+    const script = document.createElement("script");
+    script.id = "facebook-jssdk";
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+  }, []);
 
   const { data: channelsData = [] } = useQuery({
     queryKey: ["channels"],
@@ -657,21 +946,43 @@ const ProductsTab = () => {
     select: (res: any) => res.data || [],
   });
 
-  const { data: catalogsData = [], isLoading: catalogsLoading } = useQuery({
-    queryKey: ["catalogs", selectedChannel],
-    queryFn: () => ecommerceService.getCatalogs(selectedChannel),
-    select: (res: any) => res.catalogs || [],
-    enabled: !!selectedChannel,
-  });
+  const selectedChannelObj = channelsData.find((c: any) => c._id === selectedChannel);
+  // Skip Meta API if SMB and no directly linked catalog stored
+  const hasLinkedCatalog = !!selectedChannelObj?.linked_catalog_id;
+  const channelCatalogUnsupported = selectedChannelObj?.catalog_supported === false && !hasLinkedCatalog;
 
-  const { data: productsData, isLoading: productsLoading } = useQuery({
+  const { data: catalogsResp, isLoading: catalogsLoading } = useQuery({
+    queryKey: ["catalogs", selectedChannel, forceRetry],
+    queryFn: () => ecommerceService.getCatalogs(selectedChannel, forceRetry),
+    // Always run when channel selected — backend returns from DB cache instantly for SMB/linked accounts
+    enabled: !!selectedChannel && (!channelCatalogUnsupported || forceRetry),
+  });
+  const catalogsData: any[] = catalogsResp?.catalogs || [];
+  const catalogsUnsupported: boolean = (!forceRetry && channelCatalogUnsupported) || catalogsResp?.unsupported === true;
+
+  // After successful retry or link — refresh channels so catalog flags are reflected
+  useEffect(() => {
+    if (catalogsData.length > 0) {
+      queryClient.invalidateQueries({ queryKey: ["channels"] });
+      if (forceRetry) setForceRetry(false);
+    }
+  }, [catalogsData.length]);
+
+  // Close FB connect dialog when channel changes
+  useEffect(() => {
+    setShowFbConnect(false);
+  }, [selectedChannel]);
+
+  const { data: productsData, isLoading: productsLoading, error: productsError } = useQuery({
     queryKey: ["products", selectedChannel, selectedCatalog],
     queryFn: () => ecommerceService.getProducts(selectedChannel, selectedCatalog, { limit: 50 }),
     select: (res: any) => res.products || [],
     enabled: !!selectedChannel && !!selectedCatalog,
+    retry: false,
   });
 
   const products: any[] = productsData || [];
+  const needsCatalogToken = (productsError as any)?.response?.data?.needs_catalog_token === true;
 
   const handleSync = async () => {
     if (!selectedChannel || !selectedCatalog) return;
@@ -693,12 +1004,14 @@ const ProductsTab = () => {
     queryClient.invalidateQueries({ queryKey: ["products", selectedChannel, selectedCatalog] });
   };
 
+  const hasToken = !!selectedChannelObj?.catalog_access_token;
+
   return (
     <Box>
       {/* Channel + Catalog + Actions row */}
       <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} spacing={1.5} mb={3} flexWrap="wrap">
         <TextField select size="small" label="Select Channel" value={selectedChannel}
-          onChange={(e) => { setSelectedChannel(e.target.value); setSelectedCatalog(""); }}
+          onChange={(e) => { setSelectedChannel(e.target.value); setSelectedCatalog(""); setForceRetry(false); }}
           sx={{ minWidth: 200, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}>
           <MenuItem value="">— Choose a channel —</MenuItem>
           {channelsData.map((ch: any) => (
@@ -755,6 +1068,49 @@ const ProductsTab = () => {
         )}
       </Stack>
 
+      {/* Facebook Catalog Connection status banner */}
+      {selectedChannel && (
+        <Box sx={{ mb: 2.5 }}>
+          <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
+            {hasToken ? (
+              <>
+                <Chip
+                  label="Catalog Connected via Facebook ✓"
+                  size="small"
+                  sx={{ bgcolor: "#f0fdf4", border: "1px solid #bbf7d0", color: "#065f46", fontWeight: 700, fontSize: 12 }}
+                />
+                <Button
+                  size="small"
+                  onClick={() => setShowFbConnect(true)}
+                  sx={{ fontSize: 11.5, color: "#6b7280", textTransform: "none" }}
+                >
+                  Reconnect
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<Box component="img" src="https://upload.wikimedia.org/wikipedia/commons/0/05/Facebook_Logo_%282019%29.png" sx={{ width: 14, height: 14, objectFit: "contain" }} />}
+                  onClick={() => setShowFbConnect(true)}
+                  sx={{
+                    bgcolor: "#1877F2", color: "#fff", fontWeight: 700, fontSize: 12,
+                    borderRadius: "8px", px: 2, textTransform: "none",
+                    "&:hover": { bgcolor: "#1666d8" },
+                  }}
+                >
+                  Connect Facebook Catalog
+                </Button>
+                <Typography fontSize={11.5} color="#92400e">
+                  Required to read &amp; sync products from Meta
+                </Typography>
+              </>
+            )}
+          </Stack>
+        </Box>
+      )}
+
       {/* Empty states */}
       {!selectedChannel && (
         <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 10, gap: 2, border: "2px dashed #e5e7eb", borderRadius: "16px", bgcolor: "#fafafa" }}>
@@ -766,7 +1122,31 @@ const ProductsTab = () => {
         </Box>
       )}
 
-      {selectedChannel && !selectedCatalog && !catalogsLoading && catalogsData.length === 0 && (
+      {selectedChannel && !selectedCatalog && !catalogsLoading && catalogsUnsupported && (
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 10, gap: 2.5, border: "2px solid #fde68a", borderRadius: "16px", bgcolor: "#fffbeb" }}>
+          <Typography fontSize={48}>⚠️</Typography>
+          <Box textAlign="center" maxWidth={480}>
+            <Typography fontSize={16} fontWeight={700} color="#92400e">Catalog Not Detected</Typography>
+            <Typography fontSize={13} color="#78350f" mt={1} lineHeight={1.7}>
+              No catalog found for this channel. If you've already linked a catalog in{" "}
+              <Box component="a" href="https://business.facebook.com" target="_blank" sx={{ color: "#b45309", fontWeight: 600 }}>
+                Meta WhatsApp Manager
+              </Box>
+              , click Retry to refresh.
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => setForceRetry(true)}
+            sx={{ borderRadius: "8px", fontSize: 13, fontWeight: 700, bgcolor: "#d97706", "&:hover": { bgcolor: "#b45309" }, px: 3 }}
+          >
+            🔄 Retry Detection
+          </Button>
+        </Box>
+      )}
+
+      {selectedChannel && !selectedCatalog && !catalogsLoading && !catalogsUnsupported && catalogsData.length === 0 && (
         <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 10, gap: 3, border: "2px dashed #e5e7eb", borderRadius: "16px", bgcolor: "#fafafa" }}>
           <Typography fontSize={48}>📦</Typography>
           <Box textAlign="center">
@@ -797,7 +1177,28 @@ const ProductsTab = () => {
         <Box display="flex" justifyContent="center" py={8}><CircularProgress sx={{ color: "#25D366" }} /></Box>
       )}
 
-      {selectedChannel && selectedCatalog && !productsLoading && products.length === 0 && (
+      {selectedChannel && selectedCatalog && !productsLoading && needsCatalogToken && (
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 8, gap: 2, border: "2px solid #bfdbfe", borderRadius: "16px", bgcolor: "#eff6ff" }}>
+          <Typography fontSize={40}>🔑</Typography>
+          <Box textAlign="center" maxWidth={480}>
+            <Typography fontSize={15} fontWeight={700} color="#1e40af">Catalog Access Not Authorized</Typography>
+            <Typography fontSize={13} color="#1e3a8a" mt={1} lineHeight={1.7}>
+              Your WABA channel token doesn't have <strong>catalog_management</strong> permission.
+              Connect via Facebook to authorize and load your products automatically.
+            </Typography>
+          </Box>
+          <Button
+            variant="contained" size="small"
+            startIcon={<Box component="img" src="https://upload.wikimedia.org/wikipedia/commons/0/05/Facebook_Logo_%282019%29.png" sx={{ width: 16, height: 16, objectFit: "contain" }} />}
+            onClick={() => setShowFbConnect(true)}
+            sx={{ borderRadius: "8px", fontSize: 13, fontWeight: 700, bgcolor: "#1877F2", "&:hover": { bgcolor: "#1666d8" }, px: 3, textTransform: "none" }}
+          >
+            Connect via Facebook
+          </Button>
+        </Box>
+      )}
+
+      {selectedChannel && selectedCatalog && !productsLoading && !needsCatalogToken && products.length === 0 && (
         <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 10, gap: 3, border: "2px dashed #e5e7eb", borderRadius: "16px", bgcolor: "#fafafa" }}>
           <Typography fontSize={48}>🔍</Typography>
           <Box textAlign="center">
@@ -834,6 +1235,16 @@ const ProductsTab = () => {
       )}
 
       {/* Dialogs */}
+      <FacebookCatalogConnectDialog
+        open={showFbConnect}
+        channelId={selectedChannel}
+        onClose={() => setShowFbConnect(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["channels"] });
+          queryClient.invalidateQueries({ queryKey: ["catalogs", selectedChannel] });
+          queryClient.invalidateQueries({ queryKey: ["products", selectedChannel, selectedCatalog] });
+        }}
+      />
       <CreateCatalogDialog open={showCreate} channelId={selectedChannel} onClose={() => setShowCreate(false)} onSuccess={handleCatalogSuccess} />
       <LinkCatalogDialog open={showLink} channelId={selectedChannel} onClose={() => setShowLink(false)} onSuccess={handleCatalogSuccess} />
       {showAddProduct && (

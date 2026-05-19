@@ -31,12 +31,24 @@ const CatalogSelector = ({
   value: string;
   onChange: (id: string) => void;
 }) => {
-  const { data: catalogs = [], isLoading } = useQuery({
+  const { data: catalogsResp, isLoading } = useQuery({
     queryKey: ["catalogs", channelId],
     queryFn: () => ecommerceService.getCatalogs(channelId),
-    select: (res: any) => res.catalogs || [],
     enabled: !!channelId,
   });
+  const catalogs: any[] = catalogsResp?.catalogs || [];
+  const unsupported: boolean = catalogsResp?.unsupported === true;
+
+  if (unsupported) {
+    return (
+      <Box sx={{ p: 1.5, borderRadius: "8px", bgcolor: "#fffbeb", border: "1px solid #fde68a" }}>
+        <Typography fontSize={12} color="#92400e" fontWeight={600}>⚠️ Catalogs not supported</Typography>
+        <Typography fontSize={11} color="#78350f" mt={0.5} lineHeight={1.5}>
+          This channel's WhatsApp account is SMB type. Upgrade to Enterprise on Meta Business Manager to use catalogs.
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <FormControl fullWidth size="small">

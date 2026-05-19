@@ -11,8 +11,8 @@ class ECommerceService {
     return res.data;
   }
 
-  async getCatalogs(channelId: string) {
-    const res = await axiosServices.get(`/catalog/${channelId}`);
+  async getCatalogs(channelId: string, force = false) {
+    const res = await axiosServices.get(`/catalog/${channelId}`, { params: force ? { force: "true" } : {} });
     return res.data;
   }
 
@@ -28,6 +28,24 @@ class ECommerceService {
 
   async unlinkCatalog(channelId: string, catalogId: string) {
     const res = await axiosServices.delete(`/catalog/${channelId}/unlink`, { data: { catalog_id: catalogId } });
+    return res.data;
+  }
+
+  async facebookOAuthAuthorize(channelId: string, code: string) {
+    const res = await axiosServices.post(`/catalog/${channelId}/oauth/authorize`, { code });
+    return res.data;
+  }
+
+  async facebookOAuthSave(channelId: string, accessToken: string, catalogId: string) {
+    const res = await axiosServices.post(`/catalog/${channelId}/oauth/save`, {
+      access_token: accessToken,
+      catalog_id: catalogId,
+    });
+    return res.data;
+  }
+
+  async saveCatalogToken(channelId: string, token: string) {
+    const res = await axiosServices.put(`/catalog/${channelId}/token`, { token });
     return res.data;
   }
 
