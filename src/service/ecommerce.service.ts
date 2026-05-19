@@ -31,8 +31,13 @@ class ECommerceService {
     return res.data;
   }
 
-  async facebookOAuthAuthorize(channelId: string, code: string) {
-    const res = await axiosServices.post(`/catalog/${channelId}/oauth/authorize`, { code });
+  async autoDetectCatalog(channelId: string) {
+    const res = await axiosServices.post(`/catalog/${channelId}/auto-detect`);
+    return res.data;
+  }
+
+  async facebookOAuthAuthorize(channelId: string, accessToken: string) {
+    const res = await axiosServices.post(`/catalog/${channelId}/oauth/authorize`, { access_token: accessToken });
     return res.data;
   }
 
