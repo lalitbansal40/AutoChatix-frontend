@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Box, Button, Chip, CircularProgress, IconButton, InputBase, Stack, Tooltip, Typography } from '@mui/material';
+import { Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputBase, ListItemIcon, Menu, MenuItem, Stack, Tooltip, Typography } from '@mui/material';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import PhoneIcon from '@mui/icons-material/Phone';
 import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
@@ -7,6 +7,9 @@ import EditIcon from '@mui/icons-material/EditOutlined';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import SyncIcon from '@mui/icons-material/Sync';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChannelT } from 'types/channels';
@@ -28,6 +31,14 @@ const ChannelCard = ({ channel }: { channel: ChannelT }) => {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
 
+  // 3-dot menu
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  // Confirm dialogs
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState('');
+
   const handleSyncHistory = async () => {
     setSyncing(true);
     setSyncMsg('');
@@ -39,6 +50,34 @@ const ChannelCard = ({ channel }: { channel: ChannelT }) => {
     } finally {
       setSyncing(false);
       setTimeout(() => setSyncMsg(''), 4000);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setActionLoading(true);
+    setActionError('');
+    try {
+      await channelService.disconnectChannel(channel._id);
+      await queryClient.invalidateQueries({ queryKey: ['channels'] });
+      setConfirmDisconnect(false);
+    } catch (e: any) {
+      setActionError(e?.response?.data?.message || 'Failed to disconnect');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setActionLoading(true);
+    setActionError('');
+    try {
+      await channelService.deleteChannel(channel._id);
+      await queryClient.invalidateQueries({ queryKey: ['channels'] });
+      setConfirmDelete(false);
+    } catch (e: any) {
+      setActionError(e?.response?.data?.message || 'Failed to delete');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -73,6 +112,7 @@ const ChannelCard = ({ channel }: { channel: ChannelT }) => {
   };
 
   return (
+    <>
     <Box
       sx={{
         borderRadius: '14px',
@@ -92,7 +132,7 @@ const ChannelCard = ({ channel }: { channel: ChannelT }) => {
 
       <Box sx={{ p: 2.5 }}>
 
-        {/* Header: icon + name + status */}
+        {/* Header: icon + name + status + menu */}
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1, mr: 1 }}>
             <Box
@@ -173,20 +213,32 @@ const ChannelCard = ({ channel }: { channel: ChannelT }) => {
             </Box>
           </Box>
 
-          <Chip
-            label={channel.is_active ? 'Active' : 'Inactive'}
-            size="small"
-            sx={{
-              height: 22,
-              fontSize: 11,
-              fontWeight: 700,
-              bgcolor: channel.is_active ? '#f0fdf4' : '#f9fafb',
-              color: channel.is_active ? '#16a34a' : '#9ca3af',
-              border: `1px solid ${channel.is_active ? '#bbf7d0' : '#e5e7eb'}`,
-              borderRadius: '6px',
-              flexShrink: 0,
-            }}
-          />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+            <Chip
+              label={channel.is_active ? 'Active' : 'Inactive'}
+              size="small"
+              sx={{
+                height: 22,
+                fontSize: 11,
+                fontWeight: 700,
+                bgcolor: channel.is_active ? '#f0fdf4' : '#f9fafb',
+                color: channel.is_active ? '#16a34a' : '#9ca3af',
+                border: `1px solid ${channel.is_active ? '#bbf7d0' : '#e5e7eb'}`,
+                borderRadius: '6px',
+              }}
+            />
+            {(user?.role === 'admin' || user?.role === 'superadmin' || isImpersonating) && (
+              <Tooltip title="More options">
+                <IconButton
+                  size="small"
+                  onClick={(e) => { setMenuAnchor(e.currentTarget); setActionError(''); }}
+                  sx={{ p: 0.3, color: '#9ca3af', '&:hover': { color: '#374151' } }}
+                >
+                  <MoreVertIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
         </Box>
 
         {/* Info rows */}
@@ -271,6 +323,84 @@ const ChannelCard = ({ channel }: { channel: ChannelT }) => {
         </Stack>
       </Box>
     </Box>
+
+    {/* ── 3-dot Menu ── */}
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={() => setMenuAnchor(null)}
+        PaperProps={{ sx: { borderRadius: '10px', minWidth: 160, boxShadow: '0 4px 20px rgba(0,0,0,0.12)' } }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <MenuItem
+          onClick={() => { setMenuAnchor(null); setConfirmDisconnect(true); }}
+          sx={{ fontSize: 13, color: '#d97706', py: 1 }}
+        >
+          <ListItemIcon sx={{ minWidth: 32 }}>
+            <LinkOffIcon sx={{ fontSize: 17, color: '#d97706' }} />
+          </ListItemIcon>
+          Disconnect
+        </MenuItem>
+        <MenuItem
+          onClick={() => { setMenuAnchor(null); setConfirmDelete(true); }}
+          sx={{ fontSize: 13, color: '#dc2626', py: 1 }}
+        >
+          <ListItemIcon sx={{ minWidth: 32 }}>
+            <DeleteOutlineIcon sx={{ fontSize: 17, color: '#dc2626' }} />
+          </ListItemIcon>
+          Delete
+        </MenuItem>
+      </Menu>
+
+      {/* ── Disconnect Confirm Dialog ── */}
+      <Dialog open={confirmDisconnect} onClose={() => !actionLoading && setConfirmDisconnect(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, fontSize: 16, pb: 1 }}>
+          Disconnect Channel?
+        </DialogTitle>
+        <DialogContent>
+          <Typography fontSize={13.5} color="#374151" lineHeight={1.7}>
+            <strong>{channel.channel_name}</strong> ({channel.display_phone_number}) will be deactivated.
+            All data (messages, templates, contacts) will be kept — you can reconnect later.
+          </Typography>
+          {actionError && <Typography fontSize={12} color="#dc2626" mt={1}>{actionError}</Typography>}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button size="small" onClick={() => setConfirmDisconnect(false)} disabled={actionLoading}
+            sx={{ textTransform: 'none', color: '#6b7280' }}>
+            Cancel
+          </Button>
+          <Button variant="contained" size="small" onClick={handleDisconnect} disabled={actionLoading}
+            sx={{ textTransform: 'none', bgcolor: '#d97706', '&:hover': { bgcolor: '#b45309' }, borderRadius: '8px' }}>
+            {actionLoading ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : 'Disconnect'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Delete Confirm Dialog ── */}
+      <Dialog open={confirmDelete} onClose={() => !actionLoading && setConfirmDelete(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, fontSize: 16, pb: 1, color: '#dc2626' }}>
+          Delete Channel?
+        </DialogTitle>
+        <DialogContent>
+          <Typography fontSize={13.5} color="#374151" lineHeight={1.7}>
+            This will <strong>permanently delete</strong> <strong>{channel.channel_name}</strong> ({channel.display_phone_number}) from the database.
+            This action <strong>cannot be undone</strong>.
+          </Typography>
+          {actionError && <Typography fontSize={12} color="#dc2626" mt={1}>{actionError}</Typography>}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button size="small" onClick={() => setConfirmDelete(false)} disabled={actionLoading}
+            sx={{ textTransform: 'none', color: '#6b7280' }}>
+            Cancel
+          </Button>
+          <Button variant="contained" size="small" onClick={handleDelete} disabled={actionLoading}
+            sx={{ textTransform: 'none', bgcolor: '#dc2626', '&:hover': { bgcolor: '#b91c1c' }, borderRadius: '8px' }}>
+            {actionLoading ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : 'Delete Permanently'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
 

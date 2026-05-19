@@ -57,6 +57,16 @@ class ChannelService {
     return response.data;
   }
 
+  async disconnectChannel(channelId: string) {
+    const response = await axiosServices.post(`channel/${channelId}/disconnect`);
+    return response.data;
+  }
+
+  async deleteChannel(channelId: string) {
+    const response = await axiosServices.delete(`channel/${channelId}`);
+    return response.data;
+  }
+
   async getAllChannels(accountId?: string) {
     const params = accountId ? { account_id: accountId } : {};
     const response = await axiosServices.get(`superadmin/channels`, { params });
