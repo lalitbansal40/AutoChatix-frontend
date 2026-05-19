@@ -24,6 +24,7 @@ const fetchAccountLimits = () => axios.get('/team/limits').then((r) => r.data);
 const Automations = () => {
   const navigate = useNavigate();
   const [openCreate, setOpenCreate] = useState(false);
+  const [editAutomation, setEditAutomation] = useState<AutomationT | null>(null);
   const { guard, gateOpen, closeGate } = usePlanGate();
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -153,7 +154,7 @@ const Automations = () => {
             <Grid item xs={12} sm={6} lg={4} key={automation._id}>
               <Fade in timeout={350} style={{ transitionDelay: `${index * 60}ms` }}>
                 <Box>
-                  <AutomationCard automation={automation} onRefresh={refetch} />
+                  <AutomationCard automation={automation} onRefresh={refetch} onEdit={() => setEditAutomation(automation)} />
                 </Box>
               </Fade>
             </Grid>
@@ -162,12 +163,17 @@ const Automations = () => {
       )}
 
       <CreateAutomationModal
-        open={openCreate}
-        onClose={() => setOpenCreate(false)}
-        onSuccess={(newAutomation: any) => {
-          setOpenCreate(false);
-          navigate(`/automations/${newAutomation._id}`);
+        open={openCreate || !!editAutomation}
+        onClose={() => { setOpenCreate(false); setEditAutomation(null); }}
+        onSuccess={(result: any) => {
+          if (editAutomation) {
+            setEditAutomation(null);
+          } else {
+            setOpenCreate(false);
+            navigate(`/automations/${result._id}`);
+          }
         }}
+        automation={editAutomation ?? undefined}
       />
 
       <PlanGateModal open={gateOpen} onClose={closeGate} feature="create automations" />

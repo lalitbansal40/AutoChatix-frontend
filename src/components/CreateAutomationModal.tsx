@@ -20,6 +20,7 @@ import { channelService } from "service/channel.service";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIntegrationCatalog } from "hooks/useIntegrationCatalog";
 import { IntegrationDefinition } from "types/integration";
+import { AutomationT } from "types/automation";
 
 const BUILTIN_TRIGGERS = [
   { value: "new_message_received", icon: "📩", label: "Incoming Message", desc: "When contact sends a message" },
@@ -40,9 +41,17 @@ type SelectedTrigger =
   | { kind: "builtin"; value: string }
   | { kind: "integration"; slug: string; trigger_key: string; label: string };
 
-const CreateAutomationModal = ({ open, onClose, onSuccess }: any) => {
+interface CreateAutomationModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSuccess?: (automation: any) => void;
+  automation?: AutomationT;
+}
+
+const CreateAutomationModal = ({ open, onClose, onSuccess, automation }: CreateAutomationModalProps) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const isEdit = !!automation;
 
   const [name, setName] = useState("");
   const [channel, setChannel] = useState("");
@@ -64,7 +73,7 @@ const CreateAutomationModal = ({ open, onClose, onSuccess }: any) => {
     return (catalogResp?.catalog || []).filter((a) => a.connected && (a.triggers?.length ?? 0) > 0);
   }, [catalogResp]);
 
-  const handleCreate = async () => {
+  const handleSubmit = async () => {
     try {
       setLoading(true);
 
@@ -76,25 +85,37 @@ const CreateAutomationModal = ({ open, onClose, onSuccess }: any) => {
           ? { slug: selected.slug, trigger_key: selected.trigger_key }
           : undefined;
 
-      const res = await automationService.createAutomation({
-        name,
-        channel_id: channel,
-        channel_name: selectedChannel?.channel_name || "",
-        trigger,
-        trigger_config,
-        nodes: [{ id: "start", type: "trigger", label: "trigger" }],
-        edges: [],
-      });
+      if (isEdit) {
+        const updated = await automationService.updateAutomation(automation!._id, {
+          name,
+          channel_id: channel,
+          channel_name: selectedChannel?.channel_name || "",
+          trigger,
+          trigger_config,
+        });
+        queryClient.invalidateQueries({ queryKey: ["automations"] });
+        onSuccess?.(updated);
+      } else {
+        const res = await automationService.createAutomation({
+          name,
+          channel_id: channel,
+          channel_name: selectedChannel?.channel_name || "",
+          trigger,
+          trigger_config,
+          nodes: [{ id: "start", type: "trigger", label: "trigger" }],
+          edges: [],
+        });
 
-      const newAutomation = res.data?.data || res.data || res;
-      queryClient.invalidateQueries({ queryKey: ["automations"] });
-      onSuccess?.(newAutomation);
+        const newAutomation = res.data?.data || res.data || res;
+        queryClient.invalidateQueries({ queryKey: ["automations"] });
+        onSuccess?.(newAutomation);
 
-      setName("");
-      setChannel("");
-      setSelected({ kind: "builtin", value: "new_message_received" });
+        setName("");
+        setChannel("");
+        setSelected({ kind: "builtin", value: "new_message_received" });
 
-      navigate(`/automations/${newAutomation._id}`);
+        navigate(`/automations/${newAutomation._id}`);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -104,13 +125,27 @@ const CreateAutomationModal = ({ open, onClose, onSuccess }: any) => {
 
   useEffect(() => {
     if (open) {
-      setName("");
-      setChannel("");
-      setSelected({ kind: "builtin", value: "new_message_received" });
+      if (isEdit && automation) {
+        setName(automation.name);
+        const chId = typeof automation.channel_id === "string"
+          ? automation.channel_id
+          : automation.channel_id._id;
+        setChannel(chId);
+        const tc = (automation as any).trigger_config;
+        if ((automation.trigger as string) === "integration_trigger" && tc?.slug) {
+          setSelected({ kind: "integration", slug: tc.slug, trigger_key: tc.trigger_key, label: "" });
+        } else {
+          setSelected({ kind: "builtin", value: automation.trigger as string });
+        }
+      } else {
+        setName("");
+        setChannel("");
+        setSelected({ kind: "builtin", value: "new_message_received" });
+      }
     }
   }, [open]);
 
-  const canCreate = !!name.trim() && !!channel && !loading;
+  const canSubmit = !!name.trim() && !!channel && !loading;
 
   return (
     <Dialog
@@ -128,8 +163,12 @@ const CreateAutomationModal = ({ open, onClose, onSuccess }: any) => {
             🤖
           </Box>
           <Box>
-            <Typography sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>New Automation</Typography>
-            <Typography variant="caption" color="text.secondary">Configure your automation flow</Typography>
+            <Typography sx={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>
+              {isEdit ? "Edit Automation" : "New Automation"}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {isEdit ? "Update automation name and trigger" : "Configure your automation flow"}
+            </Typography>
           </Box>
         </Stack>
         <IconButton size="small" onClick={onClose} sx={{ color: "#9ca3af", "&:hover": { color: "#374151", bgcolor: "#f3f4f6" } }}>
@@ -149,7 +188,7 @@ const CreateAutomationModal = ({ open, onClose, onSuccess }: any) => {
             placeholder="e.g. Welcome Message, Order Follow-up"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e: any) => { if (e.key === "Enter" && canCreate) handleCreate(); }}
+            onKeyDown={(e: any) => { if (e.key === "Enter" && canSubmit) handleSubmit(); }}
             sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}
           />
         </Box>
@@ -289,11 +328,13 @@ const CreateAutomationModal = ({ open, onClose, onSuccess }: any) => {
         </Button>
         <Button
           variant="contained"
-          onClick={handleCreate}
-          disabled={!canCreate}
+          onClick={handleSubmit}
+          disabled={!canSubmit}
           sx={{ borderRadius: "8px", fontWeight: 700, fontSize: 13, px: 2.5, bgcolor: "#25D366", "&:hover": { bgcolor: "#1db954" }, boxShadow: "none" }}
         >
-          {loading ? "Creating…" : "Create & Open Builder →"}
+          {loading
+            ? (isEdit ? "Saving…" : "Creating…")
+            : (isEdit ? "Save Changes" : "Create & Open Builder →")}
         </Button>
       </Box>
     </Dialog>

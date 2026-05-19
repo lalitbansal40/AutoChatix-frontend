@@ -13,6 +13,7 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -22,6 +23,7 @@ import automationService from "service/automation.service";
 interface Props {
   automation: AutomationT;
   onRefresh: () => void;
+  onEdit: () => void;
 }
 
 const TRIGGER_META: Record<string, { icon: string; label: string }> = {
@@ -33,7 +35,7 @@ const TRIGGER_META: Record<string, { icon: string; label: string }> = {
   callback_id:          { icon: "🔘", label: "Callback ID" },
 };
 
-const AutomationCard = ({ automation, onRefresh }: Props) => {
+const AutomationCard = ({ automation, onRefresh, onEdit }: Props) => {
   const navigate = useNavigate();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -175,6 +177,21 @@ const AutomationCard = ({ automation, onRefresh }: Props) => {
                 }}
               >
                 {cloning ? <CircularProgress size={12} sx={{ color: "#6366f1" }} /> : <ContentCopyIcon sx={{ fontSize: 15 }} />}
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Edit automation" arrow>
+              <IconButton
+                size="small"
+                onClick={onEdit}
+                sx={{
+                  color: "#0891b2", bgcolor: "#ecfeff", border: "1px solid #a5f3fc",
+                  p: 0.75,
+                  "&:hover": { opacity: 0.8, transform: "scale(1.05)" },
+                  transition: "all 0.15s",
+                }}
+              >
+                <EditOutlinedIcon sx={{ fontSize: 15 }} />
               </IconButton>
             </Tooltip>
 
