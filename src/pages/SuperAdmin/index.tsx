@@ -551,6 +551,286 @@ const ManageDialog = ({
 };
 
 /* ─────────────────────────────────────────
+   Email Panel (superadmin send + inbox)
+───────────────────────────────────────── */
+const EmailPanel = ({ showToast }: { showToast: (msg: string, sev?: 'success' | 'error') => void }) => {
+  const [emailTab, setEmailTab] = useState(0); // 0=Compose, 1=Inbox
+  const [form, setForm] = useState({ to: '', subject: '', body: '', is_html: false });
+  const [sending, setSending] = useState(false);
+
+  // Inbox state
+  const [inboxEmails, setInboxEmails] = useState<any[]>([]);
+  const [inboxLoading, setInboxLoading] = useState(false);
+  const [inboxTotal, setInboxTotal] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [inboxPage, setInboxPage] = useState(1);
+  const [selectedEmail, setSelectedEmail] = useState<any | null>(null);
+
+  const loadInbox = async (page = 1) => {
+    setInboxLoading(true);
+    try {
+      const res = await axios.get('/superadmin/email/inbox', { params: { page, limit: 20 } });
+      setInboxEmails(res.data.emails || []);
+      setInboxTotal(res.data.total || 0);
+      setUnreadCount(res.data.unread || 0);
+      setInboxPage(page);
+    } catch {
+      showToast('Failed to load inbox', 'error');
+    } finally {
+      setInboxLoading(false);
+    }
+  };
+
+  const handleOpenEmail = async (email: any) => {
+    setSelectedEmail(email);
+    if (!email.is_read) {
+      try {
+        await axios.patch(`/superadmin/email/inbox/${email._id}/read`);
+        setInboxEmails((prev) => prev.map((e) => e._id === email._id ? { ...e, is_read: true } : e));
+        setUnreadCount((c) => Math.max(0, c - 1));
+      } catch { /* silent */ }
+    }
+  };
+
+  const handleDeleteEmail = async (id: string) => {
+    try {
+      await axios.delete(`/superadmin/email/inbox/${id}`);
+      setInboxEmails((prev) => prev.filter((e) => e._id !== id));
+      if (selectedEmail?._id === id) setSelectedEmail(null);
+      showToast('Email deleted');
+    } catch {
+      showToast('Failed to delete', 'error');
+    }
+  };
+
+  const handleSend = async () => {
+    if (!form.to || !form.subject || !form.body) {
+      showToast('Please fill all fields', 'error');
+      return;
+    }
+    setSending(true);
+    try {
+      await axios.post('/superadmin/email/send', form);
+      showToast('Email sent successfully!');
+      setForm({ to: '', subject: '', body: '', is_html: false });
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || 'Failed to send email', 'error');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Load inbox when switching to inbox tab
+  const handleTabChange = (_: any, v: number) => {
+    setEmailTab(v);
+    if (v === 1) loadInbox(1);
+  };
+
+  const inboxTotalPages = Math.max(1, Math.ceil(inboxTotal / 20));
+
+  return (
+    <Box sx={{ px: { xs: 2, md: 4 }, py: 3, maxWidth: 900 }}>
+      <Paper sx={{ borderRadius: 3, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
+
+        {/* Header */}
+        <Box sx={{ background: 'linear-gradient(135deg, #0a0f1e 0%, #0d1f3c 100%)', px: 3, py: 2.5 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" alignItems="center" gap={1.5}>
+              <Box sx={{
+                width: 40, height: 40, borderRadius: '10px',
+                background: 'linear-gradient(135deg, #3b82f6, #60a5fa)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+              }}>✉️</Box>
+              <Box>
+                <Typography variant="h6" fontWeight={800} sx={{ color: '#fff', lineHeight: 1.2 }}>Email</Typography>
+                <Typography variant="caption" sx={{ color: '#64748b' }}>hello@autochatix.com</Typography>
+              </Box>
+            </Stack>
+            {unreadCount > 0 && (
+              <Chip
+                label={`${unreadCount} unread`}
+                size="small"
+                sx={{ bgcolor: '#ef4444', color: '#fff', fontWeight: 700, fontSize: 11 }}
+              />
+            )}
+          </Stack>
+
+          {/* Sub-tabs */}
+          <Box sx={{ mt: 1.5 }}>
+            <Tabs value={emailTab} onChange={handleTabChange}
+              sx={{
+                minHeight: 34,
+                '& .MuiTab-root': { color: '#64748b', fontWeight: 600, fontSize: 12.5, textTransform: 'none', minHeight: 34, py: 0.5 },
+                '& .Mui-selected': { color: '#fff !important' },
+                '& .MuiTabs-indicator': { bgcolor: '#3b82f6', height: 2.5, borderRadius: '2px 2px 0 0' },
+              }}>
+              <Tab label="✏️  Compose" />
+              <Tab label={`📥  Inbox${unreadCount > 0 ? ` (${unreadCount})` : ''}`} />
+            </Tabs>
+          </Box>
+        </Box>
+
+        {/* ── COMPOSE ── */}
+        {emailTab === 0 && (
+          <Box sx={{ p: 3 }}>
+            <Stack spacing={2.5}>
+              <TextField
+                label="To (Recipient Email)" type="email" value={form.to}
+                onChange={(e) => setForm({ ...form, to: e.target.value })}
+                fullWidth placeholder="customer@example.com"
+                InputProps={{ startAdornment: <InputAdornment position="start" sx={{ color: '#64748b' }}>📧</InputAdornment> }}
+              />
+              <TextField
+                label="Subject" value={form.subject}
+                onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                fullWidth placeholder="Your subject line here…"
+              />
+              <Box>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.75}>
+                  <Typography variant="caption" fontWeight={600} color="#475569" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Message Body
+                  </Typography>
+                  <FormControlLabel
+                    control={<Switch size="small" checked={form.is_html} onChange={(e) => setForm({ ...form, is_html: e.target.checked })} />}
+                    label={<Typography variant="caption" color="#64748b">HTML mode</Typography>}
+                    sx={{ m: 0 }}
+                  />
+                </Stack>
+                <TextField
+                  multiline rows={10} value={form.body}
+                  onChange={(e) => setForm({ ...form, body: e.target.value })}
+                  fullWidth
+                  placeholder={form.is_html ? '<p>Your HTML email content here...</p>' : 'Type your message here…'}
+                  sx={{ '& .MuiOutlinedInput-root': { fontFamily: form.is_html ? 'monospace' : 'inherit', fontSize: form.is_html ? 13 : 14 } }}
+                />
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="contained" size="large"
+                  disabled={sending || !form.to || !form.subject || !form.body}
+                  onClick={handleSend}
+                  sx={{ bgcolor: '#3b82f6', '&:hover': { bgcolor: '#2563eb' }, fontWeight: 700, borderRadius: '10px', px: 4, boxShadow: '0 4px 14px rgba(59,130,246,0.35)' }}
+                >
+                  {sending ? 'Sending…' : 'Send Email →'}
+                </Button>
+              </Box>
+            </Stack>
+          </Box>
+        )}
+
+        {/* ── INBOX ── */}
+        {emailTab === 1 && (
+          <Box sx={{ display: 'flex', minHeight: 480 }}>
+
+            {/* Email list */}
+            <Box sx={{ width: 340, flexShrink: 0, borderRight: '1px solid #f1f5f9', overflow: 'auto' }}>
+              {inboxLoading ? (
+                <Box display="flex" justifyContent="center" alignItems="center" height={200}>
+                  <CircularProgress size={28} />
+                </Box>
+              ) : inboxEmails.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 8 }}>
+                  <Typography fontSize={36} mb={1}>📭</Typography>
+                  <Typography fontSize={13} color="#94a3b8" fontWeight={600}>Inbox is empty</Typography>
+                  <Typography fontSize={12} color="#cbd5e1" mt={0.5}>Emails sent to hello@autochatix.com<br/>will appear here</Typography>
+                </Box>
+              ) : (
+                <>
+                  {inboxEmails.map((email) => (
+                    <Box
+                      key={email._id}
+                      onClick={() => handleOpenEmail(email)}
+                      sx={{
+                        px: 2, py: 1.75, cursor: 'pointer', borderBottom: '1px solid #f1f5f9',
+                        bgcolor: selectedEmail?._id === email._id ? '#eff6ff' : email.is_read ? '#fff' : '#f0f9ff',
+                        borderLeft: `3px solid ${selectedEmail?._id === email._id ? '#3b82f6' : email.is_read ? 'transparent' : '#3b82f6'}`,
+                        '&:hover': { bgcolor: '#f8fafc' },
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={0.3}>
+                        <Typography fontSize={12.5} fontWeight={email.is_read ? 500 : 700} color="#0f172a" noWrap sx={{ maxWidth: 200 }}>
+                          {email.from_name || email.from_email}
+                        </Typography>
+                        <Typography fontSize={10.5} color="#94a3b8" flexShrink={0} ml={1}>
+                          {new Date(email.received_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                        </Typography>
+                      </Stack>
+                      <Typography fontSize={12} fontWeight={email.is_read ? 400 : 600} color="#374151" noWrap mb={0.25}>
+                        {email.subject}
+                      </Typography>
+                      <Typography fontSize={11} color="#94a3b8" noWrap>
+                        {(email.body_text || '').slice(0, 60)}
+                      </Typography>
+                    </Box>
+                  ))}
+                  {inboxTotalPages > 1 && (
+                    <Box display="flex" justifyContent="center" py={1.5}>
+                      <Pagination count={inboxTotalPages} page={inboxPage} size="small"
+                        onChange={(_, p) => loadInbox(p)} color="primary" />
+                    </Box>
+                  )}
+                </>
+              )}
+            </Box>
+
+            {/* Email detail */}
+            <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+              {!selectedEmail ? (
+                <Box sx={{ textAlign: 'center', pt: 8 }}>
+                  <Typography fontSize={40} mb={1}>👆</Typography>
+                  <Typography fontSize={13} color="#94a3b8">Select an email to read it</Typography>
+                </Box>
+              ) : (
+                <Stack spacing={2}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                    <Typography fontSize={18} fontWeight={700} color="#0f172a" sx={{ flex: 1, pr: 2 }}>
+                      {selectedEmail.subject}
+                    </Typography>
+                    <IconButton size="small" color="error" onClick={() => handleDeleteEmail(selectedEmail._id)}>
+                      <DeleteOutlined style={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Stack>
+
+                  <Box sx={{ bgcolor: '#f8fafc', borderRadius: 2, p: 2, border: '1px solid #e2e8f0' }}>
+                    <Stack direction="row" spacing={2}>
+                      <Box sx={{ width: 36, height: 36, borderRadius: '50%', bgcolor: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                        {(selectedEmail.from_name || selectedEmail.from_email || '?')[0].toUpperCase()}
+                      </Box>
+                      <Box>
+                        <Typography fontSize={13} fontWeight={700} color="#0f172a">
+                          {selectedEmail.from_name || selectedEmail.from_email}
+                        </Typography>
+                        <Typography fontSize={11.5} color="#64748b">{selectedEmail.from_email}</Typography>
+                        <Typography fontSize={11} color="#94a3b8">
+                          {new Date(selectedEmail.received_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Box>
+
+                  <Divider />
+
+                  {selectedEmail.body_html ? (
+                    <Box
+                      sx={{ fontSize: 14, lineHeight: 1.7, color: '#374151', '& a': { color: '#3b82f6' } }}
+                      dangerouslySetInnerHTML={{ __html: selectedEmail.body_html }}
+                    />
+                  ) : (
+                    <Typography fontSize={14} color="#374151" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+                      {selectedEmail.body_text || '(empty)'}
+                    </Typography>
+                  )}
+                </Stack>
+              )}
+            </Box>
+          </Box>
+        )}
+      </Paper>
+    </Box>
+  );
+};
+
+/* ─────────────────────────────────────────
    Main SuperAdmin Page
 ───────────────────────────────────────── */
 const SuperAdmin = () => {
@@ -560,6 +840,7 @@ const SuperAdmin = () => {
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false, message: '', severity: 'success',
   });
+  const [mainTab, setMainTab] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [managingAcc, setManagingAcc] = useState<any | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -689,8 +970,24 @@ const SuperAdmin = () => {
           </Stack>
         </Stack>
 
-        {/* Stats row */}
-        <Stack direction="row" spacing={2} mt={3} flexWrap="wrap">
+        {/* Main nav tabs */}
+        <Box sx={{ mt: 2.5 }}>
+          <Tabs
+            value={mainTab}
+            onChange={(_, v) => setMainTab(v)}
+            sx={{
+              '& .MuiTab-root': { color: '#64748b', fontWeight: 600, fontSize: 13, textTransform: 'none', minHeight: 38, py: 0.75 },
+              '& .Mui-selected': { color: '#fff !important' },
+              '& .MuiTabs-indicator': { bgcolor: '#00a854', height: 3, borderRadius: '3px 3px 0 0' },
+            }}
+          >
+            <Tab label="🏢  Accounts" />
+            <Tab label="✉️  Email" />
+          </Tabs>
+        </Box>
+
+        {/* Stats row (accounts tab only) */}
+        {mainTab === 0 && <Stack direction="row" spacing={2} mt={2} flexWrap="wrap">
           {[
             { label: 'Total Accounts', value: accounts.length, icon: '🏢', color: '#3b82f6' },
             { label: 'Active Plans', value: totalActive, icon: '✅', color: '#00a854' },
@@ -716,11 +1013,14 @@ const SuperAdmin = () => {
               Showing {filteredAccounts.length} of {accounts.length}
             </Typography>
           </Box>
-        </Stack>
+        </Stack>}
       </Box>
 
+      {/* ── Email Panel ── */}
+      {mainTab === 1 && <EmailPanel showToast={showToast} />}
+
       {/* ── Table ── */}
-      <Box sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
+      {mainTab === 0 && <Box sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
         <Paper sx={{ borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 6px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
           <TableContainer>
             <Table>
@@ -882,7 +1182,7 @@ const SuperAdmin = () => {
             <Pagination count={totalPages} page={page} onChange={(_, v) => setPage(v)} color="primary" />
           </Box>
         )}
-      </Box>
+      </Box>}
 
       {/* Manage Dialog */}
       {managingAcc && (

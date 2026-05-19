@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Fade, Grid, IconButton, InputAdornment, Snackbar, TextField, Tooltip, Typography } from '@mui/material';
+import {
+  Alert, Box, Button, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent,
+  Fade, FormControlLabel, Grid, IconButton, InputAdornment, Snackbar,
+  Step, StepLabel, Stepper, TextField, Tooltip, Typography,
+} from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import LinkIcon from '@mui/icons-material/Link';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
@@ -39,6 +44,9 @@ const Channels = () => {
   const [linkLoading, setLinkLoading] = useState(false);
   const [onboardingUrl, setOnboardingUrl] = useState('');
   const [copied, setCopied] = useState(false);
+  const [migrateOpen, setMigrateOpen] = useState(false);
+  const [migrateStep, setMigrateStep] = useState(0);
+  const [twoFaDisabled, setTwoFaDisabled] = useState(false);
   const [toast, setToast] = useState<{
     open: boolean;
     message: string;
@@ -204,31 +212,40 @@ const Channels = () => {
           </Typography>
         </Box>
 
-        <Tooltip title={connectTooltip} arrow>
-          <span>
-            <Button
-              variant="contained"
-              startIcon={connecting ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <AddCircleOutlineIcon sx={{ fontSize: 18 }} />}
-              onClick={() => guard(launchWhatsAppSignup)}
-              disabled={connectDisabled}
-              sx={{
-                bgcolor: '#25D366',
-                color: '#fff',
-                fontWeight: 700,
-                fontSize: 13,
-                borderRadius: '10px',
-                px: 2.5,
-                py: 1,
-                textTransform: 'none',
-                boxShadow: '0 2px 10px rgba(37,211,102,0.35)',
-                '&:hover': { bgcolor: '#1db954', boxShadow: '0 4px 14px rgba(37,211,102,0.45)' },
-                '&:disabled': { bgcolor: '#86efac', color: '#fff' },
-              }}
-            >
-              {connecting ? 'Connecting...' : 'Connect WhatsApp'}
-            </Button>
-          </span>
-        </Tooltip>
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Button
+            variant="outlined"
+            startIcon={<SwapHorizIcon sx={{ fontSize: 18 }} />}
+            onClick={() => { setMigrateStep(0); setTwoFaDisabled(false); setMigrateOpen(true); }}
+            sx={{
+              fontWeight: 700, fontSize: 13, borderRadius: '10px', px: 2.5, py: 1,
+              textTransform: 'none', borderColor: '#d1d5db', color: '#374151',
+              '&:hover': { borderColor: '#6b7280', bgcolor: '#f9fafb' },
+            }}
+          >
+            Migrate Existing Number
+          </Button>
+
+          <Tooltip title={connectTooltip} arrow>
+            <span>
+              <Button
+                variant="contained"
+                startIcon={connecting ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <AddCircleOutlineIcon sx={{ fontSize: 18 }} />}
+                onClick={() => guard(launchWhatsAppSignup)}
+                disabled={connectDisabled}
+                sx={{
+                  bgcolor: '#25D366', color: '#fff', fontWeight: 700, fontSize: 13,
+                  borderRadius: '10px', px: 2.5, py: 1, textTransform: 'none',
+                  boxShadow: '0 2px 10px rgba(37,211,102,0.35)',
+                  '&:hover': { bgcolor: '#1db954', boxShadow: '0 4px 14px rgba(37,211,102,0.45)' },
+                  '&:disabled': { bgcolor: '#86efac', color: '#fff' },
+                }}
+              >
+                {connecting ? 'Connecting...' : 'Connect WhatsApp'}
+              </Button>
+            </span>
+          </Tooltip>
+        </Box>
       </Box>
 
       {/* ── CHANNEL CARDS ── */}
@@ -327,6 +344,176 @@ const Channels = () => {
       </Box>
 
       <PlanGateModal open={gateOpen} onClose={closeGate} feature="connect channels" />
+
+      {/* ── MIGRATE EXISTING NUMBER DIALOG ── */}
+      <Dialog
+        open={migrateOpen}
+        onClose={() => setMigrateOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}
+      >
+        {/* Header */}
+        <Box sx={{ background: 'linear-gradient(135deg, #0a1628 0%, #0d2044 100%)', px: 3, py: 2.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{
+              width: 40, height: 40, borderRadius: '10px',
+              background: 'linear-gradient(135deg, #25D366, #128C7E)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+            }}>🔄</Box>
+            <Box>
+              <Typography variant="h6" fontWeight={800} sx={{ color: '#fff', lineHeight: 1.2 }}>
+                Migrate Existing WhatsApp Number
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748b' }}>
+                Move a number from another BSP or WABA to AutoChatix
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Stepper */}
+        <Box sx={{ px: 3, pt: 2.5, pb: 0 }}>
+          <Stepper activeStep={migrateStep} alternativeLabel>
+            {['Disable 2FA', 'Connect via Facebook'].map((label) => (
+              <Step key={label}>
+                <StepLabel sx={{
+                  '& .MuiStepLabel-label': { fontSize: 12, fontWeight: 600 },
+                  '& .MuiStepIcon-root.Mui-active': { color: '#25D366' },
+                  '& .MuiStepIcon-root.Mui-completed': { color: '#25D366' },
+                }}>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+        </Box>
+
+        <DialogContent sx={{ pt: 2.5, pb: 1 }}>
+
+          {/* ── STEP 0: Disable 2FA ── */}
+          {migrateStep === 0 && (
+            <Box>
+              <Box sx={{ bgcolor: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: 2, p: 2.5, mb: 2.5 }}>
+                <Typography fontWeight={700} fontSize={14} color="#92400E" mb={1}>
+                  ⚠️ Before you proceed — disable Two-Step Verification
+                </Typography>
+                <Typography fontSize={13} color="#78350F" lineHeight={1.7}>
+                  WhatsApp requires 2FA to be <strong>turned off</strong> on the number you want to migrate.
+                  If it's still enabled, the migration will fail.
+                </Typography>
+              </Box>
+
+              <Typography fontSize={13.5} color="#374151" lineHeight={1.8} mb={2}>
+                <strong>How to disable 2FA:</strong>
+              </Typography>
+
+              <Box component="ol" sx={{ pl: 2.5, m: 0, mb: 2.5 }}>
+                {[
+                  'Open WhatsApp Business Manager (business.facebook.com)',
+                  'Go to → Accounts → WhatsApp Accounts → select your account',
+                  'Click Settings → Two-step verification',
+                  'Click "Turn off" and confirm',
+                ].map((step, i) => (
+                  <Box component="li" key={i} sx={{ fontSize: 13, color: '#374151', mb: 0.75, lineHeight: 1.6 }}>
+                    {step}
+                  </Box>
+                ))}
+              </Box>
+
+              <Button
+                variant="outlined"
+                size="small"
+                href="https://business.facebook.com/settings/whatsapp-business-accounts"
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{ mb: 2.5, fontSize: 12.5, borderRadius: '8px', textTransform: 'none', borderColor: '#d1d5db', color: '#374151' }}
+              >
+                Open WhatsApp Business Manager ↗
+              </Button>
+
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={twoFaDisabled}
+                    onChange={(e) => setTwoFaDisabled(e.target.checked)}
+                    sx={{ color: '#25D366', '&.Mui-checked': { color: '#25D366' } }}
+                  />
+                }
+                label={
+                  <Typography fontSize={13.5} fontWeight={600} color="#0F172A">
+                    I have turned off two-step verification for my number
+                  </Typography>
+                }
+              />
+            </Box>
+          )}
+
+          {/* ── STEP 1: Connect via Facebook ── */}
+          {migrateStep === 1 && (
+            <Box>
+              <Box sx={{ bgcolor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 2, p: 2.5, mb: 2.5 }}>
+                <Typography fontWeight={700} fontSize={14} color="#065F46" mb={0.75}>
+                  ✅ 2FA disabled — ready to migrate
+                </Typography>
+                <Typography fontSize={13} color="#374151" lineHeight={1.7}>
+                  Click the button below to launch Facebook's Embedded Signup. Select the WhatsApp number
+                  you want to migrate and follow the on-screen steps. The process takes about 2 minutes.
+                </Typography>
+              </Box>
+
+              <Box sx={{ bgcolor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 2, p: 2, mb: 2 }}>
+                <Typography fontSize={12.5} color="#1E40AF" lineHeight={1.7}>
+                  <strong>Note:</strong> During the Facebook login flow, choose the WhatsApp Business Account
+                  that contains the number you want to migrate. Meta will handle transferring it automatically.
+                </Typography>
+              </Box>
+
+              <Button
+                fullWidth
+                variant="contained"
+                disabled={connecting}
+                startIcon={connecting ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
+                onClick={() => {
+                  setMigrateOpen(false);
+                  guard(launchWhatsAppSignup);
+                }}
+                sx={{
+                  bgcolor: '#1877F2', color: '#fff', fontWeight: 700, fontSize: 14,
+                  borderRadius: '10px', py: 1.5, textTransform: 'none',
+                  boxShadow: '0 4px 14px rgba(24,119,242,0.4)',
+                  '&:hover': { bgcolor: '#1464D8' },
+                }}
+              >
+                {connecting ? 'Connecting…' : '🔵 Login with Facebook to Migrate'}
+              </Button>
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2.5, pt: 1, gap: 1 }}>
+          <Button onClick={() => setMigrateOpen(false)} color="inherit" sx={{ borderRadius: '8px' }}>
+            Cancel
+          </Button>
+          {migrateStep === 0 && (
+            <Button
+              variant="contained"
+              disabled={!twoFaDisabled}
+              onClick={() => setMigrateStep(1)}
+              sx={{ bgcolor: '#25D366', '&:hover': { bgcolor: '#1db954' }, borderRadius: '8px', fontWeight: 700 }}
+            >
+              Next: Connect →
+            </Button>
+          )}
+          {migrateStep === 1 && (
+            <Button
+              variant="outlined"
+              onClick={() => setMigrateStep(0)}
+              sx={{ borderRadius: '8px' }}
+            >
+              ← Back
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
 
       {/* ── TOAST NOTIFICATIONS ── */}
       <Snackbar
