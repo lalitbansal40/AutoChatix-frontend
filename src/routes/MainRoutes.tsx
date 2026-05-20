@@ -25,6 +25,7 @@ import FlowBuilderEditor from 'pages/FlowBuilderEditor';
 import Leads from 'pages/Leads';
 import AutomationLibrary from 'pages/AutomationLibrary';
 import Analytics from 'pages/Analytics';
+import UserProfile from 'pages/UserProfile';
 
 // pages routing
 const MaintenanceError = Loadable(lazy(() => import('pages/maintenance/404')));
@@ -123,6 +124,10 @@ const MainRoutes = {
         {
           path: 'analytics',
           element: <Analytics />
+        },
+        {
+          path: 'profile',
+          element: <UserProfile />
         },
         {
           path: 'superadmin',

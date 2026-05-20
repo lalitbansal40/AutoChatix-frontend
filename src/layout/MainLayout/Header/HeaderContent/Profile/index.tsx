@@ -3,18 +3,17 @@ import { useNavigate } from 'react-router';
 
 // material-ui
 import { useTheme } from '@mui/material/styles';
-import { Box, ButtonBase, CardContent, Chip, ClickAwayListener, Divider, Grid, Paper, Popper, Stack, Tooltip, Typography } from '@mui/material';
+import { Box, ButtonBase, CardContent, Chip, ClickAwayListener, Divider, Grid, List, ListItemButton, ListItemIcon, ListItemText, Paper, Popper, Stack, Typography } from '@mui/material';
 
 // project import
 import Avatar from 'components/@extended/Avatar';
 import MainCard from 'components/MainCard';
 import Transitions from 'components/@extended/Transitions';
-import IconButton from 'components/@extended/IconButton';
 import useAuth from 'hooks/useAuth';
 
 // assets
 import avatar1 from 'assets/images/users/avatar-1.png';
-import { LogoutOutlined, RollbackOutlined } from '@ant-design/icons';
+import { LogoutOutlined, RollbackOutlined, UserOutlined } from '@ant-design/icons';
 
 // types
 import { ThemeMode } from 'types/config';
@@ -157,16 +156,28 @@ const Profile = () => {
                           </Stack>
                         </Stack>
                       </Grid>
-                      <Grid item>
-                        <Tooltip title="Logout">
-                          <IconButton size="large" sx={{ color: 'text.primary' }} onClick={handleLogout}>
-                            <LogoutOutlined />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
+                      <Grid item />
                     </Grid>
 
-                    {isImpersonating && (
+                    <Divider sx={{ my: 1 }} />
+                  <List component="nav" sx={{ p: 0, '& .MuiListItemIcon-root': { minWidth: 32 } }}>
+                    <ListItemButton
+                      onClick={() => { navigate('/profile'); setOpen(false); }}
+                      sx={{ borderRadius: 1, mx: 1, mb: 0.5 }}
+                    >
+                      <ListItemIcon><UserOutlined /></ListItemIcon>
+                      <ListItemText primary="My Profile & API Keys" />
+                    </ListItemButton>
+                    <ListItemButton
+                      onClick={handleLogout}
+                      sx={{ borderRadius: 1, mx: 1, color: 'error.main', '& .MuiListItemIcon-root': { color: 'error.main' } }}
+                    >
+                      <ListItemIcon><LogoutOutlined /></ListItemIcon>
+                      <ListItemText primary="Logout" />
+                    </ListItemButton>
+                  </List>
+
+                  {isImpersonating && (
                       <>
                         <Divider sx={{ my: 1.5 }} />
                         <Stack

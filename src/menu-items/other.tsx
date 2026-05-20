@@ -2,7 +2,7 @@
 import { FormattedMessage } from 'react-intl';
 
 // assets
-import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined, WalletOutlined, ThunderboltOutlined, CreditCardOutlined, BranchesOutlined, ContactsOutlined, BookOutlined, BarChartOutlined } from '@ant-design/icons';
+import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined, WalletOutlined, ThunderboltOutlined, CreditCardOutlined, BranchesOutlined, ContactsOutlined, BookOutlined, BarChartOutlined, UserOutlined } from '@ant-design/icons';
 
 // type
 import { NavItemType } from 'types/menu';
@@ -25,6 +25,7 @@ const icons = {
   ContactsOutlined,
   BookOutlined,
   BarChartOutlined,
+  UserOutlined,
 };
 
 // ==============================|| MENU ITEMS - SUPPORT ||============================== //
@@ -138,6 +139,13 @@ const other: NavItemType = {
       type: 'item',
       url: '/billing',
       icon: icons.CreditCardOutlined
+    },
+    {
+      id: 'Profile',
+      title: <FormattedMessage id="Profile" defaultMessage="My Profile" />,
+      type: 'item',
+      url: '/profile',
+      icon: icons.UserOutlined
     }
   ]
 };

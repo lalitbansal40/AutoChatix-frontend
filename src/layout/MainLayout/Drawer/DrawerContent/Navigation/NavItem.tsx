@@ -87,17 +87,23 @@ const NavItem = ({ item, level }: Props) => {
             zIndex: 1201,
             pl: drawerOpen ? `${level * 28}px` : 1.5,
             py: !drawerOpen && level === 1 ? 1.25 : 1,
+            borderRadius: drawerOpen ? '8px' : 1.5,
+            mx: drawerOpen ? 1 : 'auto',
+            transition: 'all 0.18s ease',
             ...(drawerOpen && {
               '&:hover': {
-                bgcolor: theme.palette.mode === ThemeMode.DARK ? 'divider' : 'primary.lighter'
+                bgcolor: theme.palette.mode === ThemeMode.DARK ? 'rgba(255,255,255,0.06)' : 'primary.lighter',
+                transform: 'translateX(2px)',
               },
               '&.Mui-selected': {
-                bgcolor: theme.palette.mode === ThemeMode.DARK ? 'divider' : 'primary.lighter',
-                borderRight: `2px solid ${theme.palette.primary.main}`,
+                bgcolor: theme.palette.mode === ThemeMode.DARK ? 'primary.900' : 'primary.lighter',
+                borderLeft: `3px solid ${theme.palette.primary.main}`,
+                pl: `calc(${level * 28}px - 3px)`,
                 color: iconSelectedColor,
                 '&:hover': {
                   color: iconSelectedColor,
-                  bgcolor: theme.palette.mode === ThemeMode.DARK ? 'divider' : 'primary.lighter'
+                  bgcolor: theme.palette.mode === ThemeMode.DARK ? 'primary.900' : 'primary.lighter',
+                  transform: 'translateX(2px)',
                 }
               }
             }),
@@ -122,6 +128,7 @@ const NavItem = ({ item, level }: Props) => {
               sx={{
                 minWidth: 28,
                 color: isSelected ? iconSelectedColor : textColor,
+                transition: 'color 0.18s ease',
                 ...(!drawerOpen && {
                   borderRadius: 1.5,
                   width: 36,
@@ -147,7 +154,14 @@ const NavItem = ({ item, level }: Props) => {
           {(drawerOpen || (!drawerOpen && level !== 1)) && (
             <ListItemText
               primary={
-                <Typography variant="h6" sx={{ color: isSelected ? iconSelectedColor : textColor }}>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    color: isSelected ? iconSelectedColor : textColor,
+                    fontWeight: isSelected ? 600 : 400,
+                    transition: 'all 0.18s ease',
+                  }}
+                >
                   {item.title}
                 </Typography>
               }
