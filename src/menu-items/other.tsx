@@ -2,7 +2,7 @@
 import { FormattedMessage } from 'react-intl';
 
 // assets
-import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined, WalletOutlined, ThunderboltOutlined, CreditCardOutlined, BranchesOutlined, ContactsOutlined, BookOutlined } from '@ant-design/icons';
+import { ChromeOutlined, QuestionOutlined, DeploymentUnitOutlined, MessageOutlined, RobotOutlined, ApiOutlined, TagsOutlined, PhoneOutlined, ShoppingOutlined, WalletOutlined, ThunderboltOutlined, CreditCardOutlined, BranchesOutlined, ContactsOutlined, BookOutlined, BarChartOutlined } from '@ant-design/icons';
 
 // type
 import { NavItemType } from 'types/menu';
@@ -24,6 +24,7 @@ const icons = {
   BranchesOutlined,
   ContactsOutlined,
   BookOutlined,
+  BarChartOutlined,
 };
 
 // ==============================|| MENU ITEMS - SUPPORT ||============================== //
@@ -33,6 +34,13 @@ const other: NavItemType = {
   title: <FormattedMessage id="Workspace" />,
   type: 'group',
   children: [
+    {
+      id: 'Analytics',
+      title: <FormattedMessage id="Analytics" defaultMessage="Analytics" />,
+      type: 'item',
+      url: '/analytics',
+      icon: icons.BarChartOutlined
+    },
     {
       id: 'Chats',
       title: <FormattedMessage id="Chats" />,
