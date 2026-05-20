@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSnackbar } from 'notistack';
 import {
   Autocomplete,
   Box,
@@ -32,8 +33,10 @@ function ChatDrawer({ setUser, selectedUserId }: ChatDrawerProps) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [channelId, setChannelId] = useState<string>('');
+  const [importing, setImporting] = useState(false);
   const { subscribe } = useWebSocketChat();
   const queryClient = useQueryClient();
+  const { enqueueSnackbar } = useSnackbar();
 
   // Refs so WS handler always sees latest values without re-subscribing
   const debouncedSearchRef = useRef(debouncedSearch);
@@ -136,21 +139,33 @@ function ChatDrawer({ setUser, selectedUserId }: ChatDrawerProps) {
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
           <Typography sx={{ fontSize: 18, fontWeight: 800, color: '#111827', letterSpacing: -0.3 }}>Chats</Typography>
           <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-            <Tooltip title="Import contacts" arrow>
+            <Tooltip title="Import contacts (.vcf, .csv, .xlsx)" arrow>
               <IconButton
                 size="small"
                 component="label"
+                disabled={importing}
                 sx={{ color: '#6b7280', '&:hover': { color: '#374151', bgcolor: '#f3f4f6' }, borderRadius: '8px' }}
               >
-                <FileUploadOutlinedIcon sx={{ fontSize: 18 }} />
+                {importing
+                  ? <CircularProgress size={16} sx={{ color: '#6b7280' }} />
+                  : <FileUploadOutlinedIcon sx={{ fontSize: 18 }} />}
                 <input
                   type="file" hidden accept=".csv,.xlsx,.xls,.vcf,.vcard"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file || !channelId) return;
-                    await contactService.importContacts(channelId, file);
-                    contactRefetch();
-                    e.target.value = '';
+                    setImporting(true);
+                    try {
+                      const res = await contactService.importContacts(channelId, file);
+                      const { inserted = 0, skipped = 0 } = res?.data || {};
+                      enqueueSnackbar(`${inserted} contacts imported, ${skipped} skipped`, { variant: 'success' });
+                      contactRefetch();
+                    } catch {
+                      enqueueSnackbar('Import failed. Please check the file format.', { variant: 'error' });
+                    } finally {
+                      setImporting(false);
+                      e.target.value = '';
+                    }
                   }}
                 />
               </IconButton>
