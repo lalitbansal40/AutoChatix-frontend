@@ -7,6 +7,39 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { UserProfile } from 'types/user-profile';
 import { History } from 'types/chat';
 
+// Renders WhatsApp-formatted text: *bold*, _italic_, ~strikethrough~, preserves newlines
+const WAText = ({ text, sx = {} }: { text: string; sx?: any }) => {
+  if (!text) return null;
+  const lines = text.split('\n');
+  const parseInline = (line: string, lineIdx: number) => {
+    const parts: React.ReactNode[] = [];
+    const re = /(\*[^*]+\*|_[^_]+_|~[^~]+~)/g;
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(line)) !== null) {
+      if (m.index > last) parts.push(line.slice(last, m.index));
+      const token = m[1];
+      const inner = token.slice(1, -1);
+      if (token.startsWith('*')) parts.push(<strong key={m.index}>{inner}</strong>);
+      else if (token.startsWith('_')) parts.push(<em key={m.index}>{inner}</em>);
+      else parts.push(<s key={m.index}>{inner}</s>);
+      last = m.index + token.length;
+    }
+    if (last < line.length) parts.push(line.slice(last));
+    return <Fragment key={lineIdx}>{parts}</Fragment>;
+  };
+  return (
+    <Typography component="span" sx={{ fontSize: 14, display: 'block', whiteSpace: 'pre-wrap', wordBreak: 'break-word', ...sx }}>
+      {lines.map((line, i) => (
+        <Fragment key={i}>
+          {parseInline(line, i)}
+          {i < lines.length - 1 && <br />}
+        </Fragment>
+      ))}
+    </Typography>
+  );
+};
+
 interface ChatHistoryProps {
   data: History[];
   theme: Theme;
@@ -420,7 +453,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
         <Stack sx={{ borderRadius: 2, overflow: 'hidden', maxWidth: 280 }}>
           {payload?.type === 'image' && <img src={payload?.url} style={{ width: '100%', maxHeight: 200, objectFit: 'cover' }} />}
           {payload?.type === 'video' && <video src={payload?.url} controls style={{ width: '100%' }} />}
-          {payload?.caption && <Typography sx={{ pt: 0.5, whiteSpace: 'pre-line', fontSize: 14 }}>{payload.caption}</Typography>}
+          {payload?.caption && <WAText text={payload.caption} sx={{ pt: 0.5 }} />}
           {payload?.buttons?.length > 0 && (
             <Stack sx={{ borderTop: '1px solid rgba(0,0,0,0.08)', mt: 0.5 }}>
               {payload.buttons.map((btn: any, i: number) => (
@@ -438,7 +471,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
       const items = payload?.items || [];
       return (
         <Stack spacing={1} sx={{ maxWidth: 320 }}>
-          {payload?.body && <Typography sx={{ whiteSpace: 'pre-line', fontSize: 14 }}>{payload.body}</Typography>}
+          {payload?.body && <WAText text={payload.body} />}
           <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5, maxWidth: 320 }}>
             {items.map((item: any, i: number) => (
               <Stack
@@ -483,28 +516,71 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
       const headerUrl = headerParam?.image?.link || headerParam?.video?.link || headerParam?.document?.link;
       const headerType = headerParam?.type;
 
-      const getRenderedBody = () => {
+      // Body params from the API request (for interpolating {{1}}, {{2}} etc.)
+      const bodyParams: any[] = payload?.request?.template?.components?.find(
+        (c: any) => c.type === 'body' || c.type === 'BODY'
+      )?.parameters || [];
+
+      const getRenderedBody = (): string => {
+        // Priority 1: template body text from stored templateData
         if (bodyComponent?.text) {
           let t = bodyComponent.text;
-          const bodyParams = payload?.request?.template?.components?.find((c: any) => c.type === 'body')?.parameters || [];
-          if (!bodyParams.length && history.text) return history.text;
-          t = t.replace(/{{(\d+)}}/g, (_: any, i: any) => bodyParams[i - 1]?.text || `{{${i}}}`);
+          t = t.replace(/{{(\d+)}}/g, (_: any, i: any) => bodyParams[Number(i) - 1]?.text || '');
           return t;
         }
-        return history.text || payload?.text?.body || payload?.bodyText || 'Template message';
+        // Priority 2: history.text set by backend (body text or name)
+        // Only use if it doesn't look like a raw template name (no spaces = likely a name)
+        const ht = history.text || payload?.text?.body || payload?.bodyText || '';
+        if (ht && ht.includes(' ')) return ht;
+        // Priority 3: nothing useful found — return empty so we show the name label
+        return '';
       };
 
+      const renderedBody = getRenderedBody();
+      const templateName: string = payload?.name || payload?.request?.template?.name || history.text || '';
+      // Also collect quick-reply button labels from request components
+      const quickReplyBtns: string[] = (payload?.request?.template?.components || [])
+        .filter((c: any) => c.type === 'button' || c.type === 'BUTTON')
+        .flatMap((c: any) => (c.buttons || [c]).map((b: any) => b.text || b.title).filter(Boolean));
+
       return (
-        <Stack sx={{ borderRadius: 2, overflow: 'hidden', maxWidth: 280 }}>
+        <Stack sx={{ borderRadius: 2, overflow: 'hidden', maxWidth: 300 }}>
+          {/* Template name label */}
+          {templateName && (
+            <Box sx={{ px: 1.5, pt: 1, pb: 0.25 }}>
+              <Typography sx={{ fontSize: 10.5, color: '#6b7280', fontWeight: 600, letterSpacing: 0.2, textTransform: 'uppercase' }}>
+                📋 {templateName.replace(/_/g, ' ')}
+              </Typography>
+            </Box>
+          )}
+          {/* Media header */}
           {headerUrl && headerType === 'image' && <img src={headerUrl} style={{ width: '100%', maxHeight: 200, objectFit: 'cover' }} />}
           {headerUrl && headerType === 'video' && <video src={headerUrl} controls style={{ width: '100%' }} />}
           {headerUrl && headerType === 'document' && <Box sx={{ p: 1, cursor: 'pointer' }} onClick={() => window.open(headerUrl)}>📄 View Document</Box>}
-          <Typography sx={{ pt: 0.5, whiteSpace: 'pre-line', fontSize: 14 }}>{getRenderedBody()}</Typography>
+          {/* Body */}
+          {renderedBody ? (
+            <WAText text={renderedBody} sx={{ px: 1.5, pt: templateName ? 0.25 : 1, pb: 1 }} />
+          ) : (
+            <Typography sx={{ px: 1.5, py: 1, fontSize: 13, color: '#9ca3af', fontStyle: 'italic' }}>
+              Template content not available
+            </Typography>
+          )}
+          {/* Buttons from templateData */}
           {buttonsComponent?.buttons?.length > 0 && (
-            <Stack sx={{ borderTop: '1px solid rgba(0,0,0,0.08)', mt: 0.5 }}>
+            <Stack sx={{ borderTop: '1px solid rgba(0,0,0,0.08)' }}>
               {buttonsComponent.buttons.map((btn: any, i: number) => (
-                <Box key={i} sx={{ textAlign: 'center', py: 0.9, fontSize: 13, color: '#00a884', fontWeight: 500, borderBottom: i !== buttonsComponent.buttons.length - 1 ? '1px solid rgba(0,0,0,0.08)' : 'none', cursor: 'pointer', '&:hover': { background: 'rgba(0,0,0,0.04)' } }}>
+                <Box key={i} sx={{ textAlign: 'center', py: 0.9, fontSize: 13, color: '#00a884', fontWeight: 500, borderBottom: i !== buttonsComponent.buttons.length - 1 ? '1px solid rgba(0,0,0,0.08)' : 'none' }}>
                   {btn.type === 'URL' && '🔗 '}{btn.type === 'PHONE_NUMBER' && '📞 '}{btn.text}
+                </Box>
+              ))}
+            </Stack>
+          )}
+          {/* Quick-reply buttons from request payload (shown when templateData buttons not available) */}
+          {!buttonsComponent?.buttons?.length && quickReplyBtns.length > 0 && (
+            <Stack sx={{ borderTop: '1px solid rgba(0,0,0,0.08)' }}>
+              {quickReplyBtns.map((label: string, i: number) => (
+                <Box key={i} sx={{ textAlign: 'center', py: 0.9, fontSize: 13, color: '#00a884', fontWeight: 500, borderBottom: i !== quickReplyBtns.length - 1 ? '1px solid rgba(0,0,0,0.08)' : 'none' }}>
+                  {label}
                 </Box>
               ))}
             </Stack>
@@ -523,7 +599,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
       const bodyText = payload?.text?.body || payload?.bodyText || 'Please provide your address';
       return (
         <Stack spacing={1}>
-          <Typography fontSize={14}>{bodyText}</Typography>
+          <WAText text={bodyText} />
           <Stack sx={{ border: '1px solid #25D366', color: '#25D366', borderRadius: 2, px: 2, py: 0.75, cursor: 'pointer', width: 'fit-content', fontWeight: 500, '&:hover': { background: '#f1fdf5' } }}>
             📍 Provide Address
           </Stack>
@@ -531,7 +607,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
       );
     }
 
-    if (type === 'text') return <Typography sx={{ fontSize: 14, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{text}</Typography>;
+    if (type === 'text') return <WAText text={text} />;
 
     if (type === 'interactive' && payload?.interactive?.nfm_reply) {
       return <RenderFlowResponse response={payload?.interactive?.nfm_reply?.response_json} />;
@@ -578,7 +654,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
     if (type === 'list') {
       return (
         <Stack spacing={1}>
-          <Typography sx={{ whiteSpace: 'pre-line', fontSize: 14 }}>{payload?.body}</Typography>
+          <WAText text={payload?.body || ''} />
           <Stack onClick={() => setListModal(payload)} sx={{ border: '1px solid rgba(0,0,0,0.2)', borderRadius: 2, px: 2, py: 0.75, color: '#00a884', fontWeight: 500, cursor: 'pointer', width: 'fit-content', '&:hover': { background: 'rgba(0,0,0,0.04)' } }}>
             {payload?.buttonText}
           </Stack>
@@ -602,7 +678,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
     if (type === 'button') {
       return (
         <Stack spacing={1}>
-          <Typography fontSize={14}>{payload?.bodyText}</Typography>
+          <WAText text={payload?.bodyText || ''} />
           {payload?.buttons?.map((btn: any) => (
             <Stack key={btn.id} sx={{ border: '1px solid rgba(0,0,0,0.2)', borderRadius: 2, px: 2, py: 0.75, cursor: 'pointer', width: 'fit-content', '&:hover': { background: 'rgba(0,0,0,0.04)' } }}>
               <Typography variant="body2">{btn.title}</Typography>
@@ -634,7 +710,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
     if (type === 'cta_url') {
       return (
         <Stack spacing={0.75}>
-          <Typography fontSize={14}>{payload?.bodyText}</Typography>
+          <WAText text={payload?.bodyText || ''} />
           <Stack onClick={() => window.open(payload?.url)} sx={{ border: '1px solid #25D366', color: '#25D366', borderRadius: 2, px: 2, py: 0.75, cursor: 'pointer', width: 'fit-content', fontWeight: 500 }}>
             {payload?.buttonText}
           </Stack>
@@ -830,9 +906,7 @@ const ChatHistory = ({ data, theme, user }: ChatHistoryProps) => {
     }
 
     return (
-      <Typography fontSize={14} sx={{ wordBreak: 'break-word' }}>
-        {payload?.bodyText || payload?.text?.body || (typeof payload?.text === 'string' ? payload?.text : '') || (typeof text === 'string' ? text : '') || ''}
-      </Typography>
+      <WAText text={payload?.bodyText || payload?.text?.body || (typeof payload?.text === 'string' ? payload?.text : '') || (typeof text === 'string' ? text : '') || ''} />
     );
   };
 

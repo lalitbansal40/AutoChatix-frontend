@@ -22,9 +22,8 @@ const STATIC_VARS = [
 const getAttributeVars = (allNodes: any[]): string[] => {
   const attrs: string[] = [];
   (allNodes || []).forEach((n: any) => {
-    const keys: string[] =
-      n.data?.config?.key ||
-      (n.data?.attribute_name ? (Array.isArray(n.data.attribute_name) ? n.data.attribute_name : [n.data.attribute_name]) : []);
+    const rawKey = n.data?.config?.key ?? n.data?.attribute_name;
+    const keys: string[] = Array.isArray(rawKey) ? rawKey : rawKey ? [rawKey] : [];
     keys.forEach((k: string) => {
       if (k && !attrs.includes(`{{attributes.${k}}}`)) {
         attrs.push(`{{attributes.${k}}}`);
