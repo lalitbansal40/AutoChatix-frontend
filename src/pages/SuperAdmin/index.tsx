@@ -94,6 +94,13 @@ const ManageDialog = ({
   const [tab, setTab] = useState(0);
 
   // Wallet state — balance/balance_limit stored in micro-units in DB, displayed in rupees
+  const rawRates = acc.wallet?.template_rates || {};
+  const rawBaseRates = acc.wallet?.meta_base_rates || {};
+  const getRateRupees = (ratesObj: any, cat: string) => {
+    const raw = typeof ratesObj?.get === 'function' ? ratesObj.get(cat) : ratesObj?.[cat];
+    return raw ? Number(raw) / 1_000_000 : 0;
+  };
+
   const [wallet, setWallet] = useState({
     balance: (acc.wallet?.balance ?? 0) / 1000000,
     balance_limit: (acc.wallet?.balance_limit ?? 0) / 1000000,
@@ -102,6 +109,16 @@ const ManageDialog = ({
     ai_commission_percent: acc.wallet?.ai_commission_percent ?? acc.wallet?.commission_percent ?? 15,
     ai_commission_enabled: acc.wallet?.ai_commission_enabled ?? acc.wallet?.commission_enabled ?? true,
     meta_payer: acc.wallet?.meta_payer ?? 'customer',
+    // Per-category template rates in rupees (what we charge the client; 0 = use Meta rate card)
+    rate_UTILITY:         getRateRupees(rawRates, 'UTILITY'),
+    rate_MARKETING:       getRateRupees(rawRates, 'MARKETING'),
+    rate_AUTHENTICATION:  getRateRupees(rawRates, 'AUTHENTICATION'),
+    rate_SERVICE:         getRateRupees(rawRates, 'SERVICE'),
+    // Meta base rates (what Meta charges us; used for profit markup calculation)
+    base_UTILITY:         getRateRupees(rawBaseRates, 'UTILITY'),
+    base_MARKETING:       getRateRupees(rawBaseRates, 'MARKETING'),
+    base_AUTHENTICATION:  getRateRupees(rawBaseRates, 'AUTHENTICATION'),
+    base_SERVICE:         getRateRupees(rawBaseRates, 'SERVICE'),
   });
 
   // Subscription state
@@ -117,6 +134,18 @@ const ManageDialog = ({
     extend_days: '',
   });
 
+  const [recalcResult, setRecalcResult] = useState<{ updated: number; balance_delta: number } | null>(null);
+
+  const recalculate = useMutation({
+    mutationFn: () => axios.post(`/superadmin/accounts/${acc._id}/wallet/recalculate`),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['sa-accounts'] });
+      setRecalcResult(res.data);
+      showToast(`Recalculated ${res.data.updated} entries`);
+    },
+    onError: () => showToast('Recalculate failed', 'error'),
+  });
+
   const saveWallet = useMutation({
     mutationFn: () => axios.patch(`/superadmin/accounts/${acc._id}/wallet`, {
       balance: Number(wallet.balance),
@@ -126,8 +155,20 @@ const ManageDialog = ({
       ai_commission_percent: Number(wallet.ai_commission_percent),
       ai_commission_enabled: wallet.ai_commission_enabled,
       meta_payer: wallet.meta_payer,
+      template_rates: {
+        UTILITY:        Number(wallet.rate_UTILITY)        || 0,
+        MARKETING:      Number(wallet.rate_MARKETING)      || 0,
+        AUTHENTICATION: Number(wallet.rate_AUTHENTICATION) || 0,
+        SERVICE:        Number(wallet.rate_SERVICE)        || 0,
+      },
+      meta_base_rates: {
+        UTILITY:        Number(wallet.base_UTILITY)        || 0,
+        MARKETING:      Number(wallet.base_MARKETING)      || 0,
+        AUTHENTICATION: Number(wallet.base_AUTHENTICATION) || 0,
+        SERVICE:        Number(wallet.base_SERVICE)        || 0,
+      },
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sa-accounts'] }); showToast('Wallet updated'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['sa-accounts'] }); showToast('Wallet updated'); onClose(); },
     onError: () => showToast('Failed to update wallet', 'error'),
   });
 
@@ -214,6 +255,68 @@ const ManageDialog = ({
                 InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
               />
             </Stack>
+            {/* ── Template Rates per Category ── */}
+            <Divider>Template Cost (per message, ₹)</Divider>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
+              Set what the client is charged per template category. <b>Leave 0</b> to use Meta's live rate card automatically.
+              Commission % is added on top of these rates.
+            </Typography>
+            <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
+              {[
+                { key: 'rate_UTILITY',         label: 'Utility',         placeholder: '0.1265', color: '#0284c7' },
+                { key: 'rate_MARKETING',        label: 'Marketing',       placeholder: '0.8800', color: '#d97706' },
+                { key: 'rate_AUTHENTICATION',   label: 'Authentication',  placeholder: '0.1265', color: '#7c3aed' },
+                { key: 'rate_SERVICE',          label: 'Service',         placeholder: '0 (free)', color: '#16a34a' },
+              ].map(({ key, label, placeholder, color }) => (
+                <TextField
+                  key={key}
+                  label={label}
+                  type="number"
+                  size="small"
+                  value={(wallet as any)[key] || ''}
+                  onChange={(e) => setWallet({ ...wallet, [key]: e.target.value === '' ? 0 : Number(e.target.value) })}
+                  placeholder={placeholder}
+                  sx={{ width: 160 }}
+                  inputProps={{ step: 0.0001, min: 0 }}
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start"><Typography fontSize={12} fontWeight={700} color={color}>₹</Typography></InputAdornment>,
+                  }}
+                  helperText={`0 = Meta default`}
+                />
+              ))}
+            </Stack>
+
+            {/* ── Meta Base Rates (cost to platform) ── */}
+            <Divider>Meta Base Rates (what Meta charges you)</Divider>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
+              What Meta charges AutoChatix per message. Used to calculate <b>markup profit</b> in analytics.
+              Leave 0 if unknown or not applicable.
+            </Typography>
+            <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
+              {[
+                { key: 'base_UTILITY',         label: 'Utility',         placeholder: '0.1155', color: '#0284c7' },
+                { key: 'base_MARKETING',        label: 'Marketing',       placeholder: '0.8200', color: '#d97706' },
+                { key: 'base_AUTHENTICATION',   label: 'Authentication',  placeholder: '0.1155', color: '#7c3aed' },
+                { key: 'base_SERVICE',          label: 'Service',         placeholder: '0 (free)', color: '#16a34a' },
+              ].map(({ key, label, placeholder, color }) => (
+                <TextField
+                  key={key}
+                  label={label}
+                  type="number"
+                  size="small"
+                  value={(wallet as any)[key] || ''}
+                  onChange={(e) => setWallet({ ...wallet, [key]: e.target.value === '' ? 0 : Number(e.target.value) })}
+                  placeholder={placeholder}
+                  sx={{ width: 160 }}
+                  inputProps={{ step: 0.0001, min: 0 }}
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start"><Typography fontSize={12} fontWeight={700} color={color}>₹</Typography></InputAdornment>,
+                  }}
+                  helperText="Meta's actual rate"
+                />
+              ))}
+            </Stack>
+
             <Divider>Template Commission</Divider>
             <Stack direction="row" spacing={2} alignItems="center">
               <TextField
@@ -269,6 +372,34 @@ const ManageDialog = ({
                 <MenuItem value="customer">Customer (deducted from wallet)</MenuItem>
                 <MenuItem value="platform">Platform (we pay)</MenuItem>
               </Select>
+            </Box>
+
+            {/* Recalculate existing ledger */}
+            <Box sx={{ bgcolor: '#fefce8', border: '1px solid #fde68a', borderRadius: 2, p: 1.5 }}>
+              <Typography fontSize={12} fontWeight={700} color="#92400e" mb={0.5}>
+                Recalculate Existing Transactions
+              </Typography>
+              <Typography fontSize={11.5} color="#78350f" mb={1}>
+                Re-prices all past TEMPLATE_MESSAGE entries using the rates & commission set above, and adjusts wallet balance accordingly.
+              </Typography>
+              {recalcResult && (
+                <Alert severity="success" sx={{ mb: 1, py: 0.25, fontSize: 12 }}>
+                  {recalcResult.updated} entries updated · Balance adjusted by ₹{recalcResult.balance_delta.toFixed(4)}
+                </Alert>
+              )}
+              <Button
+                size="small"
+                variant="outlined"
+                color="warning"
+                disabled={recalculate.isPending}
+                onClick={() => {
+                  if (window.confirm('This will retroactively re-price all past template transactions for this account. Continue?'))
+                    recalculate.mutate();
+                }}
+                sx={{ fontSize: 12, borderRadius: '8px' }}
+              >
+                {recalculate.isPending ? 'Recalculating…' : 'Recalculate Ledger'}
+              </Button>
             </Box>
           </Stack>
         )}
@@ -831,6 +962,357 @@ const EmailPanel = ({ showToast }: { showToast: (msg: string, sev?: 'success' | 
 };
 
 /* ─────────────────────────────────────────
+   Profit Analytics Panel
+───────────────────────────────────────── */
+type ProfitPreset = 'all' | 'this_month' | 'last_month' | 'last_3m' | 'last_6m' | 'custom';
+
+const getPresetRange = (preset: ProfitPreset, customFrom: string, customTo: string) => {
+  const now = new Date();
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  switch (preset) {
+    case 'all': return { from: '', to: '' };
+    case 'this_month': return { from: fmt(new Date(now.getFullYear(), now.getMonth(), 1)), to: fmt(now) };
+    case 'last_month': return {
+      from: fmt(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+      to: fmt(new Date(now.getFullYear(), now.getMonth(), 0)),
+    };
+    case 'last_3m': { const d = new Date(now); d.setMonth(d.getMonth() - 3); return { from: fmt(d), to: fmt(now) }; }
+    case 'last_6m': { const d = new Date(now); d.setMonth(d.getMonth() - 6); return { from: fmt(d), to: fmt(now) }; }
+    case 'custom': return { from: customFrom, to: customTo };
+  }
+};
+
+const PROFIT_PRESETS: { key: ProfitPreset; label: string }[] = [
+  { key: 'all', label: 'All Time' },
+  { key: 'this_month', label: 'This Month' },
+  { key: 'last_month', label: 'Last Month' },
+  { key: 'last_3m', label: 'Last 3M' },
+  { key: 'last_6m', label: 'Last 6M' },
+  { key: 'custom', label: 'Custom' },
+];
+
+const ProfitPanel = ({ showToast: _showToast }: { showToast: (msg: string, sev?: 'success' | 'error') => void }) => {
+  const [preset, setPreset] = useState<ProfitPreset>('this_month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+
+  const { from, to } = getPresetRange(preset, customFrom, customTo);
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['sa-profit', preset, preset === 'custom' ? customFrom : '', preset === 'custom' ? customTo : ''],
+    queryFn: async () => {
+      const params: any = {};
+      if (from) params.from = from;
+      if (to) params.to = to;
+      const res = await axios.get('/superadmin/analytics/profit', { params });
+      return res.data;
+    },
+    staleTime: 60_000,
+  });
+
+  const totals = data?.totals || {
+    revenue: 0, commission: 0, template_amount: 0, ai_amount: 0, count: 0,
+    meta_cost: 0, meta_cost_template: 0, ai_cost: 0,
+    markup_profit: null as number | null, commission_profit: 0,
+    total_profit: 0, has_meta_rates: false,
+  };
+  const monthly: any[] = data?.monthly || [];
+  const byAccount: any[] = data?.by_account || [];
+  const byType: any[] = data?.by_type || [];
+  const templateType = byType.find((t: any) => t.type === 'TEMPLATE_MESSAGE') || { revenue: 0, commission: 0, count: 0 };
+  const aiType = byType.find((t: any) => t.type === 'AI_CONVERSATION') || { revenue: 0, commission: 0, count: 0 };
+
+  const fmt = (v: number) => `₹${v.toFixed(2)}`;
+
+  return (
+    <Box sx={{ px: { xs: 2, md: 4 }, py: 3, maxWidth: 1200 }}>
+      {/* Filter bar */}
+      <Paper sx={{ borderRadius: 2, border: '1px solid #e2e8f0', p: 2, mb: 3 }}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center" useFlexGap>
+          <Typography fontSize={13} fontWeight={600} color="#475569">Period:</Typography>
+          {PROFIT_PRESETS.map(({ key, label }) => (
+            <Button
+              key={key}
+              size="small"
+              variant={preset === key ? 'contained' : 'outlined'}
+              onClick={() => setPreset(key)}
+              sx={{
+                fontSize: 12, borderRadius: '8px', py: 0.5,
+                ...(preset === key
+                  ? { bgcolor: '#0d1f3c', '&:hover': { bgcolor: '#1e3a5f' } }
+                  : { borderColor: '#e2e8f0', color: '#475569' }),
+              }}
+            >
+              {label}
+            </Button>
+          ))}
+          {preset === 'custom' && (
+            <>
+              <TextField size="small" type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} label="From" InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
+              <TextField size="small" type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} label="To" InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
+              <Button size="small" variant="contained" onClick={() => refetch()} disabled={!customFrom || !customTo}
+                sx={{ fontSize: 12, borderRadius: '8px', bgcolor: '#0d1f3c', '&:hover': { bgcolor: '#1e3a5f' } }}>
+                Apply
+              </Button>
+            </>
+          )}
+          {isLoading && <CircularProgress size={18} sx={{ ml: 1 }} />}
+        </Stack>
+      </Paper>
+
+      {/* ── Top Stat Cards ── */}
+      <Stack direction="row" spacing={2} flexWrap="wrap" mb={2} useFlexGap>
+        {/* Revenue */}
+        <Paper sx={{ flex: '1 1 180px', borderRadius: 2, border: '1px solid #e2e8f0', p: 2.5, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <Stack direction="row" alignItems="center" gap={1} mb={1}>
+            <Typography fontSize={20}>💰</Typography>
+            <Typography fontSize={12} fontWeight={600} color="#64748b">Total Revenue</Typography>
+          </Stack>
+          <Typography fontSize={22} fontWeight={800} color="#3b82f6">{fmt(totals.revenue)}</Typography>
+          <Typography fontSize={11.5} color="#94a3b8" mt={0.25}>{totals.count.toLocaleString()} transactions</Typography>
+        </Paper>
+
+        {/* Invested */}
+        <Paper sx={{ flex: '1 1 180px', borderRadius: 2, border: '1px solid #fee2e2', p: 2.5, bgcolor: '#fff7f7', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <Stack direction="row" alignItems="center" gap={1} mb={1}>
+            <Typography fontSize={20}>📤</Typography>
+            <Typography fontSize={12} fontWeight={600} color="#b45309">Platform Paid</Typography>
+          </Stack>
+          <Typography fontSize={22} fontWeight={800} color="#dc2626">{fmt(totals.meta_cost)}</Typography>
+          <Stack mt={0.25} spacing={0}>
+            <Typography fontSize={11} color="#94a3b8">Meta: {fmt(totals.meta_cost_template)}</Typography>
+            <Typography fontSize={11} color="#94a3b8">AI (OpenAI): {fmt(totals.ai_cost)}</Typography>
+          </Stack>
+        </Paper>
+
+        {/* Markup Profit */}
+        <Paper sx={{ flex: '1 1 180px', borderRadius: 2, border: totals.has_meta_rates ? '1px solid #dcfce7' : '1px solid #e2e8f0', p: 2.5, bgcolor: totals.has_meta_rates ? '#f0fdf4' : '#fafafa', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <Stack direction="row" alignItems="center" gap={1} mb={1}>
+            <Typography fontSize={20}>📊</Typography>
+            <Typography fontSize={12} fontWeight={600} color="#475569">Markup Profit</Typography>
+          </Stack>
+          {totals.markup_profit !== null ? (
+            <Typography fontSize={22} fontWeight={800} color="#15803d">{fmt(totals.markup_profit)}</Typography>
+          ) : (
+            <Typography fontSize={14} fontWeight={700} color="#94a3b8">—</Typography>
+          )}
+          <Typography fontSize={11} color="#94a3b8" mt={0.25}>
+            {totals.has_meta_rates ? 'from charging more than Meta rate' : 'Set Meta base rates to calculate'}
+          </Typography>
+        </Paper>
+
+        {/* Commission Profit */}
+        <Paper sx={{ flex: '1 1 180px', borderRadius: 2, border: '1px solid #e0e7ff', p: 2.5, bgcolor: '#f5f3ff', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <Stack direction="row" alignItems="center" gap={1} mb={1}>
+            <Typography fontSize={20}>🏷️</Typography>
+            <Typography fontSize={12} fontWeight={600} color="#5b21b6">Commission Profit</Typography>
+          </Stack>
+          <Typography fontSize={22} fontWeight={800} color="#7c3aed">{fmt(totals.commission_profit)}</Typography>
+          <Typography fontSize={11} color="#94a3b8" mt={0.25}>
+            {totals.revenue > 0 ? ((totals.commission_profit / totals.revenue) * 100).toFixed(1) : '0'}% margin
+          </Typography>
+        </Paper>
+
+        {/* Total Profit */}
+        <Paper sx={{ flex: '1 1 180px', borderRadius: 2, border: '1px solid #d1fae5', p: 2.5, bgcolor: '#ecfdf5', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+          <Stack direction="row" alignItems="center" gap={1} mb={1}>
+            <Typography fontSize={20}>📈</Typography>
+            <Typography fontSize={12} fontWeight={600} color="#065f46">Net Profit</Typography>
+          </Stack>
+          <Typography fontSize={22} fontWeight={800} color="#00a854">{fmt(totals.total_profit)}</Typography>
+          <Stack mt={0.25} spacing={0}>
+            {totals.markup_profit !== null && (
+              <Typography fontSize={11} color="#94a3b8">Markup: {fmt(totals.markup_profit)}</Typography>
+            )}
+            <Typography fontSize={11} color="#94a3b8">Commission: {fmt(totals.commission_profit)}</Typography>
+          </Stack>
+        </Paper>
+      </Stack>
+
+      {/* ── Profit Source Breakdown (template vs AI) ── */}
+      <Paper sx={{ borderRadius: 2, border: '1px solid #e2e8f0', mb: 3, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        <Box sx={{ px: 2.5, py: 1.75, borderBottom: '1px solid #f1f5f9', bgcolor: '#f8fafc' }}>
+          <Typography fontSize={13} fontWeight={700} color="#1e293b">Profit Source Breakdown</Typography>
+        </Box>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569', width: 160 }}>Category</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#dc2626' }}>Paid (Cost)</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#3b82f6' }}>Charged to Clients</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#15803d' }}>Markup Profit</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#7c3aed' }}>Commission</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#00a854' }}>Net Profit</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {/* Templates row */}
+              <TableRow hover>
+                <TableCell>
+                  <Stack direction="row" alignItems="center" gap={1}>
+                    <Typography fontSize={16}>📋</Typography>
+                    <Box>
+                      <Typography fontSize={13} fontWeight={600}>Templates</Typography>
+                      <Typography fontSize={11} color="#94a3b8">{templateType.count.toLocaleString()} messages</Typography>
+                    </Box>
+                  </Stack>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography fontSize={13} color="#dc2626" fontWeight={600}>
+                    {totals.has_meta_rates ? fmt(totals.meta_cost_template) : '—'}
+                  </Typography>
+                  {!totals.has_meta_rates && <Typography fontSize={10} color="#94a3b8">Set base rates</Typography>}
+                </TableCell>
+                <TableCell align="right">
+                  <Typography fontSize={13} fontWeight={600} color="#3b82f6">{fmt(templateType.revenue)}</Typography>
+                  <Typography fontSize={11} color="#94a3b8">base: {fmt(totals.template_amount)}</Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography fontSize={13} fontWeight={700} color="#15803d">
+                    {totals.markup_profit !== null ? fmt(totals.markup_profit) : '—'}
+                  </Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography fontSize={13} fontWeight={600} color="#7c3aed">{fmt(templateType.commission)}</Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography fontSize={13} fontWeight={700} color="#00a854">
+                    {totals.markup_profit !== null
+                      ? fmt(totals.markup_profit + templateType.commission)
+                      : fmt(templateType.commission)}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+
+              {/* AI row */}
+              <TableRow hover>
+                <TableCell>
+                  <Stack direction="row" alignItems="center" gap={1}>
+                    <Typography fontSize={16}>🤖</Typography>
+                    <Box>
+                      <Typography fontSize={13} fontWeight={600}>AI Conversations</Typography>
+                      <Typography fontSize={11} color="#94a3b8">{aiType.count.toLocaleString()} chats</Typography>
+                    </Box>
+                  </Stack>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography fontSize={13} color="#dc2626" fontWeight={600}>{fmt(totals.ai_cost)}</Typography>
+                  <Typography fontSize={11} color="#94a3b8">OpenAI cost</Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography fontSize={13} fontWeight={600} color="#3b82f6">{fmt(aiType.revenue)}</Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography fontSize={13} color="#94a3b8">—</Typography>
+                  <Typography fontSize={10} color="#94a3b8">no markup</Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography fontSize={13} fontWeight={600} color="#7c3aed">{fmt(aiType.commission)}</Typography>
+                </TableCell>
+                <TableCell align="right">
+                  <Typography fontSize={13} fontWeight={700} color="#00a854">{fmt(aiType.commission)}</Typography>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      {/* Monthly Breakdown */}
+      <Paper sx={{ borderRadius: 2, border: '1px solid #e2e8f0', mb: 3, overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid #f1f5f9' }}>
+          <Typography fontSize={14} fontWeight={700} color="#1e293b">Monthly Breakdown</Typography>
+        </Box>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>Month</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>Transactions</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>Revenue</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#00a854' }}>Your Profit</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>Margin %</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {monthly.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} align="center" sx={{ py: 4, color: '#94a3b8', fontSize: 13 }}>
+                    No data for selected period
+                  </TableCell>
+                </TableRow>
+              ) : (
+                monthly.map((m) => (
+                  <TableRow key={`${m.year}-${m.month}`} hover>
+                    <TableCell sx={{ fontSize: 13, fontWeight: 600 }}>{m.label}</TableCell>
+                    <TableCell align="right" sx={{ fontSize: 13, color: '#475569' }}>{m.count.toLocaleString()}</TableCell>
+                    <TableCell align="right" sx={{ fontSize: 13, fontWeight: 600 }}>₹{m.revenue.toFixed(2)}</TableCell>
+                    <TableCell align="right" sx={{ fontSize: 13, fontWeight: 700, color: '#00a854' }}>₹{m.commission.toFixed(2)}</TableCell>
+                    <TableCell align="right" sx={{ fontSize: 12, color: '#64748b' }}>
+                      {m.revenue > 0 ? ((m.commission / m.revenue) * 100).toFixed(1) : '0'}%
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      {/* Top Accounts by Profit */}
+      <Paper sx={{ borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid #f1f5f9' }}>
+          <Typography fontSize={14} fontWeight={700} color="#1e293b">Top Accounts by Profit</Typography>
+        </Box>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>#</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>Account</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#475569' }}>Txns</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#3b82f6' }}>Revenue</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#dc2626' }}>Meta Cost</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#15803d' }}>Markup</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#7c3aed' }}>Commission</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: 12, color: '#00a854' }}>Net Profit</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {byAccount.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 4, color: '#94a3b8', fontSize: 13 }}>
+                    No data for selected period
+                  </TableCell>
+                </TableRow>
+              ) : (
+                byAccount.map((a: any, idx: number) => (
+                  <TableRow key={String(a.account_id)} hover>
+                    <TableCell sx={{ fontSize: 12, color: '#94a3b8', width: 32 }}>#{idx + 1}</TableCell>
+                    <TableCell sx={{ fontSize: 13, fontWeight: 600 }}>{a.account_name}</TableCell>
+                    <TableCell align="right" sx={{ fontSize: 12, color: '#475569' }}>{a.count.toLocaleString()}</TableCell>
+                    <TableCell align="right" sx={{ fontSize: 13, fontWeight: 600, color: '#3b82f6' }}>{fmt(a.revenue)}</TableCell>
+                    <TableCell align="right" sx={{ fontSize: 13, color: '#dc2626' }}>
+                      {a.meta_cost !== null ? fmt(a.meta_cost) : <Typography component="span" fontSize={12} color="#94a3b8">—</Typography>}
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontSize: 13, fontWeight: 600, color: '#15803d' }}>
+                      {a.markup_profit !== null ? fmt(a.markup_profit) : <Typography component="span" fontSize={12} color="#94a3b8">—</Typography>}
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontSize: 13, color: '#7c3aed' }}>{fmt(a.commission)}</TableCell>
+                    <TableCell align="right" sx={{ fontSize: 13, fontWeight: 700, color: '#00a854' }}>{fmt(a.total_profit)}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+    </Box>
+  );
+};
+
+/* ─────────────────────────────────────────
    Main SuperAdmin Page
 ───────────────────────────────────────── */
 const SuperAdmin = () => {
@@ -983,6 +1465,7 @@ const SuperAdmin = () => {
           >
             <Tab label="🏢  Accounts" />
             <Tab label="✉️  Email" />
+            <Tab label="📊  Profit" />
           </Tabs>
         </Box>
 
@@ -1018,6 +1501,9 @@ const SuperAdmin = () => {
 
       {/* ── Email Panel ── */}
       {mainTab === 1 && <EmailPanel showToast={showToast} />}
+
+      {/* ── Profit Panel ── */}
+      {mainTab === 2 && <ProfitPanel showToast={showToast} />}
 
       {/* ── Table ── */}
       {mainTab === 0 && <Box sx={{ px: { xs: 2, md: 4 }, py: 3 }}>

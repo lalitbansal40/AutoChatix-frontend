@@ -28,6 +28,8 @@ interface Props {
     open: boolean;
     onClose: () => void;
     channelId: string;
+    /** Called after campaign is created — parent uses this to show progress bar */
+    onCampaignStarted?: (campaignId: string) => void;
 }
 
 const STEPS = ["Select Template", "Select Contacts"];
@@ -45,16 +47,32 @@ const GreenConnector = styled(StepConnector)(() => ({
     },
 }));
 
-const BulkFlowModal = ({ open, onClose, channelId }: Props) => {
+const BulkFlowModal = ({ open, onClose, channelId, onCampaignStarted }: Props) => {
     const [step, setStep] = useState(1);
     const [templateData, setTemplateData] = useState<any>(null);
-    const sendRef = useRef<any>(null);
+    const sendRef = useRef<(() => Promise<string | null>) | null>(null);
     const [loading, setLoading] = useState(false);
 
     const handleClose = () => {
         setStep(1);
         setTemplateData(null);
         onClose();
+    };
+
+    const handleSend = async () => {
+        if (!sendRef.current) return;
+        setLoading(true);
+        try {
+            const campaignId = await sendRef.current();
+            // Close modal immediately — campaign runs in background
+            handleClose();
+            // Notify parent so it can show the progress bar
+            if (campaignId && onCampaignStarted) {
+                onCampaignStarted(campaignId);
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -103,11 +121,7 @@ const BulkFlowModal = ({ open, onClose, channelId }: Props) => {
                 </Stack>
 
                 {/* ── STEPPER ── */}
-                <Stepper
-                    activeStep={step - 1}
-                    connector={<GreenConnector />}
-                    sx={{ pb: 0 }}
-                >
+                <Stepper activeStep={step - 1} connector={<GreenConnector />} sx={{ pb: 0 }}>
                     {STEPS.map((label, index) => (
                         <Step key={label} completed={step > index + 1}>
                             <StepLabel
@@ -142,19 +156,14 @@ const BulkFlowModal = ({ open, onClose, channelId }: Props) => {
                     ))}
                 </Stepper>
 
-                {/* Active tab underline */}
                 <Box sx={{ height: 3, bgcolor: "#fff", borderRadius: "3px 3px 0 0", width: 60, mt: 1.5, ml: step === 1 ? 0 : "calc(50% - 30px)", transition: "margin-left 0.3s" }} />
             </Box>
 
             {/* ── CONTENT ── */}
             <DialogContent
                 sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    height: "65vh",
-                    p: 3,
-                    bgcolor: "#f8fafc",
-                    overflow: "hidden",
+                    display: "flex", flexDirection: "column",
+                    height: "65vh", p: 3, bgcolor: "#f8fafc", overflow: "hidden",
                 }}
             >
                 <Box sx={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -164,7 +173,6 @@ const BulkFlowModal = ({ open, onClose, channelId }: Props) => {
                             onNext={(data) => setTemplateData(data)}
                         />
                     )}
-
                     {step === 2 && templateData && (
                         <ContactSelectionStep
                             channelId={channelId}
@@ -207,18 +215,13 @@ const BulkFlowModal = ({ open, onClose, channelId }: Props) => {
                         variant="contained"
                         disabled={loading}
                         startIcon={loading ? <CircularProgress size={15} color="inherit" /> : <SendIcon sx={{ fontSize: 16 }} />}
-                        onClick={async () => {
-                            setLoading(true);
-                            await sendRef.current?.();
-                            setLoading(false);
-                            handleClose();
-                        }}
+                        onClick={handleSend}
                         sx={{
                             borderRadius: "10px", fontWeight: 700, px: 3,
                             bgcolor: "#25D366", "&:hover": { bgcolor: "#1ebe5d" }, boxShadow: "none",
                         }}
                     >
-                        {loading ? "Sending…" : "Send Bulk"}
+                        {loading ? "Starting…" : "Send Bulk"}
                     </Button>
                 )}
             </DialogActions>

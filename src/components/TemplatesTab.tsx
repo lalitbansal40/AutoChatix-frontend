@@ -43,6 +43,7 @@ import { CreateTemplatePayload, templateService } from "service/template.service
 import { useSnackbar } from "notistack";
 import TemplateModal from "./TemplatePopup";
 import BulkFlowModal from "./BulkFlowModal";
+import CampaignProgressBar from "./CampaignProgressBar";
 
 // ── visual maps ────────────────────────────────────────────────────────────
 const STATUS_STYLE: Record<
@@ -100,6 +101,7 @@ const TemplatesTab = () => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedRow, setSelectedRow] = useState<any>(null);
     const [bulkFlowOpen, setBulkFlowOpen] = useState(false);
+    const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
 
     const [openModal, setOpenModal] = useState(false);
     const [editData, setEditData] = useState<any>(null);
@@ -649,7 +651,15 @@ const TemplatesTab = () => {
                 open={bulkFlowOpen}
                 onClose={() => setBulkFlowOpen(false)}
                 channelId={channelId!}
+                onCampaignStarted={(id) => setActiveCampaignId(id)}
             />
+
+            {activeCampaignId && (
+                <CampaignProgressBar
+                    campaignId={activeCampaignId}
+                    onDismiss={() => setActiveCampaignId(null)}
+                />
+            )}
         </Box>
     );
 };

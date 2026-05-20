@@ -6,7 +6,7 @@ class WalletService {
     return response.data.data;
   }
 
-  async getLedger(params?: { cursor?: string; type?: string; status?: string; limit?: number }) {
+  async getLedger(params?: { page?: number; type?: string; status?: string; limit?: number }) {
     const response = await axiosServices.get('/wallet/ledger', { params });
     return response.data.data;
   }
