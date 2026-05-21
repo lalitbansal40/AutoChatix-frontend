@@ -2,6 +2,16 @@ const webpack = require('webpack');
 const WorkBoxPlugin = require('workbox-webpack-plugin');
 
 module.exports = function override(config) {
+  // Stop source-map-loader from crashing on missing source maps inside node_modules
+  const sourceMapRule = config.module.rules.find(
+    (r) => r.enforce === 'pre' && Array.isArray(r.use) &&
+      r.use.some((u) => String(u.loader || u).includes('source-map-loader'))
+  );
+  if (sourceMapRule) {
+    sourceMapRule.exclude = /node_modules/;
+  }
+  config.ignoreWarnings = [...(config.ignoreWarnings || []), /Failed to parse source map/];
+
   config.resolve.fallback = {
     process: require.resolve('process/browser'),
     // zlib: require.resolve('browserify-zlib'),
