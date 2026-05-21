@@ -1,9 +1,10 @@
 import axiosServices from "utils/axios";
 
 export interface CampaignFilter {
-  type: "selected_ids" | "channel" | "all_channels";
+  type: "selected_ids" | "channel" | "all_channels" | "phone_list";
   ids?: string[];
   channel_ids?: string[];
+  phones?: string[];
 }
 
 export interface CampaignStatus {
@@ -27,6 +28,7 @@ class CampaignService {
       bodyParams: string[];
       language?: string;
       filter: CampaignFilter;
+      headerImageUrl?: string;
     }
   ): Promise<{ campaignId: string }> {
     const res = await axiosServices.post(`campaigns/${channelId}`, payload);

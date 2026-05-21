@@ -101,6 +101,7 @@ const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
     const [buttons, setButtons] = useState<any[]>([]);
     const [bodyExamples, setBodyExamples] = useState<string[]>([]);
     const [uploading, setUploading] = useState(false);
+    const [exampleUploading, setExampleUploading] = useState(false);
 
     // Core form
     const [form, setForm] = useState<{
@@ -226,6 +227,24 @@ const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
             enqueueSnackbar("Upload failed", { variant: "error" });
         } finally {
             setUploading(false);
+        }
+    };
+
+    // Upload example image to S3 and auto-fill the example URL field (dynamic mode)
+    const handleExampleFileUpload = async (file: File) => {
+        try {
+            const fd = new FormData();
+            fd.append("file", file);
+            setExampleUploading(true);
+            const res = await axiosServices.post(`/templates/upload-media/${channelId}`, fd, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            handleChange("mediaExampleUrl", res.data.url);
+            enqueueSnackbar("Example image uploaded to S3", { variant: "success" });
+        } catch {
+            enqueueSnackbar("Upload failed", { variant: "error" });
+        } finally {
+            setExampleUploading(false);
         }
     };
 
@@ -679,16 +698,41 @@ const TemplateModal = ({ open, onClose, onSubmit, initialData }: Props) => {
                                                                 sx={{ borderRadius: "10px", mb: 1.5, fontSize: 12, py: 0.5 }}
                                                                 icon={<LinkOutlinedIcon fontSize="small" />}
                                                             >
-                                                                <strong>URL at send time</strong> — when you run a campaign, you'll enter the image URL <strong>once</strong> and it's sent to all contacts. No image is stored in the template itself.
+                                                                <strong>URL at send time</strong> — when you run a campaign, you'll enter the image URL <strong>once</strong> and it's sent to all contacts. Upload an example image below for Meta's approval review.
                                                             </Alert>
+
+                                                            {/* Upload example to S3 or type URL */}
+                                                            <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
+                                                                <Button
+                                                                    variant="outlined" component="label" size="small"
+                                                                    disabled={exampleUploading}
+                                                                    startIcon={exampleUploading ? <CircularProgress size={13} /> : <UploadFileOutlinedIcon sx={{ fontSize: 15 }} />}
+                                                                    sx={{
+                                                                        borderRadius: "10px", textTransform: "none", fontSize: 12, fontWeight: 600,
+                                                                        borderColor: "#064e3b", color: "#064e3b",
+                                                                        "&:hover": { borderColor: "#065f46", bgcolor: "#f0fdf4" },
+                                                                        flexShrink: 0,
+                                                                    }}
+                                                                >
+                                                                    {exampleUploading ? "Uploading…" : "Upload Example to S3"}
+                                                                    <input
+                                                                        type="file" hidden
+                                                                        accept={form.headerType === "IMAGE" ? "image/*" : form.headerType === "VIDEO" ? "video/*" : "application/pdf"}
+                                                                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleExampleFileUpload(f); }}
+                                                                    />
+                                                                </Button>
+                                                                <Typography fontSize={11} color="#9ca3af">or paste URL below</Typography>
+                                                            </Stack>
+
                                                             <TextField
                                                                 fullWidth size="small"
                                                                 label={`Example ${form.headerType === "IMAGE" ? "Image" : form.headerType === "VIDEO" ? "Video" : "Document"} URL (for Meta approval)`}
-                                                                placeholder="https://example.com/image.jpg"
+                                                                placeholder="https://s3.amazonaws.com/bucket/example.jpg"
                                                                 value={form.mediaExampleUrl}
                                                                 onChange={(e) => handleChange("mediaExampleUrl", e.target.value)}
                                                                 sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
-                                                                helperText="Meta reviewers see this URL — it is NOT sent to contacts. Actual URL is entered when you launch a campaign."
+                                                                helperText={form.mediaExampleUrl ? "✓ Example URL set — Meta reviewers will see this image" : "Meta reviewers see this URL for approval. Actual send URL is entered at campaign launch."}
+                                                                FormHelperTextProps={{ sx: { color: form.mediaExampleUrl ? "#10b981" : undefined } }}
                                                             />
                                                         </Box>
                                                     )}

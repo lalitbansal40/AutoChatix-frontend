@@ -32,6 +32,7 @@ import { channelService } from "service/channel.service";
 import { campaignService, CampaignFilter } from "service/campaign.service";
 import { useEffect, useRef, useState } from "react";
 import { useSnackbar } from "notistack";
+import { parseFileToPhones } from "utils/fileParser";
 
 /*
   SelectionState describes HOW contacts are selected, not individual IDs.
@@ -66,8 +67,25 @@ const ContactSelectionStep = ({ channelId, templateData, onSend }: ContactSelect
 
     // ── File upload ──
     const [file, setFile] = useState<File | null>(null);
+    const [parsedPhones, setParsedPhones] = useState<string[]>([]);
+    const [parsing, setParsing] = useState(false);
     const [dragging, setDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Parse file in the browser — no upload needed
+    useEffect(() => {
+        if (!file) { setParsedPhones([]); return; }
+        setParsing(true);
+        parseFileToPhones(file)
+            .then((phones) => {
+                const unique = [...new Set(phones.filter(Boolean))];
+                setParsedPhones(unique);
+                if (!unique.length) enqueueSnackbar("No phone numbers found in file", { variant: "warning" });
+            })
+            .catch(() => enqueueSnackbar("Could not parse file", { variant: "error" }))
+            .finally(() => setParsing(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [file]);
 
     const { data: contacts = [], isLoading } = useQuery({
         queryKey: ["contacts", channelId, search],
@@ -177,7 +195,10 @@ const ContactSelectionStep = ({ channelId, templateData, onSend }: ContactSelect
 
     /* ── Build CampaignFilter from current selection state ── */
     const buildFilter = (): CampaignFilter | null => {
-        if (file) return null; // file mode handled separately (legacy path)
+        if (file) {
+            if (!parsedPhones.length) return null;
+            return { type: "phone_list", phones: parsedPhones };
+        }
         if (selection.mode === "manual") {
             if (!manualIds.length) return null;
             return { type: "selected_ids", ids: manualIds };
@@ -192,14 +213,19 @@ const ContactSelectionStep = ({ channelId, templateData, onSend }: ContactSelect
     };
 
     const hasSelection =
-        file !== null ||
+        (file !== null && parsedPhones.length > 0) ||
         (selection.mode === "manual" && manualIds.length > 0) ||
         (selection.mode !== "manual" && selection.count > 0);
 
     /* ── Send handler — returns campaignId string ── */
     const handleSend = async (): Promise<string | null> => {
         if (!hasSelection) {
-            enqueueSnackbar("Please select contacts or upload a file", { variant: "error" });
+            enqueueSnackbar(
+                file && !parsedPhones.length
+                    ? "No phone numbers found in the uploaded file"
+                    : "Please select contacts or upload a file",
+                { variant: "error" }
+            );
             return null;
         }
         if (templateData.bodyParams?.some((v: string) => !v)) {
@@ -208,51 +234,33 @@ const ContactSelectionStep = ({ channelId, templateData, onSend }: ContactSelect
         }
 
         const filter = buildFilter();
-
-        if (filter) {
-            // ── Campaign path (filter-based, background runner) ──
-            try {
-                const { campaignId } = await campaignService.create(channelId, {
-                    templateName: templateData.templateName,
-                    bodyParams: templateData.bodyParams || [],
-                    language: templateData.language,
-                    filter,
-                });
-                return campaignId;
-            } catch (err: any) {
-                enqueueSnackbar(
-                    err?.response?.data?.message || "Failed to start campaign",
-                    { variant: "error" }
-                );
-                return null;
-            }
+        if (!filter) {
+            enqueueSnackbar("No contacts selected", { variant: "error" });
+            return null;
         }
 
-        // ── File upload fallback (legacy sendBulkTemplate endpoint) ──
-        if (file) {
-            try {
-                const { templateService } = await import("service/template.service");
-                const formData = new FormData();
-                formData.append("templateName", templateData.templateName);
-                formData.append("bodyParams", JSON.stringify(templateData.bodyParams || []));
-                formData.append("file", file);
-                await templateService.sendBulkTemplate(channelId, formData);
-                enqueueSnackbar("Bulk sent successfully!", { variant: "success" });
-                return null; // no campaignId for file sends
-            } catch {
-                enqueueSnackbar("Error sending bulk", { variant: "error" });
-                return null;
-            }
+        try {
+            const { campaignId } = await campaignService.create(channelId, {
+                templateName: templateData.templateName,
+                bodyParams: templateData.bodyParams || [],
+                language: templateData.language,
+                filter,
+                headerImageUrl: templateData.headerImageUrl || undefined,
+            });
+            return campaignId;
+        } catch (err: any) {
+            enqueueSnackbar(
+                err?.response?.data?.message || "Failed to start campaign",
+                { variant: "error" }
+            );
+            return null;
         }
-
-        enqueueSnackbar("No contacts selected", { variant: "error" });
-        return null;
     };
 
     useEffect(() => {
         if (onSend) onSend.current = handleSend;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selection, manualIds, file, templateData]);
+    }, [selection, manualIds, file, parsedPhones, templateData]);
 
     /* ── Selection summary chip ── */
     const selectionLabel =
@@ -285,8 +293,14 @@ const ContactSelectionStep = ({ channelId, templateData, onSend }: ContactSelect
                         <Typography variant="body2" fontWeight={500} sx={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {file.name}
                         </Typography>
-                        <Chip label={`${(file.size / 1024).toFixed(1)} KB`} size="small" color="success" variant="outlined" />
-                        <IconButton size="small" onClick={() => setFile(null)} sx={{ color: "error.main" }}>
+                        {parsing ? (
+                            <CircularProgress size={16} />
+                        ) : parsedPhones.length > 0 ? (
+                            <Chip label={`${parsedPhones.length} contacts`} size="small" color="success" />
+                        ) : (
+                            <Chip label="No phones found" size="small" color="warning" variant="outlined" />
+                        )}
+                        <IconButton size="small" onClick={() => { setFile(null); setParsedPhones([]); }} sx={{ color: "error.main" }}>
                             <CloseCircleOutlined />
                         </IconButton>
                     </Stack>
